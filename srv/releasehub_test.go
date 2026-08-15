@@ -82,8 +82,8 @@ func TestUploadAndManifestFlow(t *testing.T) {
 		"INSERT INTO api_tokens (name, token_hash) VALUES ('test', ?)", hashToken(tok)); err != nil {
 		t.Fatalf("seed token: %v", err)
 	}
-	// Create app
-	req, _ := http.NewRequest("POST", ts.URL+"/api/apps", bytes.NewBufferString("slug=demo&packageName=io.demo&platform=android"))
+	// Create app (slug only), then add the android platform
+	req, _ := http.NewRequest("POST", ts.URL+"/api/apps", bytes.NewBufferString("slug=demo"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "Bearer "+tok)
 	resp, err := client.Do(req)
@@ -93,6 +93,17 @@ func TestUploadAndManifestFlow(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != 201 {
 		t.Fatalf("create app: %d", resp.StatusCode)
+	}
+	req, _ = http.NewRequest("POST", ts.URL+"/api/apps/demo/platforms", bytes.NewBufferString("platform=android&packageName=io.demo"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 201 {
+		t.Fatalf("add platform: %d", resp.StatusCode)
 	}
 
 	// Upload a fake artifact
@@ -179,8 +190,8 @@ func TestAppPlatforms(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create app (defaults to android, gets a signing key)
-	form := url.Values{"slug": {"multiapp"}, "packageName": {"io.multi"}, "platform": {"android"}}
+	// Create app: slug only (product shell)
+	form := url.Values{"slug": {"multiapp"}}
 	req, _ := http.NewRequest("POST", ts.URL+"/api/apps", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "Bearer "+tok)
@@ -191,8 +202,22 @@ func TestAppPlatforms(t *testing.T) {
 	body := new(bytes.Buffer)
 	body.ReadFrom(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != 201 || !strings.Contains(body.String(), `"signingKey":"generated"`) {
+	if resp.StatusCode != 201 {
 		t.Fatalf("create app: %d %s", resp.StatusCode, body.String())
+	}
+
+	// Add the android platform (gets a generated signing key)
+	form = url.Values{"platform": {"android"}, "packageName": {"io.multi"}}
+	req, _ = http.NewRequest("POST", ts.URL+"/api/apps/multiapp/platforms", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body.Reset(); body.ReadFrom(resp.Body); resp.Body.Close()
+	if resp.StatusCode != 201 || !strings.Contains(body.String(), `"signingKey":"generated"`) {
+		t.Fatalf("add android platform: %d %s", resp.StatusCode, body.String())
 	}
 
 	// Add the ios platform to the same slug

@@ -27,12 +27,13 @@ update-manifest API so coding environments only talk to one endpoint.
 
 An app is a product (one slug); each platform variant — android, ios — has
 its own package/bundle name, signing key, Play credentials, releases and
-version codes. `POST /api/apps` creates the product plus its first platform;
-`POST /api/apps/{slug}/platforms` adds the others (e.g. the ios version of
-an app that already ships on android).
+version codes. `POST /api/apps` registers the product (slug only);
+`POST /api/apps/{slug}/platforms` adds each platform (e.g. android now, ios
+when it ships). In the UI, registering asks for the slug alone — platforms
+are added from the app's own page.
 
 ```
-POST /api/apps                              form: slug, packageName, platform
+POST /api/apps                              form: slug
 GET  /api/apps                              → [{slug, platforms:[{platform, packageName}]}]
 POST /api/apps/{slug}/platforms             form: platform, packageName
 POST /api/apps/{slug}/releases              multipart: file, channel, versionCode?,
@@ -89,16 +90,18 @@ App signing keys live in the hub — encrypted like Play credentials
 produce signed releases, and the key survives a lost laptop. One keystore
 per app; never share across apps.
 
-**Auto-generated at app creation.** Registering an Android app
-(`POST /api/apps`) generates a fresh RSA-2048 keystore (30-year self-signed
-cert, random high-entropy password, alias `release`) and stores it encrypted —
-no keytool, no upload, no thinking about keys:
+**Auto-generated at platform creation.** Adding the android platform to an
+app (`POST /api/apps/{slug}/platforms`) generates a fresh RSA-2048 keystore
+(30-year self-signed cert, random high-entropy password, alias `release`)
+and stores it encrypted — no keytool, no upload, no thinking about keys:
 
 ```bash
-curl -H "Authorization: Bearer $HUB_TOKEN" \
-     -F slug=myapp -F packageName=io.example.myapp \
+curl -H "Authorization: Bearer $HUB_TOKEN" -F slug=myapp \
      https://hub.example.com/api/apps
-# → {"slug":"myapp","signingKey":"generated","signingSha256":"26a4…"}
+curl -H "Authorization: Bearer $HUB_TOKEN" \
+     -F platform=android -F packageName=io.example.myapp \
+     https://hub.example.com/api/apps/myapp/platforms
+# → {"slug":"myapp","platform":"android","signingKey":"generated","signingSha256":"26a4…"}
 ```
 
 The generated key never rotates (rotation breaks installed-base update

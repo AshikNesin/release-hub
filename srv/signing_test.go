@@ -99,7 +99,7 @@ func TestCreateAppGeneratesSigning(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	form := url.Values{"slug": {"genapp"}, "packageName": {"io.genapp"}, "platform": {"android"}}
+	form := url.Values{"slug": {"genapp"}}
 	req, _ := http.NewRequest("POST", ts.URL+"/api/apps", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "Bearer "+tok)
@@ -113,8 +113,17 @@ func TestCreateAppGeneratesSigning(t *testing.T) {
 	if resp.StatusCode != 201 {
 		t.Fatalf("create app: %d body=%s", resp.StatusCode, body.String())
 	}
-	if !strings.Contains(body.String(), `"signingKey":"generated"`) {
-		t.Fatalf("expected signingKey=generated in response, got: %s", body.String())
+	form = url.Values{"platform": {"android"}, "packageName": {"io.genapp"}}
+	req, _ = http.NewRequest("POST", ts.URL+"/api/apps/genapp/platforms", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body.Reset(); body.ReadFrom(resp.Body); resp.Body.Close()
+	if resp.StatusCode != 201 || !strings.Contains(body.String(), `"signingKey":"generated"`) {
+		t.Fatalf("add android platform: %d body=%s", resp.StatusCode, body.String())
 	}
 
 	// Fetch the keystore + password headers and validate the PKCS#12 parses.

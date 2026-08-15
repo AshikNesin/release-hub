@@ -98,62 +98,23 @@ func (s *Server) handleApiListApps(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
-// handleApiCreateApp POST /api/apps  (form: slug, packageName, platform)
+// handleApiCreateApp POST /api/apps  (form: slug)
 //
-// Creates the app (product) plus its first platform variant. Later platforms
-// are added with POST /api/apps/{slug}/platforms, so one slug covers both
-// the android and ios versions of the same product.
+// Registers the product shell — slug only. Platforms (which carry the
+// package name, signing key, releases) are added with
+// POST /api/apps/{slug}/platforms, so one slug covers both the android and
+// ios versions of the same product.
 func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 	slug := strings.ToLower(strings.TrimSpace(r.FormValue("slug")))
-	pkg := strings.TrimSpace(r.FormValue("packageName"))
-	platform := strings.TrimSpace(r.FormValue("platform"))
-	if platform == "" {
-		platform = "android"
-	}
 	if !slugRe.MatchString(slug) {
 		writeErr(w, 400, "invalid slug: lowercase letters, digits and dashes")
 		return
 	}
-	if pkg == "" {
-		writeErr(w, 400, "packageName required")
-		return
-	}
-	if platform != "android" && platform != "ios" {
-		writeErr(w, 400, "platform must be android or ios")
-		return
-	}
-	q := dbgen.New(s.DB)
-	res, err := q.CreateApp(r.Context(), slug)
-	if err != nil {
+	if _, err := dbgen.New(s.DB).CreateApp(r.Context(), slug); err != nil {
 		writeErr(w, 409, "app already exists or invalid: "+err.Error())
 		return
 	}
-	appID, _ := res.LastInsertId()
-	out := map[string]string{"slug": slug, "platform": platform}
-	// Android platforms: auto-generate a dedicated signing keystore so the app
-	// is deploy-ready immediately — no manual keytool/upload step. The key is
-	// generated once and never rotates (rotation would break installed-base
-	// update signature continuity); uploading a keystore via /signing still
-	// overrides it for apps with an existing key history.
-	if platform == "android" {
-		platID, err := s.addPlatform(r.Context(), appID, platform, pkg)
-		if err != nil {
-			writeErr(w, 500, "add platform: "+err.Error())
-			return
-		}
-		sum, gerr := s.generateAndStoreSigning(r.Context(), platID, slug)
-		if gerr != nil {
-			slog.Error("auto-signing failed", "slug", slug, "err", gerr)
-			writeJSON(w, 201, out) // app exists; key can be uploaded later
-			return
-		}
-		out["signingKey"] = "generated"
-		out["signingSha256"] = sum
-	} else if _, err := s.addPlatform(r.Context(), appID, platform, pkg); err != nil {
-		writeErr(w, 500, "add platform: "+err.Error())
-		return
-	}
-	writeJSON(w, 201, out)
+	writeJSON(w, 201, map[string]string{"slug": slug})
 }
 
 // handleApiAddPlatform POST /api/apps/{slug}/platforms

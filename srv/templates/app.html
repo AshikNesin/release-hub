@@ -3,6 +3,11 @@
 <h2 style="font-size:15px;margin:0 0 4px">{{.App.Slug}}</h2>
 <p class="muted" style="margin:0 0 16px">product identity — one slug, one or more platforms</p>
 
+{{if not .Platforms}}
+<div class="card">
+  <p class="muted" style="margin:0 0 4px">No platforms yet — add the android or ios variant of this app below.</p>
+</div>
+{{end}}
 {{range .Platforms}}
 <div class="card">
   <h3 style="font-size:13px;margin:0 0 8px">

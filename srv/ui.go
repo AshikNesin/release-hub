@@ -149,39 +149,23 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}{uiData{Title: "Apps", Authenticated: true}, rows, tokens})
 }
 
+// handleCreateAppUI registers the product shell: slug only. Platforms are
+// added from the app's own page ("Add platform" form / API), keeping the
+// register action a single field.
 func (s *Server) handleCreateAppUI(w http.ResponseWriter, r *http.Request) {
 	slug := strings.ToLower(strings.TrimSpace(r.FormValue("slug")))
 	if !slugRe.MatchString(slug) {
 		http.Error(w, "invalid slug", 400)
 		return
 	}
-	platform := r.FormValue("platform")
-	if platform != "android" && platform != "ios" {
-		platform = "android"
-	}
-	pkg := strings.TrimSpace(r.FormValue("packageName"))
-	if pkg == "" {
-		http.Error(w, "packageName required", 400)
-		return
-	}
-	res, err := dbgen.New(s.DB).CreateApp(r.Context(), slug)
-	if err != nil {
+	if _, err := dbgen.New(s.DB).CreateApp(r.Context(), slug); err != nil {
 		http.Error(w, "create failed: "+err.Error(), 409)
 		return
 	}
-	appID, _ := res.LastInsertId()
-	platID, err := s.addPlatform(r.Context(), appID, platform, pkg)
-	if err != nil {
-		http.Error(w, "add platform failed: "+err.Error(), 500)
-		return
-	}
-	// Same auto-signing behavior as the API: android platforms get a
-	// generated keystore using the configured certificate subject (Settings).
-	if platform == "android" {
-		if _, err := s.generateAndStoreSigning(r.Context(), platID, slug); err != nil {
-			slog.Error("auto-signing failed (UI)", "slug", slug, "err", err)
-		}
-	}
+	http.SetCookie(w, &http.Cookie{
+		Name: "rh_flash", Value: "App registered. Add its android/ios platform next.",
+		Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 30,
+	})
 	http.Redirect(w, r, "/apps/"+slug, http.StatusSeeOther)
 }
 
