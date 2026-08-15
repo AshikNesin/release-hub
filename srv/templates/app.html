@@ -54,7 +54,7 @@
       {{if not .HasAndroid}}<option>android</option>{{end}}
       <option>ios</option>
     </select></div>
-    <div><label>Package / bundle name</label><input name="packageName" value="{{.SuggestedPkg}}" placeholder="io.example.app" required list="commonpkgs"></div>
+    <div><label>Package / bundle name</label><input name="packageName" value="{{.SuggestedPkg}}" placeholder="com.example.appname" required list="commonpkgs"></div>
     <button type="submit" class="btn primary">Add platform</button>
   </form>
   <p class="hint">Prefilled from the bundle prefix in Settings (prefix + slug). Android platforms get an auto-generated signing keystore immediately.</p>
