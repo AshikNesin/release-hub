@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -262,6 +263,8 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		Releases               []relRow
 		ManifestURL, UploadURL string
 		HasSigningKey          bool
+		SignSha256             string // keystore fingerprint (not secret)
+		SignAlias              string // key alias (not secret)
 	}
 	sections := make([]platSection, 0, len(plats))
 	for _, p := range plats {
@@ -280,19 +283,35 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 				CreatedAt:   rel.CreatedAt,
 			})
 		}
+		// Non-confidential signing info: keystore fingerprint + key alias.
+		// Passwords stay encrypted and are only released via the API to
+		// authenticated CI.
+		alias := ""
+		if p.SignConfig != "" {
+			if cfgJSON, derr := decryptCreds(p.SignConfig); derr == nil {
+				var cfg struct {
+					KeyAlias string `json:"keyAlias"`
+				}
+				if json.Unmarshal(cfgJSON, &cfg) == nil {
+					alias = cfg.KeyAlias
+				}
+			}
+		}
 		sections = append(sections, platSection{
 			Platform: p.Platform, PackageName: p.PackageName, Releases: rows,
 			ManifestURL:   s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
 			UploadURL:     s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
 			HasSigningKey: p.SignSha256 != "",
+			SignSha256:    p.SignSha256,
+			SignAlias:     alias,
 		})
 	}
 	s.render(w, 200, "app.html", struct {
 		uiData
-		App            dbgen.App
-		Platforms      []platSection
-		SuggestedPkg   string // prefill for Add-platform: bundle_prefix + slug
-		HasAndroid     bool   // hide android from the picker when it exists
+		App          dbgen.App
+		Platforms    []platSection
+		SuggestedPkg string // prefill for Add-platform: bundle_prefix + slug
+		HasAndroid   bool   // hide android from the picker when it exists
 	}{
 		uiData{Title: app.Slug, Authenticated: true, AssetVersion: assetVersion},
 		app, sections,

@@ -16,8 +16,15 @@
   <div class="plathead">
     <span class="chip">{{.Platform}}</span>
     <span class="pkg mono">{{.PackageName}}</span>
-    {{if .HasSigningKey}}<span class="keystored"><i></i>key stored</span>{{end}}
+    {{if .HasSigningKey}}<span class="keystored"><i></i>signing key stored</span>{{end}}
   </div>
+  {{if .HasSigningKey}}
+  <div class="signinfo">
+    <span class="mlabel">keystore</span>
+    <code>{{printf "%.16s" .SignSha256}}…</code>
+    {{if .SignAlias}}<span class="mlabel">alias</span><code>{{.SignAlias}}</code>{{end}}
+  </div>
+  {{end}}
   <div class="manifest">
     <span class="mlabel">manifest</span>
     <code>{{.ManifestURL}}</code>
