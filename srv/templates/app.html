@@ -1,0 +1,29 @@
+{{template "base.html" .}}
+{{define "content"}}
+<h2 style="font-size:15px;margin:0 0 4px">{{.App.Slug}} <span class="badge">{{.App.Platform}}</span></h2>
+<p class="muted" style="margin:0 0 16px">{{.App.PackageName}}</p>
+
+<div class="card">
+  <p class="muted" style="margin:0 0 8px">Update manifest (point the app's UPDATE_URL here):</p>
+  <code>{{.ManifestURL}}</code>
+</div>
+
+<div class="card">
+  <table>
+    <tr><th>Version</th><th>Channel</th><th>Size</th><th>Notes</th><th>Uploaded</th><th></th></tr>
+    {{range .Releases}}
+    <tr>
+      <td>{{.VersionName}} <span class="muted">({{.VersionCode}})</span></td>
+      <td><span class="badge {{.Channel}}">{{.Channel}}</span></td>
+      <td class="muted">{{printf "%.1f" .SizeMB}} MB</td>
+      <td class="muted">{{.Notes}}</td>
+      <td class="muted">{{.CreatedAt.Format "Jan 2 15:04"}}</td>
+      <td><a href="{{.URL}}">download</a></td>
+    </tr>
+    {{else}}
+    <tr><td colspan="6" class="muted">No releases yet. Upload via:</td></tr>
+    <tr><td colspan="6"><code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=api-share {{.UploadURL}}</code></td></tr>
+    {{end}}
+  </table>
+</div>
+{{end}}

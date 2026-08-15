@@ -1,0 +1,18 @@
+[Unit]
+Description=release-hub — app release distribution hub
+After=network.target
+
+[Service]
+Type=simple
+User=exedev
+Group=exedev
+WorkingDirectory=/home/exedev/release-hub
+ExecStart=/home/exedev/release-hub/srv/srv -listen :9100 -db /home/exedev/release-hub/db.sqlite3 -artifacts /home/exedev/release-hub/artifacts -base-url https://canele-hydrofoil.exe.xyz:9100
+Restart=always
+RestartSec=5
+Environment=HOME=/home/exedev
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

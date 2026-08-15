@@ -8,10 +8,50 @@ import (
 	"time"
 )
 
+type ApiToken struct {
+	ID         int64      `json:"id"`
+	Name       string     `json:"name"`
+	TokenHash  string     `json:"token_hash"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+}
+
+type App struct {
+	ID          int64     `json:"id"`
+	Slug        string    `json:"slug"`
+	PackageName string    `json:"package_name"`
+	Platform    string    `json:"platform"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Config struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type Migration struct {
 	MigrationNumber int64     `json:"migration_number"`
 	MigrationName   string    `json:"migration_name"`
 	ExecutedAt      time.Time `json:"executed_at"`
+}
+
+type Release struct {
+	ID          int64     `json:"id"`
+	AppID       int64     `json:"app_id"`
+	VersionCode int64     `json:"version_code"`
+	VersionName string    `json:"version_name"`
+	Channel     string    `json:"channel"`
+	Notes       string    `json:"notes"`
+	Sha256      string    `json:"sha256"`
+	SizeBytes   int64     `json:"size_bytes"`
+	FileName    string    `json:"file_name"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Session struct {
+	TokenHash string    `json:"token_hash"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type Visitor struct {

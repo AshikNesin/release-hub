@@ -1,0 +1,14 @@
+{{template "base.html" .}}
+{{define "content"}}
+<div class="card" style="max-width:400px;margin:64px auto">
+  <h2 style="margin-top:0;font-size:16px">Welcome — set an admin password</h2>
+  <form method="post" action="/setup">
+    <label for="password">Password (min 8 chars)</label>
+    <input type="password" id="password" name="password" style="width:100%" required>
+    <label for="password2" style="margin-top:10px">Repeat</label>
+    <input type="password" id="password2" name="password2" style="width:100%" required>
+    <div class="err">{{.Error}}</div>
+    <button type="submit" style="width:100%;margin-top:12px">Save & sign in</button>
+  </form>
+</div>
+{{end}}

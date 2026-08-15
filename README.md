@@ -1,57 +1,54 @@
-# Go Shelley Template
+# release-hub
 
-This is a starter template for building Go web applications on exe.dev. It demonstrates end-to-end usage including HTTP handlers, authentication, database integration, and deployment.
+Self-hosted release distribution hub for personal Android (later iOS) apps.
+Single Go binary + SQLite. Owns versioning, artifact storage, channels and the
+update-manifest API so coding environments only talk to one endpoint.
 
-Use this as a foundation to build your own service.
+## Channels
 
-## Building and Running
+- `public` — production releases (future: Play/App Store promotion)
+- `internal` — testing tracks
+- `api-share` — direct APK distribution + update manifest for in-app updaters
+  (wire-compatible with Tiny Firewall's `AppUpdater` / `UPDATE_URL`)
 
-Build with `make build`, then run `./srv/srv`. (Because `srv` is a directory, `go build -o srv` places the binary inside it, at `srv/srv`.) The server listens on port 8000 by default.
+## Auth
 
-## Running as a systemd service
+- **UI**: single admin password, set on first visit (`/setup`), session cookie (30d).
+- **API**: `Authorization: Bearer rh_...` tokens, created in the UI (shown once)
+  or via `POST /api/tokens`. Stored as SHA-256 hashes.
+- **Public, no auth** (devices need them): `GET /api/apps/{slug}/manifest`,
+  `GET /artifacts/...`, `GET /health`.
+- When self-hosting outside exe.dev, run behind TLS (e.g. Caddy/nginx) — the
+  session cookie and bearer tokens must not cross the network in cleartext.
 
-To run the server as a systemd service:
+## API
 
-```bash
-# Install the service file
-sudo cp srv.service /etc/systemd/system/srv.service
-
-# Reload systemd and enable the service
-sudo systemctl daemon-reload
-sudo systemctl enable srv.service
-
-# Start the service
-sudo systemctl start srv
-
-# Check status
-systemctl status srv
-
-# View logs
-journalctl -u srv -f
+```
+POST /api/apps                     form: slug, packageName, platform
+GET  /api/apps
+POST /api/apps/{slug}/releases     multipart: file, channel, versionCode?,
+                                   versionName?, notes  (versionCode must
+                                   increase; default max+1)
+GET  /api/apps/{slug}/releases
+POST /api/tokens                   form: name → token shown once
+GET  /api/apps/{slug}/manifest?channel=api-share   (public)
+GET  /artifacts/{slug}/{file}                       (public)
 ```
 
-To restart after code changes:
+Upload example:
 
 ```bash
-make build
-sudo systemctl restart srv
+curl -H "Authorization: Bearer $HUB_TOKEN" \
+     -F file=app-release.apk -F channel=api-share \
+     -F versionCode=142 -F versionName=1.15 \
+     https://hub.example.com/api/apps/tinyfirewall/releases
 ```
 
-## Authorization
+## Dev
 
-exe.dev provides authorization headers and login/logout links
-that this template uses.
+```
+make build && make test
+./srv/srv -listen :9100 -db db.sqlite3 -artifacts artifacts -base-url https://...
+```
 
-When proxied through exed, requests will include `X-ExeDev-UserID` and
-`X-ExeDev-Email` if the user is authenticated via exe.dev.
-
-## Database
-
-This template uses sqlite (`db.sqlite3`). SQL queries are managed with sqlc.
-
-## Code layout
-
-- `cmd/srv`: main package (binary entrypoint)
-- `srv`: HTTP server logic (handlers)
-- `srv/templates`: Go HTML templates
-- `db`: SQLite open + migrations (001-base.sql)
+systemd: `release-hub.service` (port 9100).
