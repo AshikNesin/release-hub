@@ -149,9 +149,12 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 		return "", err
 	}
 	defer f.Close()
+	// Explicit media type: without it the type is sniffed from the temp
+	// file (application/zip for .aab), which Play rejects with
+	// "Media type 'application/zip' is not supported".
 	bundle, err := p.svc.Edits.Bundles.
 		Upload(p.pkgName, appEdit.Id).
-		Media(f).
+		Media(f, googleapi.ContentType("application/octet-stream")).
 		Context(ctx).
 		Do()
 	if err != nil {
