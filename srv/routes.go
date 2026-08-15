@@ -14,8 +14,11 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /login", s.handleLogin)
 	mux.HandleFunc("GET /logout", s.handleLogout)
 	mux.HandleFunc("GET /{$}", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/apps", http.StatusSeeOther)
+	}))
+	mux.HandleFunc("GET /apps", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(withFlash(r, flash(r)))
-		s.handleHome(w, r)
+		s.handleAppsPage(w, r)
 	}))
 	mux.HandleFunc("POST /apps", s.requireUI(s.handleCreateAppUI))
 	mux.HandleFunc("POST /apps/{slug}/platforms", s.requireUI(s.handleAddPlatformUI))

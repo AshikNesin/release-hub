@@ -47,7 +47,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "session error", 500)
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/apps", http.StatusSeeOther)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +103,7 @@ func (s *Server) handleFirstRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.setSession(w, r)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/apps", http.StatusSeeOther)
 }
 
 func (s *Server) hasPassword() (bool, error) {
@@ -117,7 +117,9 @@ func (s *Server) hasPassword() (bool, error) {
 
 // ---- dashboard ----
 
-func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
+// handleAppsPage GET /apps — the app list (one row per platform variant;
+// platform-less shells listed too, with a nudge to add one).
+func (s *Server) handleAppsPage(w http.ResponseWriter, r *http.Request) {
 	q := dbgen.New(s.DB)
 	apps, err := q.ListApps(r.Context())
 	if err != nil {
@@ -126,6 +128,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	}
 	type appRow struct {
 		Slug, PackageName, Platform, Latest string
+		HasPlatforms                        bool
 	}
 	rows := make([]appRow, 0)
 	for _, a := range apps {
@@ -134,12 +137,18 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "db error", 500)
 			return
 		}
+		if len(plats) == 0 {
+			// Registered shell with no platform variant yet — still list it
+			// (it owns the slug), with a nudge to open its page.
+			rows = append(rows, appRow{Slug: a.Slug})
+			continue
+		}
 		for _, p := range plats {
 			latest := "—"
 			if rels, err := q.LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{AppPlatformID: p.ID, Channel: "direct"}); err == nil && len(rels) > 0 {
 				latest = fmt.Sprintf("%s (%d)", rels[0].VersionName, rels[0].VersionCode)
 			}
-			rows = append(rows, appRow{a.Slug, p.PackageName, p.Platform, latest})
+			rows = append(rows, appRow{a.Slug, p.PackageName, p.Platform, latest, true})
 		}
 	}
 	s.render(w, 200, "apps.html", struct {
@@ -158,6 +167,10 @@ func (s *Server) handleCreateAppUI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := dbgen.New(s.DB).CreateApp(r.Context(), slug); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			http.Error(w, "an app with this slug already exists — open its page: /apps/"+slug, 409)
+			return
+		}
 		http.Error(w, "create failed: "+err.Error(), 409)
 		return
 	}

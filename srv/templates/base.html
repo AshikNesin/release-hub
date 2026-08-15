@@ -10,7 +10,7 @@
 <header class="topnav">
   <a class="brand" href="/">release-hub</a>
   {{if .Authenticated}}<nav class="links">
-    <a href="/" class="{{if eq .Title "Apps"}}active{{end}}">Apps</a>
+    <a href="/apps" class="{{if eq .Title "Apps"}}active{{end}}">Apps</a>
     <a href="/settings" class="{{if eq .Title "Settings"}}active{{end}}">Settings</a>
     <a href="/logout">Log out</a>
   </nav>{{end}}

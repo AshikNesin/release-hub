@@ -11,9 +11,13 @@
   {{range .Apps}}
   <tr>
     <td><a href="/apps/{{.Slug}}">{{.Slug}}</a></td>
+    {{if .HasPlatforms}}
     <td class="mono" style="font-size:12.5px;color:var(--fg2)">{{.PackageName}}</td>
     <td><span class="chip">{{.Platform}}</span></td>
-    <td class="muted num">{{.Latest}}</td>
+    <td class="num" style="color:var(--fg2)">{{.Latest}}</td>
+    {{else}}
+    <td colspan="3" style="color:var(--fg2)">no platform yet — <a href="/apps/{{.Slug}}">add one</a></td>
+    {{end}}
   </tr>
   {{else}}
   <tr><td colspan="4" style="color:var(--fg2)">No apps yet.</td></tr>
