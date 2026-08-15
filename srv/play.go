@@ -96,6 +96,12 @@ func classifyPlayError(err error) error {
 	case 401:
 		return fmt.Errorf("%s — the service-account JSON key is wrong or revoked; upload a fresh key in Settings", gerr.Message)
 	case 403:
+		// The API-disabled case has its own precise remedy (the enable URL);
+		// don't bury it under the generic no-access hints.
+		if strings.Contains(gerr.Message, "has not been used in project") ||
+			strings.Contains(gerr.Message, "it is disabled") {
+			return fmt.Errorf("%s — open the URL in this message and click Enable, wait a few minutes, then test again. (This is the Google Play Android Developer API switch in the service account's Cloud project; normally the Play Console → Setup → API access link enables it automatically.)", gerr.Message)
+		}
 		return fmt.Errorf("%s — no access to this package. Causes in order of likelihood: (1) app not created in Play yet (the API cannot create apps), (2) service account not invited in Play Console → Users & permissions → Invite new users with 'Create and manage releases', (3) API access not linked in Play Console → Setup → API access. Note: a newly invited service account or fresh API link can take up to 24h (usually minutes) to take effect.", gerr.Message)
 	case 404:
 		return fmt.Errorf("%s — no app with this package exists in Play yet; create it in Play Console first (the API cannot create apps)", gerr.Message)
