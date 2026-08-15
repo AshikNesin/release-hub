@@ -5,16 +5,39 @@ package srv
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 //go:embed templates/*.html
 var embeddedTemplatesFS embed.FS
+
+// assetVersion fingerprints the embedded static assets so URLs change with
+// every build. Behind CDN caches (Cloudflare & co.) this guarantees a new
+// binary can never serve stale CSS/JS: the new HTML references new URLs.
+var assetVersion = func() string {
+	h := sha256.New()
+	fs.WalkDir(embeddedStaticFS, "static", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := embeddedStaticFS.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		h.Write([]byte(p))
+		h.Write(b)
+		return nil
+	})
+	return fmt.Sprintf("%x", h.Sum(nil))[:10]
+}()
 
 //go:embed static
 var embeddedStaticFS embed.FS
@@ -23,28 +46,48 @@ var embeddedStaticFS embed.FS
 // them means a new binary).
 func staticHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /static/style.css", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		b, _ := embeddedStaticFS.ReadFile("static/style.css")
+	// Versioned, content-hashed asset URLs: immutable + cached hard by any CDN.
+	mux.HandleFunc("GET /static/{v}/{file}", func(w http.ResponseWriter, r *http.Request) {
+		if r.PathValue("v") != assetVersion {
+			http.NotFound(w, r)
+			return
+		}
+		file := "static/" + filepath.Base(r.PathValue("file"))
+		b, err := embeddedStaticFS.ReadFile(file)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		switch {
+		case strings.HasSuffix(file, ".css"):
+			w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		case strings.HasSuffix(file, ".js"):
+			w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		case strings.HasSuffix(file, ".woff2"):
+			w.Header().Set("Content-Type", "font/woff2")
+		}
 		w.Write(b)
 	})
-	mux.HandleFunc("GET /static/app.js", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-		b, _ := embeddedStaticFS.ReadFile("static/app.js")
+	// Unversioned fallback for anything still holding an old URL (CDN edge
+	// caches may keep serving it for hours): serve current assets, no-cache.
+	mux.HandleFunc("GET /static/", func(w http.ResponseWriter, r *http.Request) {
+		file := "static/" + filepath.Base(r.URL.Path)
+		b, err := embeddedStaticFS.ReadFile(file)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
+		switch {
+		case strings.HasSuffix(file, ".css"):
+			w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		case strings.HasSuffix(file, ".js"):
+			w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		case strings.HasSuffix(file, ".woff2"):
+			w.Header().Set("Content-Type", "font/woff2")
+		}
 		w.Write(b)
-	})
-	mux.HandleFunc("GET /static/Inter-Regular.woff2", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "font/woff2")
-		b, _ := embeddedStaticFS.ReadFile("static/Inter-Regular.woff2")
-		w.Write(b)
-	})
-	mux.HandleFunc("GET /static/Inter-Bold.woff2", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "font/woff2")
-		b, _ := embeddedStaticFS.ReadFile("static/Inter-Bold.woff2")
-		w.Write(b)
-	})
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.NotFound(w, r)
 	})
 	return mux
 }

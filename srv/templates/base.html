@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} · release-hub</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/{{.AssetVersion}}/style.css">
 </head>
 <body>
 <header class="topnav">
@@ -19,6 +19,6 @@
   {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
   {{block "content" .}}{{end}}
 </main>
-<script src="/static/app.js"></script>
+<script src="/static/{{.AssetVersion}}/app.js"></script>
 </body>
 </html>

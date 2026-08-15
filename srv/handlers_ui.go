@@ -22,6 +22,7 @@ type uiData struct {
 	Title         string
 	Authenticated bool
 	Flash         string
+	AssetVersion  string // fingerprints embedded CSS/JS for cache-busting URLs
 }
 
 // ---- auth pages ----
@@ -31,7 +32,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.render(w, 200, "login.html", struct {
 			uiData
 			Error string
-		}{uiData{Title: "Sign in"}, ""})
+		}{uiData{Title: "Sign in", AssetVersion: assetVersion}, ""})
 		return
 	}
 	password := r.FormValue("password")
@@ -39,7 +40,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.render(w, 401, "login.html", struct {
 			uiData
 			Error string
-		}{uiData{Title: "Sign in"}, "Wrong password"})
+		}{uiData{Title: "Sign in", AssetVersion: assetVersion}, "Wrong password"})
 		return
 	}
 	if err := s.setSession(w, r); err != nil {
@@ -70,7 +71,7 @@ func (s *Server) handleFirstRun(w http.ResponseWriter, r *http.Request) {
 		s.render(w, 200, "firstrun.html", struct {
 			uiData
 			Error string
-		}{uiData{Title: "Setup"}, ""})
+		}{uiData{Title: "Setup", AssetVersion: assetVersion}, ""})
 		return
 	}
 	pw, pw2 := r.FormValue("password"), r.FormValue("password2")
@@ -78,14 +79,14 @@ func (s *Server) handleFirstRun(w http.ResponseWriter, r *http.Request) {
 		s.render(w, 400, "firstrun.html", struct {
 			uiData
 			Error string
-		}{uiData{Title: "Setup"}, "Password must be at least 8 characters"})
+		}{uiData{Title: "Setup", AssetVersion: assetVersion}, "Password must be at least 8 characters"})
 		return
 	}
 	if pw != pw2 {
 		s.render(w, 400, "firstrun.html", struct {
 			uiData
 			Error string
-		}{uiData{Title: "Setup"}, "Passwords don't match"})
+		}{uiData{Title: "Setup", AssetVersion: assetVersion}, "Passwords don't match"})
 		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
@@ -98,7 +99,7 @@ func (s *Server) handleFirstRun(w http.ResponseWriter, r *http.Request) {
 		s.render(w, 500, "firstrun.html", struct {
 			uiData
 			Error string
-		}{uiData{Title: "Setup"}, "Failed to save: " + err.Error()})
+		}{uiData{Title: "Setup", AssetVersion: assetVersion}, "Failed to save: " + err.Error()})
 		return
 	}
 	_ = s.setSession(w, r)
@@ -146,7 +147,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 		uiData
 		Apps   []appRow
 		Tokens []dbgen.ApiToken
-	}{uiData{Title: "Apps", Authenticated: true}, rows, tokens})
+	}{uiData{Title: "Apps", Authenticated: true, AssetVersion: assetVersion}, rows, tokens})
 }
 
 // handleCreateAppUI registers the product shell: slug only. Platforms are
@@ -280,7 +281,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		App       dbgen.App
 		Platforms []platSection
 	}{
-		uiData{Title: app.Slug, Authenticated: true},
+		uiData{Title: app.Slug, Authenticated: true, AssetVersion: assetVersion},
 		app, sections,
 	})
 }
@@ -336,5 +337,5 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	s.render(w, 200, "settings.html", struct {
 		uiData
 		Fields []field
-	}{uiData{Title: "Settings", Authenticated: true}, fields})
+	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion}, fields})
 }
