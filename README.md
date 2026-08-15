@@ -146,11 +146,17 @@ stored in the DB, encrypted at rest (AES-256-GCM, key from the
 - `channel=internal` → Play **internal testing** track
 - `channel=direct` (or any `.apk`) → hub only, Play untouched
 
+**Full walkthrough** — Play Console setup, service account + JSON key,
+granting release access, enabling per app (UI **or** API), testers, and
+troubleshooting: see [`docs/play-internal-testing.md`](docs/play-internal-testing.md).
+
 The release itself is recorded even if Play publishing fails — the API
 response includes `playRelease` or `playError` so CI can decide whether
 to fail.
 
-Setup (per app, one API call — no server filesystem access needed):
+Setup (per app, one API call or the app page's Google Play form — no server
+filesystem access needed; detailed steps in
+[`docs/play-internal-testing.md`](docs/play-internal-testing.md)):
 
 1. Play Console → Users & permissions → API access → link a Google Cloud
    project and create a service account; grant it release permissions.
