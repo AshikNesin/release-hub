@@ -223,7 +223,3 @@ make build && make test
 
 systemd: `release-hub.service` (port 9100).
 
-
-> **Rename note**: the channel formerly called `api-share` is now `direct`.
-> The old name is still accepted on upload/manifest queries and maps to the
-> same channel; stored releases are migrated to the new name.

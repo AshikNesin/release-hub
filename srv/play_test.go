@@ -9,8 +9,8 @@ func TestTrackFor(t *testing.T) {
 	}{
 		"public":    {"production", true},
 		"internal":  {"internal", true},
-		"api-share": {"", false}, // legacy alias
-		"direct":     {"", false},
+		"direct":             {"", false},
+		"api-share (legacy)": {"", false}, // rejected at upload layer; trackFor returns no track anyway
 		"weird":     {"", false},
 	}
 	for ch, want := range cases {

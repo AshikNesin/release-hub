@@ -132,6 +132,16 @@ func TestUploadAndManifestFlow(t *testing.T) {
 		t.Fatalf("sha mismatch in manifest: %s", m.Sha256)
 	}
 
+	// unknown channel on manifest: 404, no panic
+	respM, err := http.Get(ts.URL + "/api/apps/demo/manifest?channel=nosuch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	respM.Body.Close()
+	if respM.StatusCode != 404 {
+		t.Fatalf("expected 404 for unknown channel, got %d", respM.StatusCode)
+	}
+
 	// versionCode regression must be rejected
 	body2 := &bytes.Buffer{}
 	mw2 := multipart.NewWriter(body2)

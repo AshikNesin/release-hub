@@ -153,10 +153,6 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	if channel == "" {
 		channel = "direct"
 	}
-	// "api-share" is the old name for the direct channel; still accepted.
-	if channel == "api-share" {
-		channel = "direct"
-	}
 	switch channel {
 	case "public", "internal", "direct":
 	default:
@@ -366,19 +362,17 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 	if channel == "" {
 		channel = "direct"
 	}
-	// accept the legacy name
-	if channel == "api-share" {
-		channel = "direct"
-	}
 	releases, err := dbgen.New(s.DB).LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{
 		AppID: app.ID, Channel: channel,
 	})
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			writeErr(w, 404, "no release on channel "+channel)
-			return
-		}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		writeErr(w, 500, err.Error())
+		return
+	}
+	// LIMIT 1 with no match returns zero rows, not ErrNoRows — guard the
+	// slice access or a channel with no releases panics the handler.
+	if len(releases) == 0 {
+		writeErr(w, 404, "no release on channel "+channel)
 		return
 	}
 	rel := releases[0]
