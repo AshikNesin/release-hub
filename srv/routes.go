@@ -23,16 +23,17 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /apps", s.requireUI(s.handleCreateAppUI))
 	mux.HandleFunc("POST /apps/{slug}/platforms", s.requireUI(s.handleAddPlatformUI))
 	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/play", s.requireUI(s.handlePlayConfigUI))
-	mux.HandleFunc("POST /tokens", s.requireUI(s.handleCreateTokenUI))
-	mux.HandleFunc("GET /apps/{slug}", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
-		r = r.WithContext(withFlash(r, flash(r)))
-		s.handleAppDetail(w, r)
-	}))
 	mux.HandleFunc("GET /settings", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(withFlash(r, flash(r)))
 		s.handleSettings(w, r)
 	}))
 	mux.HandleFunc("POST /settings", s.requireUI(s.handleSettings))
+	mux.HandleFunc("POST /settings/play", s.requireUI(s.handlePlayAccountsUI))
+	mux.HandleFunc("POST /tokens", s.requireUI(s.handleCreateTokenUI))
+	mux.HandleFunc("GET /apps/{slug}", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(withFlash(r, flash(r)))
+		s.handleAppDetail(w, r)
+	}))
 
 	// API (bearer auth)
 	mux.HandleFunc("GET /api/apps", s.requireAPI(s.handleApiListApps))
@@ -45,6 +46,9 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/releases", s.requireAPI(s.handleApiReleases))
 	mux.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/play", s.requireAPI(s.handleApiSetPlay))
+	mux.HandleFunc("GET /api/play-accounts", s.requireAPI(s.handleApiPlayAccounts))
+	mux.HandleFunc("POST /api/play-accounts", s.requireAPI(s.handleApiPlayAccounts))
+	mux.HandleFunc("POST /api/play-accounts/delete", s.requireAPI(s.handleApiDeletePlayAccount))
 	mux.HandleFunc("POST /api/apps/{slug}/signing", s.requireAPI(s.handleApiSetSigning))
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/signing", s.requireAPI(s.handleApiSetSigning))
 	mux.HandleFunc("GET /api/apps/{slug}/signing", s.requireAPI(s.handleApiGetSigning))

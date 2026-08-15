@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -266,6 +267,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 	SignSha256             string // keystore fingerprint (not secret)
 	SignAlias              string // key alias (not secret)
 	PlayEnabled            bool
+	PlayAccountID          int64  // linked shared service account (0 = none)
 	PlayEmail              string // service-account email (identifier, not secret)
 }
 	sections := make([]platSection, 0, len(plats))
@@ -299,6 +301,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+		acctID, acctEmail := s.playAccountInfo(p)
 		sections = append(sections, platSection{
 			Platform: p.Platform, PackageName: p.PackageName, Releases: rows,
 			ManifestURL:   s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
@@ -307,8 +310,17 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			SignSha256:    p.SignSha256,
 			SignAlias:     alias,
 			PlayEnabled:   p.PlayEnabled == 1,
-			PlayEmail:     playEmail(p.PlayCredentials),
+			PlayAccountID: acctID,
+			PlayEmail:     acctEmail,
 		})
+	}
+	type accountOption struct {
+		ID    int64
+		Email string
+	}
+	accounts := make([]accountOption, 0)
+	for _, acct := range s.mustListPlayAccounts(r) {
+		accounts = append(accounts, accountOption{acct.ID, playEmail(acct.Credentials)})
 	}
 	s.render(w, 200, "app.html", struct {
 		uiData
@@ -316,6 +328,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		Platforms    []platSection
 		SuggestedPkg string // prefill for Add-platform: bundle_prefix + slug
 		HasAndroid   bool   // hide android from the picker when it exists
+		PlayAccounts []accountOption
 	}{
 		uiData{Title: app.Slug, Authenticated: true, Flash: flashFrom(r), AssetVersion: assetVersion},
 		app, sections,
@@ -328,6 +341,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			}
 			return false
 		}(),
+		accounts,
 	})
 }
 
@@ -350,6 +364,19 @@ func playEmail(encCreds string) string {
 	return probe.ClientEmail
 }
 
+// playAccountInfo resolves a platform's linked shared account to
+// (accountID, email). Zero values when not linked.
+func (s *Server) playAccountInfo(p dbgen.AppPlatform) (int64, string) {
+	if p.PlayAccountID == nil {
+		return 0, ""
+	}
+	acct, err := dbgen.New(s.DB).PlayAccountByID(context.Background(), *p.PlayAccountID)
+	if err != nil {
+		return *p.PlayAccountID, ""
+	}
+	return acct.ID, playEmail(acct.Credentials)
+}
+
 func (s *Server) render(w http.ResponseWriter, status int, name string, data any) {
 	tmpl, err := parsePageTemplate(s.TemplatesDir, name)
 	if err != nil {
@@ -365,8 +392,10 @@ func (s *Server) render(w http.ResponseWriter, status int, name string, data any
 }
 
 // handlePlayConfigUI POST /apps/{slug}/platforms/{platform}/play —
-// session-auth twin of the bearer API: upload service-account JSON from the
-// browser, or disable with enable=false. Redirects back with a flash.
+// session-auth twin of the bearer API: enable this platform for Play against
+// a shared service account (picked with account=<id>, or a credentials file
+// which also creates/replaces the shared account), or disable with
+// enable=false. Redirects back with a flash.
 func (s *Server) handlePlayConfigUI(w http.ResponseWriter, r *http.Request) {
 	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
 	if !ok {
@@ -380,8 +409,8 @@ func (s *Server) handlePlayConfigUI(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	if r.FormValue("enable") == "false" {
-		if err := dbgen.New(s.DB).SetPlayConfig(r.Context(), dbgen.SetPlayConfigParams{
-			PlayEnabled: 0, PlayCredentials: "", ID: plat.ID,
+		if err := dbgen.New(s.DB).SetPlayAccountForPlatform(r.Context(), dbgen.SetPlayAccountForPlatformParams{
+			PlayEnabled: 0, PlayAccountID: nil, ID: plat.ID,
 		}); err != nil {
 			http.Error(w, "disable failed: "+err.Error(), 500)
 			return
@@ -390,13 +419,42 @@ func (s *Server) handlePlayConfigUI(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}
-	email, err := s.storePlayCredentials(r, plat.ID)
-	if err != nil {
-		setFlash("Play setup failed: " + err.Error())
+	var acctID int64
+	var email string
+	if f, hdr, err := r.FormFile("file"); err == nil && hdr.Size > 0 {
+		f.Close()
+		acctID, email, err = s.upsertPlayAccountFromRequest(r)
+		if err != nil {
+			setFlash("Play setup failed: " + err.Error())
+			http.Redirect(w, r, back, http.StatusSeeOther)
+			return
+		}
+	} else if idStr := strings.TrimSpace(r.FormValue("account")); idStr != "" {
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			setFlash("Play setup failed: bad account id.")
+			http.Redirect(w, r, back, http.StatusSeeOther)
+			return
+		}
+		acct, err := dbgen.New(s.DB).PlayAccountByID(r.Context(), id)
+		if err != nil {
+			setFlash("Play setup failed: unknown service account.")
+			http.Redirect(w, r, back, http.StatusSeeOther)
+			return
+		}
+		acctID, email = acct.ID, playEmail(acct.Credentials)
+	} else {
+		setFlash("Play setup failed: pick a service account or upload a JSON key.")
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}
-	setFlash("Google Play publishing enabled for " + email + ".")
+	if err := dbgen.New(s.DB).SetPlayAccountForPlatform(r.Context(), dbgen.SetPlayAccountForPlatformParams{
+		PlayEnabled: 1, PlayAccountID: &acctID, ID: plat.ID,
+	}); err != nil {
+		http.Error(w, "enable failed: "+err.Error(), 500)
+		return
+	}
+	setFlash("Google Play publishing enabled via " + email + ".")
 	http.Redirect(w, r, back, http.StatusSeeOther)
 }
 
@@ -435,6 +493,11 @@ func suggestPackage(prefix, slug string) string {
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	q := dbgen.New(s.DB)
 	if r.Method == http.MethodPost {
+		// Shared Play service accounts (separate form from the settings forms).
+		if r.URL.Path == "/settings/play" {
+			s.handlePlayAccountsUI(w, r)
+			return
+		}
 		// Two independent forms post here (bundle prefix / cert subject).
 		// Only overwrite keys the submitted form actually carried; a missing
 		// field means "not part of this save", not "clear the value".
@@ -473,12 +536,67 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		fields = append(fields, field{f.Field, v, f.Label, f.Hint, f.Placeholder})
 	}
 	tokens, _ := q.ListApiTokens(r.Context())
+	type playAcctRow struct {
+		ID, Email string
+		Platforms []string // "slug (platform)" using this account
+	}
+	playRows := make([]playAcctRow, 0)
+	for _, acct := range s.mustListPlayAccounts(r) {
+		row := playAcctRow{ID: strconv.FormatInt(acct.ID, 10), Email: playEmail(acct.Credentials)}
+		plats, err := dbgen.New(s.DB).ListPlatformsWithPlay(r.Context())
+		if err == nil {
+			for _, p := range plats {
+				if p.PlayAccountID != nil && *p.PlayAccountID == acct.ID {
+					row.Platforms = append(row.Platforms, strconv.FormatInt(int64(p.AppID), 10)+"/"+p.Platform)
+				}
+			}
+		}
+		playRows = append(playRows, row)
+	}
 	s.render(w, 200, "settings.html", struct {
 		uiData
 		Fields       []field
 		BundlePrefix string
 		Tokens       []dbgen.ApiToken
 		NewToken     string
+		PlayAccounts []playAcctRow
 	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion},
-		fields, s.bundlePrefix(r.Context()), tokens, flashFrom(r)})
+		fields, s.bundlePrefix(r.Context()), tokens, flashFrom(r), playRows})
+}
+
+// handlePlayAccountsUI POST /settings/play — add/replace/delete the shared
+// Play service accounts from the Settings page.
+func (s *Server) handlePlayAccountsUI(w http.ResponseWriter, r *http.Request) {
+	setFlash := func(msg string) {
+		http.SetCookie(w, &http.Cookie{
+			Name: "rh_flash", Value: msg, Path: "/", HttpOnly: true,
+			SameSite: http.SameSiteLaxMode, MaxAge: 30,
+		})
+	}
+	if r.FormValue("action") == "delete" {
+		id, err := strconv.ParseInt(strings.TrimSpace(r.FormValue("id")), 10, 64)
+		if err != nil {
+			setFlash("Play account: bad id.")
+			http.Redirect(w, r, "/settings", http.StatusSeeOther)
+			return
+		}
+		// Clear flags BEFORE deleting — the FK's ON DELETE SET NULL would
+		// otherwise null play_account_id first and orphan play_enabled=1 rows.
+		if _, err := s.DB.Exec(`UPDATE app_platforms SET play_enabled = 0 WHERE play_account_id = ?`, id); err != nil {
+			setFlash("Play account: clearing linked apps failed — " + err.Error())
+		} else if err := dbgen.New(s.DB).DeletePlayAccount(r.Context(), id); err != nil {
+			setFlash("Play account: delete failed — " + err.Error())
+		} else {
+			setFlash("Play service account removed.")
+		}
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+		return
+	}
+	_, email, err := s.upsertPlayAccountFromRequest(r)
+	if err != nil {
+		setFlash("Play account failed: " + err.Error())
+	} else {
+		setFlash("Service account " + email + " saved — enable it per app from the app's page.")
+	}
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }

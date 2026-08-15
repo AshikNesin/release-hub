@@ -34,7 +34,7 @@
   <div class="playinfo">
     <span class="keystored"><i></i>Google Play publishing on</span>
     <span class="mlabel">service account</span>
-    <code>{{.PlayEmail}}</code>
+    <code>{{if .PlayEmail}}{{.PlayEmail}}{{else}}#{{.PlayAccountID}}{{end}}</code>
     <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play" class="inline" style="margin:0">
       <input type="hidden" name="enable" value="false">
       <button type="submit" class="btn ghost xs">disable</button>
@@ -46,10 +46,16 @@
   <div class="playsetup">
     <span class="mlabel">Google Play</span>
     <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play" enctype="multipart/form-data" class="inline">
-      <div><label>Service-account JSON key</label><input type="file" name="file" accept=".json,application/json" required></div>
+      {{if $.PlayAccounts}}
+      <div><label>Service account (shared, manage in Settings)</label>
+        <select name="account" style="width:280px">
+          {{range $.PlayAccounts}}<option value="{{.ID}}">{{.Email}}</option>{{end}}
+        </select></div>
+      {{end}}
+      <div><label>{{if $.PlayAccounts}}Or upload a new key{{else}}Service-account JSON key{{end}}</label><input type="file" name="file" accept=".json,application/json"{{if not $.PlayAccounts}} required{{end}}></div>
       <button type="submit" class="btn primary">Enable Play publishing</button>
     </form>
-    <p class="hint" style="margin:6px 0 0">Play service-account JSON key with release access (Play Console → Setup → API access; detailed guide in <code>docs/play-internal-testing.md</code>). <code>channel=internal</code> .aab uploads go to internal testing, <code>channel=public</code> to production.</p>
+    <p class="hint" style="margin:6px 0 0">One shared service account covers every app (Play Console → Setup → API access; guide in <code>docs/play-internal-testing.md</code>). <code>channel=internal</code> .aab uploads go to internal testing, <code>channel=public</code> to production.</p>
   </div>
   {{end}}
   <table>

@@ -36,6 +36,35 @@
 </section>
 
 <section>
+  <div class="sect">Google Play service accounts</div>
+  <p class="hint" style="margin:0 0 14px">One shared service account covers every app — upload it here once, then flip apps on from their own pages. Same email re-uploaded = key rotation.</p>
+  <table>
+    <thead><tr><th>#</th><th>Service account</th><th>Actions</th></tr></thead>
+    <tbody>
+    {{range .PlayAccounts}}
+    <tr>
+      <td class="num">{{.ID}}</td>
+      <td class="mono" style="font-size:12.5px">{{.Email}}</td>
+      <td>
+        <form method="post" action="/settings/play" class="inline" style="margin:0">
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="id" value="{{.ID}}">
+          <button type="submit" class="btn ghost xs">remove</button>
+        </form>
+      </td>
+    </tr>
+    {{else}}
+    <tr><td colspan="3" style="color:var(--fg2)">None yet.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  <form method="post" action="/settings/play" enctype="multipart/form-data" class="inline" style="margin-top:12px">
+    <div><label>Service-account JSON key</label><input type="file" name="file" accept=".json,application/json" required></div>
+    <button type="submit" class="btn primary">Save service account</button>
+  </form>
+</section>
+
+<section>
   <div class="sect">Certificate subject</div>
   <p class="hint" style="margin:0 0 14px">Applies to newly generated keys only — existing keystores keep their certificate.</p>
   <form method="post" action="/settings" class="inline">

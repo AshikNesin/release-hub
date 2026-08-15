@@ -138,9 +138,10 @@ enrolled, losing this key means users can never update the app.
 ## Google Play (optional)
 
 Apps with Play enabled get their **.aab** uploads pushed to Google Play
-automatically, alongside normal hub storage. The service-account JSON is
-stored in the DB, encrypted at rest (AES-256-GCM, key from the
-`RELEASE_HUB_SECRET_KEY` env var — 32 bytes, base64- or hex-encoded):
+automatically, alongside normal hub storage. A **single shared service
+account** covers all apps; its JSON key is stored in the DB, encrypted at
+rest (AES-256-GCM, key from the `RELEASE_HUB_SECRET_KEY` env var — 32
+bytes, base64- or hex-encoded):
 
 - `channel=public`   → Play **production** track
 - `channel=internal` → Play **internal testing** track
@@ -154,29 +155,33 @@ The release itself is recorded even if Play publishing fails — the API
 response includes `playRelease` or `playError` so CI can decide whether
 to fail.
 
-Setup (per app, one API call or the app page's Google Play form — no server
-filesystem access needed; detailed steps in
-[`docs/play-internal-testing.md`](docs/play-internal-testing.md)):
-
-1. Play Console → **Setup → API access** (find it via the console's search
-   box; the page moves between redesigns) → link a Google Cloud project,
-   create a service account, and grant it release permissions — detailed
-   steps in the walkthrough doc.
-2. Generate a 32-byte key: `openssl rand -base64 32`, export it as
-   `RELEASE_HUB_SECRET_KEY` for the hub process.
-3. Enable for the app:
+Setup is now **one service account for the whole hub** — upload it once, then
+enable apps individually (no per-app credential copies to manage):
 
 ```bash
+# once per hub: store the shared service account
 curl -H "Authorization: Bearer $HUB_TOKEN" \
      -F file=service-account.json \
-     https://hub.example.com/api/apps/tinyfirewall/play
-# → {"playEnabled":true,"serviceAccount":"hub@project.iam.gserviceaccount.com"}
+     https://hub.example.com/api/play-accounts
+# → {"id":1,"serviceAccount":"hub@project.iam.gserviceaccount.com"}
 
-# disable:  -F enable=false
+# per app: enable Play publishing against it
+curl -H "Authorization: Bearer $HUB_TOKEN" -F account=1 \
+     https://hub.example.com/api/apps/tinyfirewall/play
+# → {"playEnabled":true,"serviceAccount":"hub@…"}
+
+# disable an app:  -F enable=false
+# rotate the key:  re-POST the file to /api/play-accounts (same email replaces)
+# remove account:  POST /api/play-accounts/delete  -F id=1
 ```
 
-A shared service account with account-wide release access can serve
-many apps — one credential uploaded per app is fine.
+In the UI: **Settings → Google Play service accounts** stores the key once;
+each app's page has an Enable/disable toggle (dropdown of shared accounts,
+or upload a new key inline). Uploading the JSON on an app page also works
+and creates the shared account implicitly.
+
+A shared service account with account-wide release access serves many apps —
+that's the intended setup.
 
 Upload example:
 

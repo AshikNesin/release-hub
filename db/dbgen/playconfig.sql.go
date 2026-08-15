@@ -9,8 +9,38 @@ import (
 	"context"
 )
 
+const createPlayAccount = `-- name: CreatePlayAccount :one
+INSERT INTO play_accounts (label, credentials) VALUES (?, ?) RETURNING id, label, credentials, created_at
+`
+
+type CreatePlayAccountParams struct {
+	Label       string `json:"label"`
+	Credentials string `json:"credentials"`
+}
+
+func (q *Queries) CreatePlayAccount(ctx context.Context, arg CreatePlayAccountParams) (PlayAccount, error) {
+	row := q.db.QueryRowContext(ctx, createPlayAccount, arg.Label, arg.Credentials)
+	var i PlayAccount
+	err := row.Scan(
+		&i.ID,
+		&i.Label,
+		&i.Credentials,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deletePlayAccount = `-- name: DeletePlayAccount :exec
+DELETE FROM play_accounts WHERE id = ?
+`
+
+func (q *Queries) DeletePlayAccount(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deletePlayAccount, id)
+	return err
+}
+
 const listPlatformsWithPlay = `-- name: ListPlatformsWithPlay :many
-SELECT ap.id, ap.app_id, ap.platform, ap.package_name, ap.play_enabled, ap.play_credentials, ap.sign_keystore, ap.sign_config, ap.sign_sha256, ap.created_at FROM app_platforms ap WHERE ap.play_enabled = 1
+SELECT ap.id, ap.app_id, ap.platform, ap.package_name, ap.play_enabled, ap.sign_keystore, ap.sign_config, ap.sign_sha256, ap.created_at, ap.play_account_id FROM app_platforms ap WHERE ap.play_enabled = 1
 `
 
 func (q *Queries) ListPlatformsWithPlay(ctx context.Context) ([]AppPlatform, error) {
@@ -28,10 +58,42 @@ func (q *Queries) ListPlatformsWithPlay(ctx context.Context) ([]AppPlatform, err
 			&i.Platform,
 			&i.PackageName,
 			&i.PlayEnabled,
-			&i.PlayCredentials,
 			&i.SignKeystore,
 			&i.SignConfig,
 			&i.SignSha256,
+			&i.CreatedAt,
+			&i.PlayAccountID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPlayAccounts = `-- name: ListPlayAccounts :many
+SELECT id, label, credentials, created_at FROM play_accounts ORDER BY id
+`
+
+func (q *Queries) ListPlayAccounts(ctx context.Context) ([]PlayAccount, error) {
+	rows, err := q.db.QueryContext(ctx, listPlayAccounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PlayAccount{}
+	for rows.Next() {
+		var i PlayAccount
+		if err := rows.Scan(
+			&i.ID,
+			&i.Label,
+			&i.Credentials,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -47,17 +109,33 @@ func (q *Queries) ListPlatformsWithPlay(ctx context.Context) ([]AppPlatform, err
 	return items, nil
 }
 
-const setPlayConfig = `-- name: SetPlayConfig :exec
-UPDATE app_platforms SET play_enabled = ?, play_credentials = ? WHERE id = ?
+const playAccountByID = `-- name: PlayAccountByID :one
+SELECT id, label, credentials, created_at FROM play_accounts WHERE id = ?
 `
 
-type SetPlayConfigParams struct {
-	PlayEnabled     int64  `json:"play_enabled"`
-	PlayCredentials string `json:"play_credentials"`
-	ID              int64  `json:"id"`
+func (q *Queries) PlayAccountByID(ctx context.Context, id int64) (PlayAccount, error) {
+	row := q.db.QueryRowContext(ctx, playAccountByID, id)
+	var i PlayAccount
+	err := row.Scan(
+		&i.ID,
+		&i.Label,
+		&i.Credentials,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
-func (q *Queries) SetPlayConfig(ctx context.Context, arg SetPlayConfigParams) error {
-	_, err := q.db.ExecContext(ctx, setPlayConfig, arg.PlayEnabled, arg.PlayCredentials, arg.ID)
+const setPlayAccountForPlatform = `-- name: SetPlayAccountForPlatform :exec
+UPDATE app_platforms SET play_enabled = ?, play_account_id = ? WHERE id = ?
+`
+
+type SetPlayAccountForPlatformParams struct {
+	PlayEnabled   int64  `json:"play_enabled"`
+	PlayAccountID *int64 `json:"play_account_id"`
+	ID            int64  `json:"id"`
+}
+
+func (q *Queries) SetPlayAccountForPlatform(ctx context.Context, arg SetPlayAccountForPlatformParams) error {
+	_, err := q.db.ExecContext(ctx, setPlayAccountForPlatform, arg.PlayEnabled, arg.PlayAccountID, arg.ID)
 	return err
 }

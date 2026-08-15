@@ -76,21 +76,39 @@ many apps; uploading the same JSON per app in the hub is fine.
 4. **Invite user**. Permissions on a freshly linked API project can take up
    to 24h to activate — usually minutes.
 
-## One-time: enable Play for the app in the hub
+## One-time: store the service account in the hub
 
-Two ways, same result (credentials validated, encrypted, stored):
+The service account is **hub-wide** — one credential, every app. Upload it
+once; enabling apps is just a toggle (no per-app credential copies).
 
-**UI (recommended):** open the app's page in the hub. If the android
-platform has no Play credentials yet, a **Google Play** box offers a file
-picker — choose the service-account JSON → **Enable Play publishing**. The
-box then shows the service-account email, the channel→track mapping and a
-disable button.
+**UI (recommended):** **Settings → Google Play service accounts** → choose
+the JSON → **Save service account**. Re-uploading a JSON with the same
+service-account email replaces the old key (rotation).
 
 **API:**
 
 ```bash
+# store / rotate the shared account
 curl -H "Authorization: Bearer $HUB_TOKEN" \
      -F file=service-account.json \
+     https://hub.example.com/api/play-accounts
+# → {"id":1,"serviceAccount":"release-hub@….gserviceaccount.com"}
+
+GET /api/play-accounts                # list ids + emails
+POST /api/play-accounts/delete -F id=1  # remove (disables linked apps)
+```
+
+## Per app: enable Play publishing
+
+**UI:** open the app's page — the **Google Play** box lists shared accounts
+in a dropdown; pick one and **Enable Play publishing** (or upload a new key
+inline, which also creates the shared account). A green dot shows it's on;
+**disable** turns it off.
+
+**API:**
+
+```bash
+curl -H "Authorization: Bearer $HUB_TOKEN" -F account=1 \
      https://hub.example.com/api/apps/tinyfirewall/play
 # → {"playEnabled":true,"serviceAccount":"release-hub@….gserviceaccount.com"}
 
@@ -98,6 +116,10 @@ curl -H "Authorization: Bearer $HUB_TOKEN" \
 curl -H "Authorization: Bearer $HUB_TOKEN" -F enable=false \
      https://hub.example.com/api/apps/tinyfirewall/play
 ```
+
+The legacy form (`-F file=service-account.json` posted to
+`/api/apps/{slug}/play`) still works — it creates/updates the shared
+account and enables the app on it.
 
 ## One-time: testers for the internal track
 
@@ -156,14 +178,20 @@ your account → Keys → Add key → JSON. See the table at the top.
 | Upload OK but testers see nothing | Track has no tester list / opt-in not completed, or Play still processing the release (minutes). |
 | First upload ever fails on declarations | Play requires app declarations (privacy policy, content rating, target audience…) before it accepts artifacts. Finish them in Console. |
 | `decrypt play credentials: …` | `RELEASE_HUB_SECRET_KEY` changed since upload — re-upload the JSON (stored data is unreadable without the original key). |
+| Shared account deleted but app still shows enabled | Shouldn't happen (delete clears flags); re-toggle the app or re-enable it. |
 
 ## Security notes
 
 - The JSON key unlocks Play releases for the account — treat it like a
   production credential. It is stored encrypted; the hub never logs it.
-- The UI route is session-auth; the API route is bearer-auth. Both validate
-  the file (parses as service-account JSON with `client_email`) before
-  storing.
+- The service account is shared hub-wide and stored **encrypted at rest**
+  (AES-256-GCM, key from `RELEASE_HUB_SECRET_KEY` — the hub's existing
+  secret); apps only carry an enabled flag.
+- The UI routes are session-auth; the API routes are bearer-auth. Uploads
+  are validated (must parse as service-account JSON with `client_email`)
+  before storing.
+- Deleting a shared account disables every app linked to it (flags cleared,
+  credentials gone).
 - Keep the hub behind TLS in production (session cookie + bearer tokens).
 - If a key is compromised: delete it in Google Cloud (Service Accounts →
   Keys) and upload a fresh one — Play-side permissions survive key rotation.

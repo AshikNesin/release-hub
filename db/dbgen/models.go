@@ -23,16 +23,16 @@ type App struct {
 }
 
 type AppPlatform struct {
-	ID              int64     `json:"id"`
-	AppID           int64     `json:"app_id"`
-	Platform        string    `json:"platform"`
-	PackageName     string    `json:"package_name"`
-	PlayEnabled     int64     `json:"play_enabled"`
-	PlayCredentials string    `json:"play_credentials"`
-	SignKeystore    string    `json:"sign_keystore"`
-	SignConfig      string    `json:"sign_config"`
-	SignSha256      string    `json:"sign_sha256"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID            int64     `json:"id"`
+	AppID         int64     `json:"app_id"`
+	Platform      string    `json:"platform"`
+	PackageName   string    `json:"package_name"`
+	PlayEnabled   int64     `json:"play_enabled"`
+	SignKeystore  string    `json:"sign_keystore"`
+	SignConfig    string    `json:"sign_config"`
+	SignSha256    string    `json:"sign_sha256"`
+	CreatedAt     time.Time `json:"created_at"`
+	PlayAccountID *int64    `json:"play_account_id"`
 }
 
 type Config struct {
@@ -44,6 +44,13 @@ type Migration struct {
 	MigrationNumber int64     `json:"migration_number"`
 	MigrationName   string    `json:"migration_name"`
 	ExecutedAt      time.Time `json:"executed_at"`
+}
+
+type PlayAccount struct {
+	ID          int64     `json:"id"`
+	Label       string    `json:"label"`
+	Credentials string    `json:"credentials"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Release struct {

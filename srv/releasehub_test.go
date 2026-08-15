@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -220,6 +221,101 @@ func TestApiSetPlayUpdatesPlatformRowNotAppRow(t *testing.T) {
 		JOIN apps a ON a.id = ap.app_id WHERE a.slug = 'beta'`).Scan(&betaPlay)
 	if alphaPlay != 1 || betaPlay != 0 {
 		t.Fatalf("play flags wrong: alpha=%d beta=%d (app/platform id mixup)", alphaPlay, betaPlay)
+	}
+}
+
+func TestSharedPlayAccountFlow(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	client := ts.Client()
+
+	tok := "rh_sharedplay"
+	if _, err := s.DB.Exec(
+		"INSERT INTO api_tokens (name, token_hash) VALUES ('test', ?)", hashToken(tok)); err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+	// Three apps → three platforms sharing one service account.
+	for _, slug := range []string{"one", "two", "three"} {
+		req, _ := http.NewRequest("POST", ts.URL+"/api/apps", bytes.NewBufferString("slug="+slug))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		req, _ = http.NewRequest("POST", ts.URL+"/api/apps/"+slug+"/platforms",
+			bytes.NewBufferString("platform=android&packageName=io.test."+slug))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err = client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+
+	// Create the shared account once.
+	creds := []byte(`{"client_email": "shared@test.iam.gserviceaccount.com"}`)
+	body := &bytes.Buffer{}
+	mw := multipart.NewWriter(body)
+	fw, _ := mw.CreateFormFile("file", "sa.json")
+	fw.Write(creds)
+	mw.Close()
+	req, _ := http.NewRequest("POST", ts.URL+"/api/play-accounts", body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var acct struct {
+		ID            int64  `json:"id"`
+		ServiceAccount string `json:"serviceAccount"`
+	}
+	json.NewDecoder(resp.Body).Decode(&acct)
+	resp.Body.Close()
+	if acct.ID == 0 || acct.ServiceAccount != "shared@test.iam.gserviceaccount.com" {
+		t.Fatalf("create account: %+v", acct)
+	}
+
+	// Enable every app against it with one form field — no file re-upload.
+	for _, slug := range []string{"one", "two", "three"} {
+		req, _ := http.NewRequest("POST", ts.URL+"/api/apps/"+slug+"/play",
+			bytes.NewBufferString("account=1"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 200 || !strings.Contains(string(out), "playEnabled\":true") {
+			t.Fatalf("enable %s: %d %s", slug, resp.StatusCode, out)
+		}
+	}
+
+	// One credential row, three enabled platforms pointing at it.
+	var nAccts, nEnabled int
+	s.DB.QueryRow("SELECT COUNT(*) FROM play_accounts").Scan(&nAccts)
+	s.DB.QueryRow("SELECT COUNT(*) FROM app_platforms WHERE play_enabled = 1 AND play_account_id = 1").Scan(&nEnabled)
+	if nAccts != 1 || nEnabled != 3 {
+		t.Fatalf("want 1 account / 3 enabled platforms, got %d / %d", nAccts, nEnabled)
+	}
+
+	// Delete the account: platforms detach and disable.
+	req, _ = http.NewRequest("POST", ts.URL+"/api/play-accounts/delete", bytes.NewBufferString("id=1"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	s.DB.QueryRow("SELECT COUNT(*) FROM app_platforms WHERE play_enabled = 1").Scan(&nEnabled)
+	if nEnabled != 0 {
+		t.Fatalf("platforms still enabled after account delete: %d", nEnabled)
 	}
 }
 

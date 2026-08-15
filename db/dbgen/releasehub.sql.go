@@ -40,7 +40,7 @@ func (q *Queries) AppBySlug(ctx context.Context, slug string) (App, error) {
 }
 
 const appPlatformByAppAndPlatform = `-- name: AppPlatformByAppAndPlatform :one
-SELECT id, app_id, platform, package_name, play_enabled, play_credentials, sign_keystore, sign_config, sign_sha256, created_at FROM app_platforms WHERE app_id = ? AND platform = ?
+SELECT id, app_id, platform, package_name, play_enabled, sign_keystore, sign_config, sign_sha256, created_at, play_account_id FROM app_platforms WHERE app_id = ? AND platform = ?
 `
 
 type AppPlatformByAppAndPlatformParams struct {
@@ -57,11 +57,11 @@ func (q *Queries) AppPlatformByAppAndPlatform(ctx context.Context, arg AppPlatfo
 		&i.Platform,
 		&i.PackageName,
 		&i.PlayEnabled,
-		&i.PlayCredentials,
 		&i.SignKeystore,
 		&i.SignConfig,
 		&i.SignSha256,
 		&i.CreatedAt,
+		&i.PlayAccountID,
 	)
 	return i, err
 }
@@ -344,7 +344,7 @@ func (q *Queries) ListApps(ctx context.Context) ([]App, error) {
 }
 
 const listPlatformsByApp = `-- name: ListPlatformsByApp :many
-SELECT id, app_id, platform, package_name, play_enabled, play_credentials, sign_keystore, sign_config, sign_sha256, created_at FROM app_platforms WHERE app_id = ? ORDER BY platform
+SELECT id, app_id, platform, package_name, play_enabled, sign_keystore, sign_config, sign_sha256, created_at, play_account_id FROM app_platforms WHERE app_id = ? ORDER BY platform
 `
 
 func (q *Queries) ListPlatformsByApp(ctx context.Context, appID int64) ([]AppPlatform, error) {
@@ -362,11 +362,11 @@ func (q *Queries) ListPlatformsByApp(ctx context.Context, appID int64) ([]AppPla
 			&i.Platform,
 			&i.PackageName,
 			&i.PlayEnabled,
-			&i.PlayCredentials,
 			&i.SignKeystore,
 			&i.SignConfig,
 			&i.SignSha256,
 			&i.CreatedAt,
+			&i.PlayAccountID,
 		); err != nil {
 			return nil, err
 		}
@@ -431,7 +431,7 @@ func (q *Queries) MaxVersionCode(ctx context.Context, appPlatformID int64) (inte
 }
 
 const platformBySlugAndPlatform = `-- name: PlatformBySlugAndPlatform :one
-SELECT ap.id, ap.app_id, ap.platform, ap.package_name, ap.play_enabled, ap.play_credentials, ap.sign_keystore, ap.sign_config, ap.sign_sha256, ap.created_at FROM app_platforms ap JOIN apps a ON a.id = ap.app_id
+SELECT ap.id, ap.app_id, ap.platform, ap.package_name, ap.play_enabled, ap.sign_keystore, ap.sign_config, ap.sign_sha256, ap.created_at, ap.play_account_id FROM app_platforms ap JOIN apps a ON a.id = ap.app_id
 WHERE a.slug = ? AND ap.platform = ?
 `
 
@@ -449,11 +449,11 @@ func (q *Queries) PlatformBySlugAndPlatform(ctx context.Context, arg PlatformByS
 		&i.Platform,
 		&i.PackageName,
 		&i.PlayEnabled,
-		&i.PlayCredentials,
 		&i.SignKeystore,
 		&i.SignConfig,
 		&i.SignSha256,
 		&i.CreatedAt,
+		&i.PlayAccountID,
 	)
 	return i, err
 }
