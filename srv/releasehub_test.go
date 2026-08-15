@@ -21,8 +21,8 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
-	s.ArtifactsDir = filepath.Join(dir, "artifacts")
 	s.BaseURL = "http://hub.test"
+	s.Storage = &LocalStorage{Dir: filepath.Join(dir, "artifacts"), BaseURL: "http://hub.test"}
 	lastTestServer = s
 	ts := httptest.NewServer(s.muxForTest())
 	t.Cleanup(ts.Close)

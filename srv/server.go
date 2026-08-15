@@ -28,8 +28,8 @@ type Server struct {
 	Hostname     string
 	TemplatesDir string
 	StaticDir    string
-	ArtifactsDir string // where uploaded artifacts are stored
-	BaseURL      string // public base URL for artifact/manifest links
+	BaseURL      string  // public base URL for links
+	Storage      Storage // local FS or S3 (see storage.go)
 }
 
 // auth
@@ -274,7 +274,11 @@ func (s *Server) Serve(addr string) error {
 		w.Write([]byte("ok"))
 	})
 
-	slog.Info("starting release-hub", "addr", addr, "artifacts", s.ArtifactsDir)
+	stype := "local"
+	if _, ok := s.Storage.(*S3Storage); ok {
+		stype = "s3"
+	}
+	slog.Info("starting release-hub", "addr", addr, "storage", stype)
 	return http.ListenAndServe(addr, mux)
 }
 

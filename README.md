@@ -44,6 +44,31 @@ curl -H "Authorization: Bearer $HUB_TOKEN" \
      https://hub.example.com/api/apps/tinyfirewall/releases
 ```
 
+## Storage backends
+
+Artifacts live behind a `Storage` interface; pick with flags (no code change):
+
+**Local filesystem (default)**
+```
+./srv/srv -artifacts /data/artifacts
+```
+
+**AWS S3** (also works with R2/MinIO via `-s3-endpoint`)
+```
+export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
+./srv/srv -s3-bucket my-releases -s3-region eu-west-1 [-s3-prefix release-hub]           [-s3-endpoint https://...r2.cloudflarestorage.com]
+```
+
+With S3:
+- uploads stream to the bucket (multipart for 50MB+ APKs),
+- download URLs in the manifest are **presigned** (7-day TTL) so devices fetch
+  straight from S3 — the hub never proxies artifact traffic.
+- if the bucket is public behind CloudFront, pass `-s3-public-base https://cdn.example.com`
+  to use plain URLs instead of presigned ones.
+
+Credentials: static keys via `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, or
+any provider in the default AWS chain (env, shared config, IAM role).
+
 ## Dev
 
 ```

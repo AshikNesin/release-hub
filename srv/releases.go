@@ -1,15 +1,12 @@
 package srv
 
 import (
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -192,43 +189,33 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Stream to disk while hashing; artifacts/<appslug>/<versionCode>_<filename>
-	dir := filepath.Join(s.ArtifactsDir, app.Slug)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
+	// Stream to storage while hashing; key = <slug>/<versionCode>_<filename>
 	fileName := fmt.Sprintf("%d_%s", versionCode, filepath.Base(hdr.Filename))
-	path := filepath.Join(dir, fileName)
-	h := sha256.New()
-	size, err := func() (int64, error) {
-		out, err := os.Create(path)
-		if err != nil {
-			return 0, err
-		}
-		defer out.Close()
-		return io.Copy(io.MultiWriter(out, h), file)
-	}()
+	key := app.Slug + "/" + fileName
+	size, sha, err := s.Storage.Save(r.Context(), key, file)
 	if err != nil {
-		_ = os.Remove(path)
 		writeErr(w, 500, "store artifact: "+err.Error())
 		return
 	}
-	sha := hex.EncodeToString(h.Sum(nil))
 
 	if _, err := q.CreateRelease(r.Context(), dbgen.CreateReleaseParams{
 		AppID: app.ID, VersionCode: versionCode, VersionName: versionName,
 		Channel: channel, Notes: r.FormValue("notes"),
 		Sha256: sha, SizeBytes: size, FileName: fileName,
 	}); err != nil {
-		_ = os.Remove(path)
+		_ = s.Storage.Delete(r.Context(), key)
 		writeErr(w, 500, "record release: "+err.Error())
+		return
+	}
+	dlURL, err := s.Storage.PublicURL(r.Context(), key)
+	if err != nil {
+		writeErr(w, 500, "sign url: "+err.Error())
 		return
 	}
 	writeJSON(w, 201, map[string]any{
 		"slug": app.Slug, "versionCode": versionCode, "versionName": versionName,
 		"channel": channel, "sha256": sha, "size": size,
-		"apkUrl": s.artifactURL(app.Slug, fileName),
+		"apkUrl": dlURL,
 	})
 }
 
@@ -245,10 +232,11 @@ func (s *Server) handleApiReleases(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(releases))
 	for _, rel := range releases {
+		u, _ := s.Storage.PublicURL(r.Context(), app.Slug+"/"+rel.FileName)
 		out = append(out, map[string]any{
 			"versionCode": rel.VersionCode, "versionName": rel.VersionName,
 			"channel": rel.Channel, "sha256": rel.Sha256, "size": rel.SizeBytes,
-			"url": s.artifactURL(app.Slug, rel.FileName),
+			"url": u,
 			"createdAt": rel.CreatedAt.Format(time.RFC3339),
 		})
 	}
@@ -279,32 +267,44 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rel := releases[0]
+	dlURL, err := s.Storage.PublicURL(r.Context(), app.Slug+"/"+rel.FileName)
+	if err != nil {
+		writeErr(w, 500, "sign url: "+err.Error())
+		return
+	}
 	writeJSON(w, 200, releaseManifest{
 		VersionCode: int(rel.VersionCode),
 		VersionName: rel.VersionName,
-		ApkURL:      s.artifactURL(app.Slug, rel.FileName),
+		ApkURL:      dlURL,
 		Sha256:      rel.Sha256,
 		Size:        rel.SizeBytes,
 	})
 }
 
-// handleArtifact GET /artifacts/{slug}/{file} — public (devices need this
-// without auth; the URLs are unguessable-ish via version prefix + name, and
-// these are public app binaries anyway).
+// handleArtifact GET /artifacts/{slug}/{file} — public. For local storage
+// this streams from disk; for S3 it 302s to a presigned URL so the hub never
+// proxies bucket traffic.
 func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	file := filepath.Base(r.PathValue("file"))
-	path := filepath.Join(s.ArtifactsDir, slug, file)
-	if _, err := os.Stat(path); err != nil {
+	key := slug + "/" + file
+	if _, isLocal := s.Storage.(*LocalStorage); !isLocal {
+		u, err := s.Storage.PublicURL(r.Context(), key)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, u, http.StatusFound)
+		return
+	}
+	rc, err := s.Storage.Open(r.Context(), key)
+	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+	defer rc.Close()
 	w.Header().Set("Cache-Control", "no-store")
-	http.ServeFile(w, r, path)
-}
-
-func (s *Server) artifactURL(slug, fileName string) string {
-	return fmt.Sprintf("%s/artifacts/%s/%s", strings.TrimSuffix(s.BaseURL, "/"), slug, fileName)
+	_, _ = io.Copy(w, rc)
 }
 
 // ---- API: tokens (UI-only actions also exposed here) ----
