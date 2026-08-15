@@ -30,6 +30,11 @@ type Server struct {
 	StaticDir    string
 	BaseURL      string  // public base URL for links
 	Storage      Storage // local FS or S3 (see storage.go)
+
+	// PlayCredsDir holds optional per-app service-account JSON files named
+	// <packageName>.json. Apps with a file here get their .aab releases
+	// pushed to the matching Play track (public→production, internal→internal).
+	PlayCredsDir string
 }
 
 // auth

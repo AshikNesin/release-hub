@@ -69,6 +69,44 @@ With S3:
 Credentials: static keys via `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, or
 any provider in the default AWS chain (env, shared config, IAM role).
 
+## Google Play (optional)
+
+When `-play-creds-dir` is set, apps that have a service-account JSON file
+named `<packageName>.json` in that directory get their **.aab** uploads
+pushed to Google Play automatically, alongside normal hub storage:
+
+- `channel=public`   → Play **production** track
+- `channel=internal` → Play **internal testing** track
+- `channel=api-share` (or any `.apk`) → hub only, Play untouched
+
+The release itself is recorded even if Play publishing fails — the API
+response includes `playRelease` or `playError` so CI can decide whether
+to fail.
+
+Setup (one-time):
+
+1. Play Console → Users & permissions → API access → link a Google Cloud
+   project and create a service account; grant it release permissions.
+2. Download the service-account JSON key.
+3. Save it as `/etc/release-hub/play/io.nesin.tinyfirewall.json` (i.e.
+   `<packageName>.json` inside the creds dir; one file per app — an
+   account with account-wide access can serve many apps).
+4. Start the hub with `-play-creds-dir /etc/release-hub/play`.
+
+Upload example:
+
+```bash
+./gradlew bundleRelease
+curl -H "Authorization: Bearer $HUB_TOKEN" \
+     -F file=app-release.aab -F channel=internal -F versionName=1.15 \
+     https://hub.example.com/api/apps/tinyfirewall/releases
+# → {"apkUrl":…, "playRelease":"1.15 (115)"}
+```
+
+Note: Play requires versionCodes to strictly increase per app, and the
+first upload of an app must come after its Console declarations
+(privacy policy, VPN form, etc.) are complete.
+
 ## Docker
 
 Multi-stage build (static binary, ~20MB image, runs as unprivileged user
@@ -113,12 +151,16 @@ services:
   release-hub:
     build: .
     ports: ["9100:9100"]
-    volumes: [release-hub-data:/data]
+    volumes:
+      - release-hub-data:/data
+      - ./play-creds:/data/play:ro        # optional: service-account JSONs
     restart: unless-stopped
-    # command: >-   # override for S3 / custom base-url
-    #   release-hub -listen :9100 -db /data/db.sqlite3
-    #   -base-url https://hub.example.com
-    #   -s3-bucket my-releases -s3-region eu-west-1
+    command: >-
+      release-hub -listen :9100 -db /data/db.sqlite3
+      -artifacts /data/artifacts
+      -base-url https://hub.example.com
+      -play-creds-dir /data/play
+      # -s3-bucket my-releases -s3-region eu-west-1
 volumes:
   release-hub-data:
 ```

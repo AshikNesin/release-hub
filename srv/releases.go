@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -14,6 +15,8 @@ import (
 	"time"
 
 	"context"
+
+	"log/slog"
 
 	"srv.exe.dev/db/dbgen"
 )
@@ -212,11 +215,60 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, "sign url: "+err.Error())
 		return
 	}
-	writeJSON(w, 201, map[string]any{
+	resp := map[string]any{
 		"slug": app.Slug, "versionCode": versionCode, "versionName": versionName,
 		"channel": channel, "sha256": sha, "size": size,
 		"apkUrl": dlURL,
-	})
+	}
+
+	// Optional Play Store publishing for .aab artifacts when this app has a
+	// service-account key in PlayCredsDir.
+	if playRelease, err := s.publishToPlay(r, app, key, channel, versionName, r.FormValue("notes")); err != nil {
+		slog.Warn("play publish failed", "app", app.Slug, "error", err)
+		resp["playError"] = err.Error() // stored + served; release itself succeeded
+	} else if playRelease != "" {
+		resp["playRelease"] = playRelease
+	}
+	writeJSON(w, 201, resp)
+}
+
+// publishToPlay pushes an .aab to Google Play when configured for the app.
+// Returns ("", nil) when not applicable (not an .aab, or no credentials).
+func (s *Server) publishToPlay(r *http.Request, app dbgen.App, key, channel, versionName, notes string) (string, error) {
+	if s.PlayCredsDir == "" || !strings.HasSuffix(strings.ToLower(key), ".aab") {
+		return "", nil
+	}
+	credFile := filepath.Join(s.PlayCredsDir, app.PackageName+".json")
+	if _, err := os.Stat(credFile); err != nil {
+		return "", nil // this app doesn't use Play
+	}
+	pub, err := NewPlayPublisher(r.Context(), app.PackageName, credFile)
+	if err != nil {
+		return "", err
+	}
+	// Materialize the artifact to a temp file for the uploader.
+	tmp, err := os.CreateTemp("", "hub-aab-*.aab")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmp.Name())
+	rc, err := s.Storage.Open(r.Context(), key)
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+	if _, err := io.Copy(tmp, rc); err != nil {
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		return "", err
+	}
+	release, err := pub.Publish(r.Context(), tmp.Name(), channel, versionName, notes)
+	if err != nil {
+		return "", err
+	}
+	slog.Info("play publish ok", "app", app.Slug, "channel", channel, "release", release)
+	return release, nil
 }
 
 // handleApiReleases GET /api/apps/{slug}/releases
