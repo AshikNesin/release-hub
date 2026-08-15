@@ -266,6 +266,9 @@ func (s *Server) Serve(addr string) error {
 	mux.HandleFunc("GET /api/apps/{slug}/releases", s.requireAPI(s.handleApiReleases))
 	mux.HandleFunc("POST /api/tokens", s.requireAPI(s.handleApiCreateToken))
 	mux.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
+	mux.HandleFunc("POST /api/apps/{slug}/signing", s.requireAPI(s.handleApiSetSigning))
+	mux.HandleFunc("GET /api/apps/{slug}/signing", s.requireAPI(s.handleApiGetSigning))
+	mux.HandleFunc("POST /api/apps/{slug}/signing/delete", s.requireAPI(s.handleApiDeleteSigning))
 
 	// Public (devices): manifest + artifact download need no auth.
 	mux.HandleFunc("GET /api/apps/{slug}/manifest", s.handleManifest)

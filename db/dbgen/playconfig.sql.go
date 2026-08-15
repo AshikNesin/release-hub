@@ -10,7 +10,7 @@ import (
 )
 
 const listAppsWithPlay = `-- name: ListAppsWithPlay :many
-SELECT id, slug, package_name, platform, created_at, play_enabled, play_credentials FROM apps WHERE play_enabled = 1
+SELECT id, slug, package_name, platform, created_at, play_enabled, play_credentials, sign_keystore, sign_config, sign_sha256 FROM apps WHERE play_enabled = 1
 `
 
 func (q *Queries) ListAppsWithPlay(ctx context.Context) ([]App, error) {
@@ -30,6 +30,9 @@ func (q *Queries) ListAppsWithPlay(ctx context.Context) ([]App, error) {
 			&i.CreatedAt,
 			&i.PlayEnabled,
 			&i.PlayCredentials,
+			&i.SignKeystore,
+			&i.SignConfig,
+			&i.SignSha256,
 		); err != nil {
 			return nil, err
 		}

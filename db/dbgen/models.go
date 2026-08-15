@@ -24,6 +24,9 @@ type App struct {
 	CreatedAt       time.Time `json:"created_at"`
 	PlayEnabled     int64     `json:"play_enabled"`
 	PlayCredentials string    `json:"play_credentials"`
+	SignKeystore    string    `json:"sign_keystore"`
+	SignConfig      string    `json:"sign_config"`
+	SignSha256      string    `json:"sign_sha256"`
 }
 
 type Config struct {

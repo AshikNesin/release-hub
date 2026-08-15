@@ -69,6 +69,42 @@ With S3:
 Credentials: static keys via `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, or
 any provider in the default AWS chain (env, shared config, IAM role).
 
+## Signing keystores (per app)
+
+App signing keys can live in the hub too — encrypted like Play credentials
+(`RELEASE_HUB_SECRET_KEY`) — so **any** authenticated build environment can
+produce signed releases, and the key survives a lost laptop. One keystore
+per app; never share across apps.
+
+Store:
+
+```bash
+curl -H "Authorization: Bearer $HUB_TOKEN" \
+     -F file=release.jks -F storePassword=... -F keyAlias=release \
+     https://hub.example.com/api/apps/tinyfirewall/signing
+# → {"stored":true,"keystoreSha256":"8862…"}
+```
+
+Fetch (CI / any coding env):
+
+```bash
+curl -sD /tmp/h -H "Authorization: Bearer $HUB_TOKEN" \
+     -o app.jks https://hub.example.com/api/apps/tinyfirewall/signing
+STORE_PW=$(grep -i x-hub-store-password /tmp/h | cut -d' ' -f2 | tr -d '\r')
+ALIAS=$(grep -i x-hub-key-alias /tmp/h | cut -d' ' -f2 | tr -d '\r')
+KEY_PW=$(grep -i x-hub-key-password /tmp/h | cut -d' ' -f2 | tr -d '\r')
+# verify integrity:
+echo "$(grep -i x-hub-keystore-sha256 /tmp/h | cut -d' ' -f2 | tr -d '\r')  app.jks" | sha256sum -c
+```
+
+Then point gradle at it (`signingConfigs` reading env vars). Delete with
+`POST /api/apps/{slug}/signing/delete`.
+
+⚠️ This endpoint is bearer-auth only and returns live key material — the hub
+token now unlocks signing. Keep tokens scoped and the hub behind TLS.
+Also keep an offline backup of the keystore: if Play App Signing is NOT
+enrolled, losing this key means users can never update the app.
+
 ## Google Play (optional)
 
 Apps with Play enabled get their **.aab** uploads pushed to Google Play

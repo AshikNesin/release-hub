@@ -46,6 +46,10 @@ func (s *Server) muxForTest() *http.ServeMux {
 	m.HandleFunc("POST /api/apps/{slug}/releases", s.requireAPI(s.handleApiUpload))
 	m.HandleFunc("GET /api/apps/{slug}/releases", s.requireAPI(s.handleApiReleases))
 	m.HandleFunc("POST /api/tokens", s.requireAPI(s.handleApiCreateToken))
+	m.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
+	m.HandleFunc("POST /api/apps/{slug}/signing", s.requireAPI(s.handleApiSetSigning))
+	m.HandleFunc("GET /api/apps/{slug}/signing", s.requireAPI(s.handleApiGetSigning))
+	m.HandleFunc("POST /api/apps/{slug}/signing/delete", s.requireAPI(s.handleApiDeleteSigning))
 	m.HandleFunc("GET /api/apps/{slug}/manifest", s.handleManifest)
 	m.HandleFunc("GET /artifacts/{slug}/{file}", s.handleArtifact)
 	return m
