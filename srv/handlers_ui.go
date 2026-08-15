@@ -315,12 +315,12 @@ func (s *Server) render(w http.ResponseWriter, status int, name string, data any
 
 // signingSettingsField maps form field -> config key for the cert-subject
 // settings shown on the Settings page. Order defines form order.
-var signingSettingsFields = []struct{ Field, Key, Label, Hint string }{
-	{"org", "sign_org", "Organization (O)", "Company name baked into every generated signing certificate. Default: release-hub"},
-	{"ou", "sign_ou", "Organizational unit (OU)", "Team or division, e.g. Mobile"},
-	{"locality", "sign_locality", "Locality (L)", "City, e.g. Bengaluru"},
-	{"state", "sign_state", "State (ST)", "State or province"},
-	{"country", "sign_country", "Country (C)", "Two-letter code, e.g. IN"},
+var signingSettingsFields = []struct{ Field, Key, Label, Hint, Placeholder string }{
+	{"org", "sign_org", "Organization (O)", "Company name baked into every generated signing certificate.", "release-hub"},
+	{"ou", "sign_ou", "Organizational unit (OU)", "Team or division.", "Mobile"},
+	{"locality", "sign_locality", "Locality (L)", "City.", "Bengaluru"},
+	{"state", "sign_state", "State (ST)", "State or province.", "Karnataka"},
+	{"country", "sign_country", "Country (C)", "Two-letter code.", "IN"},
 }
 
 // bundlePrefix reads the configured default package prefix, e.g. "io.nesin".
@@ -346,15 +346,29 @@ func suggestPackage(prefix, slug string) string {
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	q := dbgen.New(s.DB)
 	if r.Method == http.MethodPost {
+		// Two independent forms post here (bundle prefix / cert subject).
+		// Only overwrite keys the submitted form actually carried; a missing
+		// field means "not part of this save", not "clear the value".
+		posted := r.PostForm
+		if posted == nil {
+			if err := r.ParseForm(); err == nil {
+				posted = r.PostForm
+			}
+		}
 		for _, f := range signingSettingsFields {
+			if !posted.Has(f.Field) {
+				continue
+			}
 			if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: f.Key, Value: strings.TrimSpace(r.FormValue(f.Field))}); err != nil {
 				http.Error(w, "save failed: "+err.Error(), 500)
 				return
 			}
 		}
-		if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: "bundle_prefix", Value: strings.Trim(strings.TrimSpace(r.FormValue("bundle_prefix")), ".")}); err != nil {
-			http.Error(w, "save failed: "+err.Error(), 500)
-			return
+		if posted.Has("bundle_prefix") {
+			if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: "bundle_prefix", Value: strings.Trim(strings.TrimSpace(r.FormValue("bundle_prefix")), ".")}); err != nil {
+				http.Error(w, "save failed: "+err.Error(), 500)
+				return
+			}
 		}
 		http.SetCookie(w, &http.Cookie{
 			Name: "rh_flash", Value: "Settings saved. New keys will use this certificate name.",
@@ -363,11 +377,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings", http.StatusSeeOther)
 		return
 	}
-	type field struct{ Name, Value, Label, Hint string }
+	type field struct{ Name, Value, Label, Hint, Placeholder string }
 	fields := make([]field, 0, len(signingSettingsFields))
 	for _, f := range signingSettingsFields {
 		v, _ := q.GetConfig(r.Context(), f.Key)
-		fields = append(fields, field{f.Field, v, f.Label, f.Hint})
+		fields = append(fields, field{f.Field, v, f.Label, f.Hint, f.Placeholder})
 	}
 	s.render(w, 200, "settings.html", struct {
 		uiData
