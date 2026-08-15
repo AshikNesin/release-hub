@@ -16,7 +16,7 @@
     <td class="muted num">{{.Latest}}</td>
   </tr>
   {{else}}
-  <tr><td colspan="4" style="color:var(--fg3)">No apps yet.</td></tr>
+  <tr><td colspan="4" style="color:var(--fg2)">No apps yet.</td></tr>
   {{end}}
   </tbody>
 </table>
@@ -38,7 +38,7 @@
     {{range .Tokens}}
     <tr><td>{{.Name}}</td><td class="num" style="color:var(--fg2)">{{.CreatedAt.Format "Jan 2, 2006 15:04"}}</td><td class="num" style="color:var(--fg2)">{{if .LastUsedAt}}{{.LastUsedAt.Format "Jan 2, 2006 15:04"}}{{else}}—{{end}}</td></tr>
     {{else}}
-    <tr><td colspan="3" style="color:var(--fg3)">None.</td></tr>
+    <tr><td colspan="3" style="color:var(--fg2)">None.</td></tr>
     {{end}}
     </tbody>
   </table>

@@ -28,7 +28,7 @@
     <tbody>
     {{range .Releases}}
     <tr>
-      <td><span class="num">{{.VersionName}}</span> <span style="color:var(--fg3)">({{.VersionCode}})</span></td>
+      <td><span class="num">{{.VersionName}}</span> <span style="color:var(--fg2)">({{.VersionCode}})</span></td>
       <td><span class="chip">{{.Channel}}</span></td>
       <td class="num" style="color:var(--fg2)">{{printf "%.1f" .SizeMB}} MB</td>
       <td style="color:var(--fg2)">{{.Notes}}</td>
@@ -36,7 +36,7 @@
       <td><a href="{{.URL}}">download</a></td>
     </tr>
     {{else}}
-    <tr><td colspan="6" style="color:var(--fg3)">No releases yet.</td></tr>
+    <tr><td colspan="6" style="color:var(--fg2)">No releases yet.</td></tr>
     <tr><td colspan="6"><div class="uploadcmd">
       <code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=direct {{.UploadURL}}</code>
       <button class="btn ghost xs" data-copy="curl -H &quot;Authorization: Bearer $TOKEN&quot; -F file=app.apk -F channel=direct {{.UploadURL}}">copy</button>
