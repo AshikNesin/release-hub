@@ -263,17 +263,13 @@ No database service needed.
    | Variable | Required | Notes |
    |---|---|---|
    | `RELEASE_HUB_SECRET_KEY` | **yes** | 32-byte base64/hex. Encrypts Play credentials and signing keystores at rest. `openssl rand -base64 32`. Losing it = losing stored keys — back it up. |
+   | `RELEASE_HUB_BASE_URL` | **yes** | Public address Coolify assigns (e.g. `https://hub.nesin.io`). Used in manifest/download links. |
 
-5. **Base URL** — the manifest/download URLs embed the public address. In the
-   application's **Command** (or start command) override, set:
-
-   ```
-   release-hub -listen :9100 -db /data/db.sqlite3 -artifacts /data/artifacts -base-url https://hub.yourdomain.com
-   ```
-
-   (equivalently via Coolify's custom start command field). Use the **https**
-   URL Coolify assigns — Coolify terminates TLS, and the session cookie is
-   marked Secure automatically when the base URL is https.
+5. **Base URL** — the manifest/download URLs embed the public address. Set it
+   via the `RELEASE_HUB_BASE_URL` env var (also accepted as a `-base-url`
+   flag). Use the **https** URL Coolify assigns — Coolify terminates TLS, and
+   the session cookie is marked Secure automatically when the base URL is
+   https.
 
 6. **Deploy**. First visit to the domain shows the one-time `/setup` page to
    set the admin password; then register your app (it gets a signing key

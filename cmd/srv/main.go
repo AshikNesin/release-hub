@@ -10,6 +10,8 @@ import (
 	"srv.exe.dev/srv"
 )
 
+// envOr lets each flag be overridden by an environment variable:
+// RELEASE_HUB_<UPPERCASE_NAME>. Flags win when both are given explicitly.
 func envOr(k, def string) string {
 	if v := os.Getenv(k); strings.TrimSpace(v) != "" {
 		return v
@@ -21,7 +23,7 @@ var (
 	flagListen    = flag.String("listen", ":9100", "address to listen on")
 	flagDB        = flag.String("db", "db.sqlite3", "sqlite database path")
 	flagArtifacts = flag.String("artifacts", "artifacts", "local storage dir (ignored with -s3-bucket)")
-	flagBaseURL   = flag.String("base-url", "http://localhost:9100", "public base URL used in manifest/download links")
+	flagBaseURL   = flag.String("base-url", envOr("RELEASE_HUB_BASE_URL", "http://localhost:9100"), "public base URL used in manifest/download links (env: RELEASE_HUB_BASE_URL)")
 
 	// Optional S3 storage. -s3-bucket switches the backend from local FS.
 	flagS3Bucket   = flag.String("s3-bucket", "", "S3 bucket for artifacts (switches storage backend to S3)")

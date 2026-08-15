@@ -14,4 +14,4 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 VOLUME ["/data"]
 EXPOSE 9100
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["release-hub", "-listen", ":9100", "-db", "/data/db.sqlite3", "-artifacts", "/data/artifacts", "-base-url", "http://localhost:9100"]
+CMD ["release-hub", "-listen", ":9100", "-db", "/data/db.sqlite3", "-artifacts", "/data/artifacts"]
