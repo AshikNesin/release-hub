@@ -19,19 +19,23 @@ testing** track; `channel=public` goes to **production**; `channel=direct`
 
 ## One-time: link API access in Play Console
 
-Direct link (fastest — the console UI moves this page around):
+The console UI moves this page around between redesigns. Reliable ways in:
 
-> <https://play.google.com/console/api-access>
+- The **search box** at the top of Play Console: type "API access".
+- Manually: console **home** (not inside an app) → ☰ menu → bottom group →
+  **Setup** → **API access** (older UIs: **Users and permissions → API
+  access**).
+- A deep link that works when signed into a single account:
+  `https://play.google.com/console/u/0/api-access` — bump `/u/0/` to
+  `/u/1/` etc. if you're signed into multiple Google profiles and 0 is the
+  wrong one. If this 404s, use the manual path above.
 
 1. Sign in at <https://play.google.com/console> with the **account owner**
    Google account (e.g. the one owning `io.nesin.tinyfirewall`).
-2. In the current console UI the page lives under **Setup → API access** in
-   the left sidebar (older UIs: **Users and permissions → API access**).
-   It's account-level, not inside an app. Non-admin accounts won't see it.
-3. Either accept the suggested Google Cloud project (**View → Link**), or
+2. Either accept the suggested Google Cloud project (**View → Link**), or
    create/link a project of your choice. Any ordinary project works — it
    just hosts the service account.
-4. If Play shows a setup wizard, you can follow it, or continue with the
+3. If Play shows a setup wizard, you can follow it, or continue with the
    next section directly in Google Cloud Console.
 
 ## One-time: service account + JSON key
@@ -53,8 +57,8 @@ many apps; uploading the same JSON per app in the hub is fine.
 
 ## One-time: grant the service account release access in Play
 
-1. Back in **Play Console → Invite new users** (under **Users and
-   permissions**; direct: <https://play.google.com/console/users>).
+1. Back in **Play Console → Invite new users** (top search: "invite users",
+   or **Users and permissions** in the sidebar).
 2. Paste the service-account email from the previous step.
 3. Under **Account permissions** check:
    - **View app information and download bulk reports**
@@ -119,7 +123,7 @@ forms — are complete).
 
 | Symptom | Cause / fix |
 |---|---|
-| `playError`: 403 … not linked | Service account wasn't invited in Play Console, or API access not linked yet. Re-check **Setup → API access** (<https://play.google.com/console/api-access>) and the invite. |
+| `playError`: 403 … not linked | Service account wasn't invited in Play Console, or API access not linked yet. Re-check **Setup → API access** (find it via console search) and the invite. |
 | `playError`: 401 invalid_grant | Wrong/revoked JSON key — re-download a fresh key and re-upload it in the hub. |
 | `playError`: release failed … versionCode | Play rejected the version code (must strictly increase per app). Bump it. |
 | Upload OK but testers see nothing | Track has no tester list / opt-in not completed, or Play still processing the release (minutes). |
