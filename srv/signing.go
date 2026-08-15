@@ -245,8 +245,8 @@ func generateKeystoreWithSubject(commonName string, subj certSubject) (p12 []byt
 		return nil, cfg, nil, fmt.Errorf("generate serial: %w", err)
 	}
 	tmpl := x509.Certificate{
-		SerialNumber: serial,
-		Subject:      subj.pkixName(commonName),
+		SerialNumber:          serial,
+		Subject:               subj.pkixName(commonName),
 		NotBefore:             time.Now().Add(-time.Hour), // tolerate clock skew
 		NotAfter:              time.Now().AddDate(30, 0, 0),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,

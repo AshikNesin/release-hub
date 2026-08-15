@@ -1,14 +1,14 @@
 {{template "base.html" .}}
 {{define "content"}}
-<h2 style="font-size:15px;margin:0 0 12px">Apps</h2>
 <div class="card">
+  <h2>Apps</h2>
   <table>
     <tr><th>App</th><th>Package</th><th>Platform</th><th>Latest (direct)</th></tr>
     {{range .Apps}}
     <tr>
       <td><a href="/apps/{{.Slug}}">{{.Slug}}</a></td>
       <td class="muted">{{.PackageName}}</td>
-      <td>{{.Platform}}</td>
+      <td><span class="badge {{.Platform}}">{{.Platform}}</span></td>
       <td class="muted">{{.Latest}}</td>
     </tr>
     {{else}}
@@ -18,16 +18,16 @@
 </div>
 
 <div class="card">
-  <h3 style="font-size:13px;margin:0 0 10px;color:var(--muted)">Register app</h3>
+  <h3 class="muted">Register app</h3>
   <form method="post" action="/apps" class="inline">
     <div><label>Slug</label><input name="slug" placeholder="tinyfirewall" required></div>
     <button type="submit">Add</button>
   </form>
-  <p class="muted" style="margin:8px 0 0;font-size:12px">Just a name — add the android/ios platforms (package names, signing keys) from the app's page.</p>
+  <p class="muted small" style="margin:8px 0 0">Just a name — add the android/ios platforms (package names, signing keys) from the app's page.</p>
 </div>
 
 <div class="card">
-  <h3 style="font-size:13px;margin:0 0 10px;color:var(--muted)">API tokens</h3>
+  <h3 class="muted">API tokens</h3>
   <table>
     <tr><th>Name</th><th>Created</th><th>Last used</th></tr>
     {{range .Tokens}}

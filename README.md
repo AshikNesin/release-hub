@@ -301,3 +301,27 @@ make build && make test
 
 systemd: `release-hub.service` (port 9100).
 
+Code layout (one file per concern, single canonical route table):
+
+```
+cmd/srv/            flags + wiring (storage backend choice)
+srv/
+  server.go         Server, Options, New(), Serve()
+  routes.go         THE route table (used by Serve and tests — no drift)
+  auth.go           bearer tokens, sessions, middleware
+  api_apps.go       app/platform registration + tokens (API)
+  api_releases.go   upload, release list, Play publish (API)
+  public.go         manifest + artifact download (device-facing, no auth)
+  handlers_ui.go    server-rendered pages
+  templates.go      go:embed templates + static assets, render helpers
+  signing.go        keystore generation/storage (PKCS#12 w/ friendlyName)
+  play.go           Google Play Publishing API client
+  storage.go        Storage interface: LocalStorage, S3Storage
+  secrets.go        at-rest encryption of keystores/credentials
+  templates/*.html  pages ({{define "content"}} over base.html)
+  static/           style.css, app.js (embedded, served at /static/)
+db/
+  migrations/       numbered SQLite migrations (auto-run at startup)
+  queries/          sqlc queries → db/dbgen (regen: sqlc generate in db/)
+```
+

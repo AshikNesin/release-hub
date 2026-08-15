@@ -116,8 +116,8 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 
 	releaseName := fmt.Sprintf("%s (%d)", versionName, bundle.VersionCode)
 	rel := &androidpublisher.TrackRelease{
-		Name:        releaseName,
-		Status:      "completed",
+		Name:         releaseName,
+		Status:       "completed",
 		VersionCodes: []int64{bundle.VersionCode},
 		ReleaseNotes: []*androidpublisher.LocalizedText{
 			{Language: "en-US", Text: notes},

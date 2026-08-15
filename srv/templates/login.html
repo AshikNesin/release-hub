@@ -1,11 +1,11 @@
 {{template "base.html" .}}
 {{define "content"}}
 <div class="card" style="max-width:360px;margin:64px auto">
-  <h2 style="margin-top:0;font-size:16px">Sign in</h2>
+  <h2>Sign in</h2>
   <form method="post" action="/login">
     <label for="password">Admin password</label>
     <input type="password" id="password" name="password" style="width:100%" autofocus required>
-    <div class="err">{{.Error}}</div>
+    {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
     <button type="submit" style="width:100%;margin-top:12px">Sign in</button>
   </form>
 </div>

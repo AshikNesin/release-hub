@@ -44,12 +44,9 @@ func run() error {
 	if err != nil {
 		hostname = "unknown"
 	}
-	server, err := srv.New(*flagDB, hostname)
-	if err != nil {
-		return fmt.Errorf("create server: %w", err)
-	}
-	server.BaseURL = *flagBaseURL
+	// Storage backend: local FS by default, S3-compatible when -s3-bucket set.
 	ctx := context.Background()
+	var st srv.Storage = &srv.LocalStorage{Dir: *flagArtifacts, BaseURL: *flagBaseURL}
 	if *flagS3Bucket != "" {
 		s3s, err := srv.NewS3Storage(ctx, srv.S3Options{
 			Bucket: *flagS3Bucket, Region: *flagS3Region, Endpoint: *flagS3Endpoint,
@@ -60,9 +57,13 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("s3 storage: %w", err)
 		}
-		server.Storage = s3s
-	} else {
-		server.Storage = &srv.LocalStorage{Dir: *flagArtifacts, BaseURL: *flagBaseURL}
+		st = s3s
+	}
+	server, err := srv.New(srv.Options{
+		DBPath: *flagDB, Hostname: hostname, BaseURL: *flagBaseURL, Storage: st,
+	})
+	if err != nil {
+		return fmt.Errorf("create server: %w", err)
 	}
 	return server.Serve(*flagListen)
 }

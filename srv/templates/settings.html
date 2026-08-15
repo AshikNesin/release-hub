@@ -1,12 +1,10 @@
 {{template "base.html" .}}
 {{define "content"}}
-<h2 style="font-size:15px;margin:0 0 12px">Settings</h2>
-
 <div class="card">
-  <h3 style="font-size:13px;margin:0 0 6px">Signing certificate name</h3>
-  <p class="muted" style="margin:0 0 12px;font-size:12px">
-    Used as the distinguished name when a signing keystore is auto-generated for
-    a new Android app. Applies to <b>newly generated keys only</b> — existing
+  <h2>Signing certificate name</h2>
+  <p class="sub">
+    Distinguished name used when a signing keystore is auto-generated for a new
+    Android platform. Applies to <b>newly generated keys only</b> — existing
     keystores keep their certificate (changing it would break update signature
     continuity).
   </p>

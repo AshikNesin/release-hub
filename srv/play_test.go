@@ -7,11 +7,11 @@ func TestTrackFor(t *testing.T) {
 		track string
 		ok    bool
 	}{
-		"public":    {"production", true},
-		"internal":  {"internal", true},
+		"public":             {"production", true},
+		"internal":           {"internal", true},
 		"direct":             {"", false},
 		"api-share (legacy)": {"", false}, // rejected at upload layer; trackFor returns no track anyway
-		"weird":     {"", false},
+		"weird":              {"", false},
 	}
 	for ch, want := range cases {
 		track, ok := trackFor(ch)

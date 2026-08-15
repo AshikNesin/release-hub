@@ -121,7 +121,9 @@ func TestCreateAppGeneratesSigning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body.Reset(); body.ReadFrom(resp.Body); resp.Body.Close()
+	body.Reset()
+	body.ReadFrom(resp.Body)
+	resp.Body.Close()
 	if resp.StatusCode != 201 || !strings.Contains(body.String(), `"signingKey":"generated"`) {
 		t.Fatalf("add android platform: %d body=%s", resp.StatusCode, body.String())
 	}

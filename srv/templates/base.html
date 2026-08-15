@@ -1,45 +1,25 @@
+{{define "nav"}}{{if .Authenticated}}<nav class="main">
+  <a href="/" class="{{if eq .Title "Apps"}}active{{end}}">Apps</a>
+  <a href="/settings" class="{{if eq .Title "Settings"}}active{{end}}">Settings</a>
+  <a class="ghost" href="/logout">Logout</a>
+</nav>{{end}}{{end}}
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} · release-hub</title>
-<style>
-  :root { --bg:#0f1115; --card:#1a1e27; --border:#2a3040; --fg:#e6e9ef; --muted:#8b93a7; --accent:#4f8cff; }
-  * { box-sizing: border-box; }
-  body { margin:0; font-family: ui-sans-serif, system-ui, sans-serif; background:var(--bg); color:var(--fg); }
-  a { color: var(--accent); text-decoration: none; }
-  .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
-  header { display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px; }
-  header h1 { font-size: 18px; margin: 0; }
-  .card { background: var(--card); border:1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-  .muted { color: var(--muted); font-size: 13px; }
-  table { width:100%; border-collapse: collapse; font-size: 14px; }
-  th { text-align:left; color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-  td { padding: 8px; border-bottom: 1px solid var(--border); }
-  tr:last-child td { border-bottom: none; }
-  .badge { display:inline-block; padding:2px 8px; border-radius: 999px; font-size: 11px; border:1px solid var(--border); color: var(--muted); }
-  .badge.public { color:#7ee2a8; border-color:#2f5d43; }
-  .badge.internal { color:#ffd479; border-color:#6b5a2a; }
-  input, select, button, textarea { font: inherit; background:#11141b; color:var(--fg); border:1px solid var(--border); border-radius:8px; padding:8px 10px; }
-  button { cursor: pointer; background: var(--accent); border-color: var(--accent); color: #fff; }
-  button.secondary { background: transparent; border:1px solid var(--border); color: var(--fg); }
-  form.inline { display:flex; gap:8px; flex-wrap:wrap; align-items:end; }
-  label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
-  .row { display:flex; gap:16px; flex-wrap:wrap; }
-  .err { color:#ff8b8b; font-size:13px; margin-top:8px; }
-  code { background:#11141b; padding:2px 6px; border-radius:6px; font-size: 12px; word-break: break-all; }
-  .flash { background:#1d2b1f; border:1px solid #2f5d43; color:#b8f0cd; padding:10px 14px; border-radius:8px; margin-bottom:16px; font-size:14px; word-break: break-all; }
-</style>
+<link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1><a href="/" style="color:var(--fg)">release-hub</a></h1>
-    {{if .Authenticated}}<a class="muted" href="/settings">settings</a> <a class="muted" href="/logout">logout</a>{{end}}
+  <header class="top">
+    <div class="brand"><span class="logo">R</span><a href="/">release-hub</a></div>
+    {{template "nav" .}}
   </header>
   {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
   {{block "content" .}}{{end}}
 </div>
+<script src="/static/app.js"></script>
 </body>
 </html>

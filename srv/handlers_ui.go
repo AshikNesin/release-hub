@@ -1,13 +1,13 @@
 package srv
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
-	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -246,10 +246,10 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		CreatedAt                        time.Time
 	}
 	type platSection struct {
-		Platform, PackageName          string
-		Releases                       []relRow
-		ManifestURL, UploadURL         string
-		HasSigningKey                  bool
+		Platform, PackageName  string
+		Releases               []relRow
+		ManifestURL, UploadURL string
+		HasSigningKey          bool
 	}
 	sections := make([]platSection, 0, len(plats))
 	for _, p := range plats {
@@ -262,7 +262,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		for _, rel := range releases {
 			rows = append(rows, relRow{
 				VersionName: rel.VersionName, Channel: rel.Channel, Notes: rel.Notes,
-				URL: "/artifacts/" + app.Slug + "/" + p.Platform + "/" + rel.FileName,
+				URL:         "/artifacts/" + app.Slug + "/" + p.Platform + "/" + rel.FileName,
 				VersionCode: rel.VersionCode,
 				SizeMB:      float64(rel.SizeBytes) / (1 << 20),
 				CreatedAt:   rel.CreatedAt,
@@ -270,14 +270,14 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		sections = append(sections, platSection{
 			Platform: p.Platform, PackageName: p.PackageName, Releases: rows,
-			ManifestURL: s.BaseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
-			UploadURL:   s.BaseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
+			ManifestURL:   s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
+			UploadURL:     s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
 			HasSigningKey: p.SignSha256 != "",
 		})
 	}
 	s.render(w, 200, "app.html", struct {
 		uiData
-		App      dbgen.App
+		App       dbgen.App
 		Platforms []platSection
 	}{
 		uiData{Title: app.Slug, Authenticated: true},
@@ -286,10 +286,16 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) render(w http.ResponseWriter, status int, name string, data any) {
+	tmpl, err := parsePageTemplate(s.TemplatesDir, name)
+	if err != nil {
+		slog.Error("parse template", "name", name, "error", err)
+		http.Error(w, "template error", 500)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	if err := renderTemplate(w, s.TemplatesDir, name, data); err != nil {
-		slog.Warn("render template", "name", name, "error", err)
+	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
+		slog.Error("render template", "name", name, "error", err)
 	}
 }
 

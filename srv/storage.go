@@ -20,8 +20,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// Storage is where release artifacts live. Implementations must stream
-// (artifacts are 50MB+); nothing may buffer a whole file in memory.
+// Storage is the artifact backend: local FS or S3. Implementations must
+// stream (artifacts are 50MB+); nothing may buffer a whole file in memory.
 type Storage interface {
 	// Save streams src to the artifact identified by key, returning size and
 	// sha256. Implementations must clean up on failure.

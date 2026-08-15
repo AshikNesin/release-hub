@@ -14,50 +14,20 @@ import (
 	"testing"
 )
 
-var lastTestServer *Server
-
 func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	t.Helper()
 	dir := t.TempDir()
-	s, err := New(filepath.Join(dir, "test.sqlite3"), "test-host")
+	s, err := New(Options{
+		DBPath: filepath.Join(dir, "test.sqlite3"), Hostname: "test-host",
+		BaseURL: "http://hub.test",
+		Storage: &LocalStorage{Dir: filepath.Join(dir, "artifacts"), BaseURL: "http://hub.test"},
+	})
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
-	s.BaseURL = "http://hub.test"
-	s.Storage = &LocalStorage{Dir: filepath.Join(dir, "artifacts"), BaseURL: "http://hub.test"}
-	lastTestServer = s
-	ts := httptest.NewServer(s.muxForTest())
+	ts := httptest.NewServer(s.routes())
 	t.Cleanup(ts.Close)
 	return s, ts
-}
-
-// muxForTest builds the same route table as Serve without listening.
-func (s *Server) muxForTest() *http.ServeMux {
-	m := http.NewServeMux()
-	m.HandleFunc("GET /setup", s.handleFirstRun)
-	m.HandleFunc("POST /setup", s.handleFirstRun)
-	m.HandleFunc("GET /login", s.handleLogin)
-	m.HandleFunc("POST /login", s.handleLogin)
-	m.HandleFunc("GET /logout", s.handleLogout)
-	m.HandleFunc("GET /{$}", s.requireUI(s.handleHome))
-	m.HandleFunc("POST /apps", s.requireUI(s.handleCreateAppUI))
-	m.HandleFunc("POST /tokens", s.requireUI(s.handleCreateTokenUI))
-	m.HandleFunc("GET /apps/{slug}", s.requireUI(s.handleAppDetail))
-	m.HandleFunc("GET /api/apps", s.requireAPI(s.handleApiListApps))
-	m.HandleFunc("POST /api/apps", s.requireAPI(s.handleApiCreateApp))
-	m.HandleFunc("POST /api/apps/{slug}/platforms", s.requireAPI(s.handleApiAddPlatform))
-	m.HandleFunc("POST /api/apps/{slug}/releases", s.requireAPI(s.handleApiUpload))
-	m.HandleFunc("POST /api/apps/{slug}/{platform}/releases", s.requireAPI(s.handleApiUpload))
-	m.HandleFunc("GET /api/apps/{slug}/releases", s.requireAPI(s.handleApiReleases))
-	m.HandleFunc("POST /api/tokens", s.requireAPI(s.handleApiCreateToken))
-	m.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
-	m.HandleFunc("POST /api/apps/{slug}/signing", s.requireAPI(s.handleApiSetSigning))
-	m.HandleFunc("GET /api/apps/{slug}/signing", s.requireAPI(s.handleApiGetSigning))
-	m.HandleFunc("POST /api/apps/{slug}/signing/delete", s.requireAPI(s.handleApiDeleteSigning))
-	m.HandleFunc("GET /api/apps/{slug}/manifest", s.handleManifest)
-	m.HandleFunc("GET /api/apps/{slug}/{platform}/signing", s.requireAPI(s.handleApiGetSigning))
-	m.HandleFunc("GET /artifacts/{slug}/{platform}/{file}", s.handleArtifact)
-	return m
 }
 
 func TestApiRequiresBearer(t *testing.T) {
@@ -73,12 +43,12 @@ func TestApiRequiresBearer(t *testing.T) {
 }
 
 func TestUploadAndManifestFlow(t *testing.T) {
-	_, ts := newTestServer(t)
+	s, ts := newTestServer(t)
 	client := ts.Client()
 
 	// Seed a bearer token directly in the DB with a known hash.
 	tok := "rh_testtoken123"
-	if _, err := lastTestServer.DB.Exec(
+	if _, err := s.DB.Exec(
 		"INSERT INTO api_tokens (name, token_hash) VALUES ('test', ?)", hashToken(tok)); err != nil {
 		t.Fatalf("seed token: %v", err)
 	}
@@ -178,8 +148,6 @@ func TestUploadAndManifestFlow(t *testing.T) {
 	}
 }
 
-
-
 // App → platforms: one slug, android + ios variants, independent releases
 // and signing keys per platform.
 func TestAppPlatforms(t *testing.T) {
@@ -215,7 +183,9 @@ func TestAppPlatforms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body.Reset(); body.ReadFrom(resp.Body); resp.Body.Close()
+	body.Reset()
+	body.ReadFrom(resp.Body)
+	resp.Body.Close()
 	if resp.StatusCode != 201 || !strings.Contains(body.String(), `"signingKey":"generated"`) {
 		t.Fatalf("add android platform: %d %s", resp.StatusCode, body.String())
 	}
@@ -229,7 +199,9 @@ func TestAppPlatforms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body.Reset(); body.ReadFrom(resp.Body); resp.Body.Close()
+	body.Reset()
+	body.ReadFrom(resp.Body)
+	resp.Body.Close()
 	if resp.StatusCode != 201 {
 		t.Fatalf("add platform: %d %s", resp.StatusCode, body.String())
 	}
@@ -241,7 +213,9 @@ func TestAppPlatforms(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body.Reset(); body.ReadFrom(resp.Body); resp.Body.Close()
+	body.Reset()
+	body.ReadFrom(resp.Body)
+	resp.Body.Close()
 	got := body.String()
 	if !strings.Contains(got, `"slug":"multiapp"`) || !strings.Contains(got, `"platform":"android"`) || !strings.Contains(got, `"platform":"ios"`) {
 		t.Fatalf("list apps missing platforms: %s", got)

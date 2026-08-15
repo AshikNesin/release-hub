@@ -1,22 +1,22 @@
 {{template "base.html" .}}
 {{define "content"}}
-<h2 style="font-size:15px;margin:0 0 4px">{{.App.Slug}}</h2>
-<p class="muted" style="margin:0 0 16px">product identity — one slug, one or more platforms</p>
-
-{{if not .Platforms}}
 <div class="card">
-  <p class="muted" style="margin:0 0 4px">No platforms yet — add the android or ios variant of this app below.</p>
+  <h2 style="font-size:16px">{{.App.Slug}} <span class="muted small">product</span></h2>
+  {{if not .Platforms}}<p class="muted" style="margin:0">No platforms yet — add the android or ios variant below.</p>{{end}}
 </div>
-{{end}}
+
 {{range .Platforms}}
 <div class="card">
-  <h3 style="font-size:13px;margin:0 0 8px">
-    <span class="badge">{{.Platform}}</span>
-    <span class="muted">{{.PackageName}}</span>
-    {{if .HasSigningKey}}<span class="muted">· signing key stored</span>{{end}}
-  </h3>
-  <p class="muted" style="margin:0 0 8px">Update manifest (point the app's UPDATE_URL here):</p>
-  <code>{{.ManifestURL}}</code>
+  <div class="plat-head">
+    <span class="badge {{.Platform}}">{{.Platform}}</span>
+    <span class="pkg">{{.PackageName}}</span>
+    {{if .HasSigningKey}}<span class="badge key">signing key stored</span>{{end}}
+  </div>
+  <p class="muted small" style="margin:8px 0 4px">Update manifest (point the app's UPDATE_URL here):</p>
+  <div class="copywrap">
+    <code>{{.ManifestURL}}</code>
+    <button class="ghost" data-copy="{{.ManifestURL}}">copy</button>
+  </div>
   <table style="margin-top:12px">
     <tr><th>Version</th><th>Channel</th><th>Size</th><th>Notes</th><th>Uploaded</th><th></th></tr>
     {{range .Releases}}
@@ -30,18 +30,19 @@
     </tr>
     {{else}}
     <tr><td colspan="6" class="muted">No releases yet. Upload via:</td></tr>
-    <tr><td colspan="6"><code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=direct {{.UploadURL}}</code></td></tr>
+    <tr><td colspan="6"><div class="copywrap"><code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=direct {{.UploadURL}}</code><button class="ghost" data-copy="curl -H &quot;Authorization: Bearer $TOKEN&quot; -F file=app.apk -F channel=direct {{.UploadURL}}">copy</button></div></td></tr>
     {{end}}
   </table>
 </div>
 {{end}}
 
 <div class="card">
-  <h3 style="font-size:13px;margin:0 0 10px;color:var(--muted)">Add platform</h3>
+  <h3 class="muted">Add platform</h3>
   <form method="post" action="/apps/{{.App.Slug}}/platforms" class="inline">
     <div><label>Platform</label><select name="platform"><option>ios</option><option>android</option></select></div>
     <div><label>Package / bundle name</label><input name="packageName" placeholder="io.example.app" required></div>
     <button type="submit">Add platform</button>
   </form>
+  <p class="muted small" style="margin:8px 0 0">Android platforms get an auto-generated signing keystore immediately.</p>
 </div>
 {{end}}
