@@ -142,12 +142,10 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 			rows = append(rows, appRow{a.Slug, p.PackageName, p.Platform, latest})
 		}
 	}
-	tokens, _ := q.ListApiTokens(r.Context())
 	s.render(w, 200, "apps.html", struct {
 		uiData
-		Apps   []appRow
-		Tokens []dbgen.ApiToken
-	}{uiData{Title: "Apps", Authenticated: true, AssetVersion: assetVersion}, rows, tokens})
+		Apps []appRow
+	}{uiData{Title: "Apps", Authenticated: true, AssetVersion: assetVersion}, rows})
 }
 
 // handleCreateAppUI registers the product shell: slug only. Platforms are
@@ -221,10 +219,10 @@ func (s *Server) handleCreateTokenUI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: "rh_flash", Value: "New token (copy now, shown once): " + token,
+		Name: "rh_flash", Value: token,
 		Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 30,
 	})
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
 // ---- app detail ----
@@ -383,9 +381,13 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		v, _ := q.GetConfig(r.Context(), f.Key)
 		fields = append(fields, field{f.Field, v, f.Label, f.Hint, f.Placeholder})
 	}
+	tokens, _ := q.ListApiTokens(r.Context())
 	s.render(w, 200, "settings.html", struct {
 		uiData
 		Fields       []field
 		BundlePrefix string
-	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion}, fields, s.bundlePrefix(r.Context())})
+		Tokens       []dbgen.ApiToken
+		NewToken     string
+	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion},
+		fields, s.bundlePrefix(r.Context()), tokens, flashFrom(r)})
 }

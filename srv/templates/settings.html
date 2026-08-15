@@ -15,6 +15,27 @@
 </section>
 
 <section>
+  <div class="sect">API tokens</div>
+  {{if .NewToken}}
+  <div class="flash">New token (copy it now, shown only once): <code>{{.NewToken}}</code></div>
+  {{end}}
+  <table>
+    <thead><tr><th>Name</th><th>Created</th><th>Last used</th></tr></thead>
+    <tbody>
+    {{range .Tokens}}
+    <tr><td>{{.Name}}</td><td class="num" style="color:var(--fg2)">{{.CreatedAt.Format "Jan 2, 2006 15:04"}}</td><td class="num" style="color:var(--fg2)">{{if .LastUsedAt}}{{.LastUsedAt.Format "Jan 2, 2006 15:04"}}{{else}}—{{end}}</td></tr>
+    {{else}}
+    <tr><td colspan="3" style="color:var(--fg2)">None. Create one for CI / deploy scripts.</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  <form method="post" action="/tokens" class="inline" style="margin-top:12px">
+    <div><label>Name</label><input name="name" placeholder="ci" required></div>
+    <button type="submit" class="btn primary">Create token</button>
+  </form>
+</section>
+
+<section>
   <div class="sect">Certificate subject</div>
   <p class="hint" style="margin:0 0 14px">Applies to newly generated keys only — existing keystores keep their certificate.</p>
   <form method="post" action="/settings" class="inline">

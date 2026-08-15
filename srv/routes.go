@@ -21,7 +21,10 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /apps/{slug}/platforms", s.requireUI(s.handleAddPlatformUI))
 	mux.HandleFunc("POST /tokens", s.requireUI(s.handleCreateTokenUI))
 	mux.HandleFunc("GET /apps/{slug}", s.requireUI(s.handleAppDetail))
-	mux.HandleFunc("GET /settings", s.requireUI(s.handleSettings))
+	mux.HandleFunc("GET /settings", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(withFlash(r, flash(r)))
+		s.handleSettings(w, r)
+	}))
 	mux.HandleFunc("POST /settings", s.requireUI(s.handleSettings))
 
 	// API (bearer auth)
