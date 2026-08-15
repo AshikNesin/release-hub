@@ -50,10 +50,13 @@
 <section>
   <div class="sect">Add platform</div>
   <form method="post" action="/apps/{{.App.Slug}}/platforms" class="inline">
-    <div><label>Platform</label><select name="platform" style="width:120px"><option>ios</option><option>android</option></select></div>
-    <div><label>Package / bundle name</label><input name="packageName" placeholder="io.example.app" required></div>
+    <div><label>Platform</label><select name="platform" style="width:120px">
+      {{if not .HasAndroid}}<option>android</option>{{end}}
+      <option>ios</option>
+    </select></div>
+    <div><label>Package / bundle name</label><input name="packageName" value="{{.SuggestedPkg}}" placeholder="io.example.app" required list="commonpkgs"></div>
     <button type="submit" class="btn primary">Add platform</button>
   </form>
-  <p class="hint">Android platforms get an auto-generated signing keystore immediately.</p>
+  <p class="hint">Prefilled from the bundle prefix in Settings (prefix + slug). Android platforms get an auto-generated signing keystore immediately.</p>
 </section>
 {{end}}

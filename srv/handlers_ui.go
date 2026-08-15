@@ -278,11 +278,22 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, 200, "app.html", struct {
 		uiData
-		App       dbgen.App
-		Platforms []platSection
+		App            dbgen.App
+		Platforms      []platSection
+		SuggestedPkg   string // prefill for Add-platform: bundle_prefix + slug
+		HasAndroid     bool   // hide android from the picker when it exists
 	}{
 		uiData{Title: app.Slug, Authenticated: true, AssetVersion: assetVersion},
 		app, sections,
+		suggestPackage(s.bundlePrefix(r.Context()), app.Slug),
+		func() bool {
+			for _, p := range plats {
+				if p.Platform == "android" {
+					return true
+				}
+			}
+			return false
+		}(),
 	})
 }
 
@@ -312,6 +323,26 @@ var signingSettingsFields = []struct{ Field, Key, Label, Hint string }{
 	{"country", "sign_country", "Country (C)", "Two-letter code, e.g. IN"},
 }
 
+// bundlePrefix reads the configured default package prefix, e.g. "io.nesin".
+// Used to prefill the package-name field when adding a platform: prefix+slug
+// (io.nesin + tinyfirewall → io.nesin.tinyfirewall).
+func (s *Server) bundlePrefix(ctx context.Context) string {
+	v, err := dbgen.New(s.DB).GetConfig(ctx, "bundle_prefix")
+	if err != nil {
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(v), ".")
+}
+
+// suggestPackage builds the prefilled package name for a new platform.
+// Slug is lowercase alnum+dashes; package segments use underscores for dashes.
+func suggestPackage(prefix, slug string) string {
+	if prefix == "" {
+		return ""
+	}
+	return prefix + "." + strings.ReplaceAll(slug, "-", "_")
+}
+
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	q := dbgen.New(s.DB)
 	if r.Method == http.MethodPost {
@@ -320,6 +351,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "save failed: "+err.Error(), 500)
 				return
 			}
+		}
+		if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: "bundle_prefix", Value: strings.Trim(strings.TrimSpace(r.FormValue("bundle_prefix")), ".")}); err != nil {
+			http.Error(w, "save failed: "+err.Error(), 500)
+			return
 		}
 		http.SetCookie(w, &http.Cookie{
 			Name: "rh_flash", Value: "Settings saved. New keys will use this certificate name.",
@@ -336,6 +371,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	s.render(w, 200, "settings.html", struct {
 		uiData
-		Fields []field
-	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion}, fields})
+		Fields       []field
+		BundlePrefix string
+	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion}, fields, s.bundlePrefix(r.Context())})
 }
