@@ -2,12 +2,18 @@ package srv
 
 import (
 	"bytes"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
+	"time"
+
+	pkcs12 "software.sslmate.com/src/go-pkcs12"
 )
 
 func TestSigningRoundtrip(t *testing.T) {
@@ -74,5 +80,68 @@ func TestSigningRoundtrip(t *testing.T) {
 	s.requireAPI(s.handleApiGetSigning)(resp2, req)
 	if resp2.Code != 401 {
 		t.Fatalf("expected 401 without token, got %d", resp2.Code)
+	}
+}
+
+// Creating an android app must auto-generate a usable signing keystore:
+// fetch it back, decrypt, and verify the RSA key + cert actually parse.
+func TestCreateAppGeneratesSigning(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	tok := "rh_signing_gen_test"
+	if _, err := s.DB.Exec("INSERT INTO api_tokens (name, token_hash) VALUES ('t', ?)", hashToken(tok)); err != nil {
+		t.Fatal(err)
+	}
+
+	form := url.Values{"slug": {"genapp"}, "packageName": {"io.genapp"}, "platform": {"android"}}
+	req, _ := http.NewRequest("POST", ts.URL+"/api/apps", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := new(bytes.Buffer)
+	body.ReadFrom(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 201 {
+		t.Fatalf("create app: %d body=%s", resp.StatusCode, body.String())
+	}
+	if !strings.Contains(body.String(), `"signingKey":"generated"`) {
+		t.Fatalf("expected signingKey=generated in response, got: %s", body.String())
+	}
+
+	// Fetch the keystore + password headers and validate the PKCS#12 parses.
+	req, _ = http.NewRequest("GET", ts.URL+"/api/apps/genapp/signing", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("fetch signing: %d", resp.StatusCode)
+	}
+	pw := resp.Header.Get("X-Hub-Store-Password")
+	if len(pw) < 24 {
+		t.Fatalf("expected high-entropy store password, got %q", pw)
+	}
+	p12 := new(bytes.Buffer)
+	p12.ReadFrom(resp.Body)
+	if p12.Len() < 1000 {
+		t.Fatalf("keystore suspiciously small: %d bytes", p12.Len())
+	}
+	key, cert, err := pkcs12.Decode(p12.Bytes(), pw)
+	if err != nil {
+		t.Fatalf("decode generated pkcs12: %v", err)
+	}
+	if _, ok := key.(*rsa.PrivateKey); !ok {
+		t.Fatalf("expected RSA key, got %T", key)
+	}
+	if cert.Subject.CommonName != "Android App: genapp" {
+		t.Fatalf("unexpected cert CN: %q", cert.Subject.CommonName)
+	}
+	if time.Until(cert.NotAfter) < 29*365*24*time.Hour {
+		t.Fatalf("cert validity too short: expires %s", cert.NotAfter)
 	}
 }

@@ -1,11 +1,15 @@
 package srv
 
 import (
+	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,10 +17,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"context"
-
-	"log/slog"
 
 	"srv.exe.dev/db/dbgen"
 )
@@ -109,11 +109,48 @@ func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := dbgen.New(s.DB)
-	if _, err := q.CreateApp(r.Context(), dbgen.CreateAppParams{Slug: slug, PackageName: pkg, Platform: platform}); err != nil {
+	res, err := q.CreateApp(r.Context(), dbgen.CreateAppParams{Slug: slug, PackageName: pkg, Platform: platform})
+	if err != nil {
 		writeErr(w, 409, "app already exists or invalid: "+err.Error())
 		return
 	}
-	writeJSON(w, 201, map[string]string{"slug": slug, "channel": platform})
+	out := map[string]string{"slug": slug, "channel": platform}
+	// Android apps: auto-generate a dedicated signing keystore so the app is
+	// deploy-ready immediately — no manual keytool/upload step. Developer
+	// experience: register the app, set HUB_TOKEN, run deploy.sh. The key is
+	// generated once at creation and never rotates (rotation would break
+	// installed-base update signature continuity); uploading a keystore via
+	// /signing still overrides it for apps with an existing key history.
+	if platform == "android" {
+		appID, _ := res.LastInsertId()
+		p12, cfg, certPEM, gerr := generateKeystore("Android App: " + slug)
+		if gerr != nil {
+			slog.Error("auto-signing generation failed", "slug", slug, "err", gerr)
+			writeJSON(w, 201, out) // app exists; key can be uploaded later
+			return
+		}
+		cfgJSON, _ := json.Marshal(cfg)
+		encKS, e1 := encryptCreds(p12)
+		encCfg, e2 := encryptCreds(cfgJSON)
+		if e1 != nil || e2 != nil {
+			slog.Error("auto-signing encrypt failed", "slug", slug)
+			writeJSON(w, 201, out)
+			return
+		}
+		sum := sha256.Sum256(p12)
+		if err := q.SetSigningConfig(r.Context(), dbgen.SetSigningConfigParams{
+			SignKeystore: encKS, SignConfig: encCfg,
+			SignSha256: hex.EncodeToString(sum[:]), ID: appID,
+		}); err != nil {
+			slog.Error("auto-signing store failed", "slug", slug, "err", err)
+			writeJSON(w, 201, out)
+			return
+		}
+		_ = certPEM
+		out["signingKey"] = "generated"
+		out["signingSha256"] = hex.EncodeToString(sum[:])
+	}
+	writeJSON(w, 201, out)
 }
 
 // appFromSlug resolves ?app= or path param to an app row.

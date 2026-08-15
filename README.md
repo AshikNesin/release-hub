@@ -71,12 +71,26 @@ any provider in the default AWS chain (env, shared config, IAM role).
 
 ## Signing keystores (per app)
 
-App signing keys can live in the hub too — encrypted like Play credentials
+App signing keys live in the hub — encrypted like Play credentials
 (`RELEASE_HUB_SECRET_KEY`) — so **any** authenticated build environment can
 produce signed releases, and the key survives a lost laptop. One keystore
 per app; never share across apps.
 
-Store:
+**Auto-generated at app creation.** Registering an Android app
+(`POST /api/apps`) generates a fresh RSA-2048 keystore (30-year self-signed
+cert, random high-entropy password, alias `release`) and stores it encrypted —
+no keytool, no upload, no thinking about keys:
+
+```bash
+curl -H "Authorization: Bearer $HUB_TOKEN" \
+     -F slug=myapp -F packageName=io.example.myapp \
+     https://hub.example.com/api/apps
+# → {"slug":"myapp","signingKey":"generated","signingSha256":"26a4…"}
+```
+
+The generated key never rotates (rotation breaks installed-base update
+signature continuity). To bring an app with an existing key history instead,
+upload it explicitly — that replaces the generated one:
 
 ```bash
 curl -H "Authorization: Bearer $HUB_TOKEN" \
