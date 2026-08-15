@@ -228,6 +228,54 @@ volumes:
 Run behind a TLS-terminating proxy (Caddy/nginx/Traefik) in production —
 the session cookie and bearer tokens must not cross the network in cleartext.
 
+## Deploy on Coolify
+
+Coolify can deploy this repo directly — the Dockerfile is already
+self-contained (static Go binary, unprivileged user, SQLite in `/data`).
+No database service needed.
+
+1. **New Resource → Application** in your Coolify project.
+2. Point it at this repo (GitHub / Git provider). Build pack: **Dockerfile**
+   (auto-detected). Leave the port at **9100** — that's what the container
+   listens on; Coolify maps it to your domain automatically.
+3. **Persistence** — Coolify treats `/data` as the state directory. In the
+   application settings, add a **persistent storage volume** mounted at `/data`
+   (file storage is fine; db.sqlite3 + artifacts live there). Without this,
+   every redeploy starts with a fresh empty hub.
+4. **Environment variables** (Application → Environment):
+
+   | Variable | Required | Notes |
+   |---|---|---|
+   | `RELEASE_HUB_SECRET_KEY` | **yes** | 32-byte base64/hex. Encrypts Play credentials and signing keystores at rest. `openssl rand -base64 32`. Losing it = losing stored keys — back it up. |
+
+5. **Base URL** — the manifest/download URLs embed the public address. In the
+   application's **Command** (or start command) override, set:
+
+   ```
+   release-hub -listen :9100 -db /data/db.sqlite3 -artifacts /data/artifacts -base-url https://hub.yourdomain.com
+   ```
+
+   (equivalently via Coolify's custom start command field). Use the **https**
+   URL Coolify assigns — Coolify terminates TLS, and the session cookie is
+   marked Secure automatically when the base URL is https.
+
+6. **Deploy**. First visit to the domain shows the one-time `/setup` page to
+   set the admin password; then register your app (it gets a signing key
+   automatically) and create an API token for CI/`deploy.sh`.
+
+### S3 artifacts on Coolify
+
+If you'd rather keep APKs out of the Coolify volume, add the AWS env vars
+(`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) and extend the start command
+with `-s3-bucket my-releases -s3-region eu-west-1` (or `-s3-endpoint` for
+R2/MinIO). SQLite still stays in `/data` either way.
+
+### Upgrades
+
+Push to the repo → Coolify rebuilds and redeploys. `/data` persists, so
+apps, releases, tokens and stored signing keys survive updates. Migrations
+run automatically on startup.
+
 ## Dev
 
 ```
