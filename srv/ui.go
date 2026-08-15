@@ -148,12 +148,21 @@ func (s *Server) handleCreateAppUI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid slug", 400)
 		return
 	}
-	_, err := dbgen.New(s.DB).CreateApp(r.Context(), dbgen.CreateAppParams{
-		Slug: slug, PackageName: r.FormValue("packageName"), Platform: r.FormValue("platform"),
+	platform := r.FormValue("platform")
+	res, err := dbgen.New(s.DB).CreateApp(r.Context(), dbgen.CreateAppParams{
+		Slug: slug, PackageName: r.FormValue("packageName"), Platform: platform,
 	})
 	if err != nil {
 		http.Error(w, "create failed: "+err.Error(), 409)
 		return
+	}
+	// Same auto-signing behavior as the API: android apps get a generated
+	// keystore using the configured certificate subject (Settings page).
+	if platform == "android" {
+		appID, _ := res.LastInsertId()
+		if _, err := s.generateAndStoreSigning(r.Context(), appID, slug); err != nil {
+			slog.Error("auto-signing failed (UI)", "slug", slug, "err", err)
+		}
 	}
 	http.Redirect(w, r, "/apps/"+slug, http.StatusSeeOther)
 }
@@ -233,4 +242,44 @@ func (s *Server) render(w http.ResponseWriter, status int, name string, data any
 	if err := renderTemplate(w, s.TemplatesDir, name, data); err != nil {
 		slog.Warn("render template", "name", name, "error", err)
 	}
+}
+
+// ---- settings ----
+
+// signingSettingsField maps form field -> config key for the cert-subject
+// settings shown on the Settings page. Order defines form order.
+var signingSettingsFields = []struct{ Field, Key, Label, Hint string }{
+	{"org", "sign_org", "Organization (O)", "Company name baked into every generated signing certificate. Default: release-hub"},
+	{"ou", "sign_ou", "Organizational unit (OU)", "Team or division, e.g. Mobile"},
+	{"locality", "sign_locality", "Locality (L)", "City, e.g. Bengaluru"},
+	{"state", "sign_state", "State (ST)", "State or province"},
+	{"country", "sign_country", "Country (C)", "Two-letter code, e.g. IN"},
+}
+
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	q := dbgen.New(s.DB)
+	if r.Method == http.MethodPost {
+		for _, f := range signingSettingsFields {
+			if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: f.Key, Value: strings.TrimSpace(r.FormValue(f.Field))}); err != nil {
+				http.Error(w, "save failed: "+err.Error(), 500)
+				return
+			}
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name: "rh_flash", Value: "Settings saved. New keys will use this certificate name.",
+			Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 30,
+		})
+		http.Redirect(w, r, "/settings", http.StatusSeeOther)
+		return
+	}
+	type field struct{ Name, Value, Label, Hint string }
+	fields := make([]field, 0, len(signingSettingsFields))
+	for _, f := range signingSettingsFields {
+		v, _ := q.GetConfig(r.Context(), f.Key)
+		fields = append(fields, field{f.Field, v, f.Label, f.Hint})
+	}
+	s.render(w, 200, "settings.html", struct {
+		uiData
+		Fields []field
+	}{uiData{Title: "Settings", Authenticated: true}, fields})
 }

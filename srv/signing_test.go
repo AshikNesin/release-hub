@@ -2,6 +2,7 @@ package srv
 
 import (
 	"bytes"
+	"context"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,8 @@ import (
 	"time"
 
 	pkcs12 "software.sslmate.com/src/go-pkcs12"
+
+	"srv.exe.dev/db/dbgen"
 )
 
 func TestSigningRoundtrip(t *testing.T) {
@@ -143,5 +146,49 @@ func TestCreateAppGeneratesSigning(t *testing.T) {
 	}
 	if time.Until(cert.NotAfter) < 29*365*24*time.Hour {
 		t.Fatalf("cert validity too short: expires %s", cert.NotAfter)
+	}
+}
+
+// Settings (sign_org etc.) must flow into the generated certificate's DN.
+func TestGeneratedKeyUsesConfiguredSubject(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, _ := newTestServer(t)
+	q := dbgen.New(s.DB)
+	ctx := context.Background()
+	for k, v := range map[string]string{
+		"sign_org":      "Nesin Technologies",
+		"sign_ou":       "Mobile",
+		"sign_locality": "Chennai",
+		"sign_state":    "Tamil Nadu",
+		"sign_country":  "IN",
+	} {
+		if err := q.SetConfig(ctx, dbgen.SetConfigParams{Key: k, Value: v}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sub := s.subjectFromConfig(ctx)
+	if sub.Organization != "Nesin Technologies" || sub.Country != "IN" {
+		t.Fatalf("subject not loaded from config: %+v", sub)
+	}
+	name := sub.pkixName("Android App: x")
+	if name.CommonName != "Android App: x" ||
+		name.Organization[0] != "Nesin Technologies" ||
+		name.OrganizationalUnit[0] != "Mobile" ||
+		name.Locality[0] != "Chennai" ||
+		name.Province[0] != "Tamil Nadu" ||
+		name.Country[0] != "IN" {
+		t.Fatalf("unexpected DN: %+v", name)
+	}
+	// And the end-to-end path: generate with this subject and read the cert back.
+	p12, cfg, _, err := generateKeystoreWithSubject("Android App: x", sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, cert, err := pkcs12.Decode(p12, cfg.StorePassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cert.Subject.Organization[0] != "Nesin Technologies" || cert.Subject.Country[0] != "IN" {
+		t.Fatalf("cert subject wrong: %+v", cert.Subject)
 	}
 }

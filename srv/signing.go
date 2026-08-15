@@ -2,6 +2,7 @@ package srv
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
@@ -18,6 +19,7 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	pkcs12 "software.sslmate.com/src/go-pkcs12"
@@ -148,6 +150,92 @@ func (s *Server) handleApiDeleteSigning(w http.ResponseWriter, r *http.Request) 
 // some JDK builds still expect the legacy PBE algorithms. Everything modern
 // still reads it fine.
 func generateKeystore(commonName string) (p12 []byte, cfg signingConfig, certPEM []byte, err error) {
+	return generateKeystoreWithSubject(commonName, certSubject{Organization: "release-hub"})
+}
+
+// certSubject holds the configurable parts of the generated certificate's
+// distinguished name. Values come from hub-wide settings (Settings page) and
+// apply to every keystore generated after they are saved. Blank fields are
+// simply omitted from the DN.
+type certSubject struct {
+	Organization string // O=  company name
+	OrgUnit      string // OU= team / division
+	Locality     string // L=  city
+	State        string // ST= state
+	Country      string // C=  two-letter country code
+}
+
+// subjectFromConfig reads the cert-subject settings, returning defaults when
+// unset. Fails soft: a settings read error must never block app creation.
+// generateAndStoreSigning generates a keystore for the given app using the
+// configured certificate subject (Settings page), stores it encrypted, and
+// returns the keystore sha256 hex. Shared by the API and UI create paths.
+func (s *Server) generateAndStoreSigning(ctx context.Context, appID int64, slug string) (sha string, err error) {
+	sub := s.subjectFromConfig(ctx)
+	p12, cfg, _, err := generateKeystoreWithSubject("Android App: "+slug, sub)
+	if err != nil {
+		return "", fmt.Errorf("generate: %w", err)
+	}
+	cfgJSON, _ := json.Marshal(cfg)
+	encKS, e1 := encryptCreds(p12)
+	encCfg, e2 := encryptCreds(cfgJSON)
+	if e1 != nil || e2 != nil {
+		return "", fmt.Errorf("encrypt: %v %v", e1, e2)
+	}
+	sum := sha256.Sum256(p12)
+	if err := dbgen.New(s.DB).SetSigningConfig(ctx, dbgen.SetSigningConfigParams{
+		SignKeystore: encKS, SignConfig: encCfg,
+		SignSha256: hex.EncodeToString(sum[:]), ID: appID,
+	}); err != nil {
+		return "", fmt.Errorf("store: %w", err)
+	}
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func (s *Server) subjectFromConfig(ctx context.Context) certSubject {
+	q := dbgen.New(s.DB)
+	get := func(key string) string {
+		v, err := q.GetConfig(ctx, key)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(v)
+	}
+	sub := certSubject{
+		Organization: get("sign_org"),
+		OrgUnit:      get("sign_ou"),
+		Locality:     get("sign_locality"),
+		State:        get("sign_state"),
+		Country:      get("sign_country"),
+	}
+	if sub.Organization == "" {
+		sub.Organization = "release-hub"
+	}
+	return sub
+}
+
+func (c certSubject) pkixName(commonName string) pkix.Name {
+	name := pkix.Name{CommonName: commonName}
+	if c.Organization != "" {
+		name.Organization = []string{c.Organization}
+	}
+	if c.OrgUnit != "" {
+		name.OrganizationalUnit = []string{c.OrgUnit}
+	}
+	if c.Locality != "" {
+		name.Locality = []string{c.Locality}
+	}
+	if c.State != "" {
+		name.Province = []string{c.State}
+	}
+	if c.Country != "" {
+		name.Country = []string{c.Country}
+	}
+	return name
+}
+
+// generateKeystoreWithSubject is generateKeystore with a configurable DN.
+func generateKeystoreWithSubject(commonName string, subj certSubject) (p12 []byte, cfg signingConfig, certPEM []byte, err error) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, cfg, nil, fmt.Errorf("generate rsa key: %w", err)
@@ -158,10 +246,7 @@ func generateKeystore(commonName string) (p12 []byte, cfg signingConfig, certPEM
 	}
 	tmpl := x509.Certificate{
 		SerialNumber: serial,
-		Subject: pkix.Name{
-			CommonName:   commonName,
-			Organization: []string{"release-hub"},
-		},
+		Subject:      subj.pkixName(commonName),
 		NotBefore:             time.Now().Add(-time.Hour), // tolerate clock skew
 		NotAfter:              time.Now().AddDate(30, 0, 0),
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,

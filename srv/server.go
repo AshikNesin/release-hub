@@ -258,6 +258,8 @@ func (s *Server) Serve(addr string) error {
 	mux.HandleFunc("POST /apps", s.requireUI(s.handleCreateAppUI))
 	mux.HandleFunc("POST /tokens", s.requireUI(s.handleCreateTokenUI))
 	mux.HandleFunc("GET /apps/{slug}", s.requireUI(s.handleAppDetail))
+	mux.HandleFunc("GET /settings", s.requireUI(s.handleSettings))
+	mux.HandleFunc("POST /settings", s.requireUI(s.handleSettings))
 
 	// API (bearer auth)
 	mux.HandleFunc("GET /api/apps", s.requireAPI(s.handleApiListApps))

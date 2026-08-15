@@ -2,9 +2,7 @@ package srv
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -123,32 +121,14 @@ func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 	// /signing still overrides it for apps with an existing key history.
 	if platform == "android" {
 		appID, _ := res.LastInsertId()
-		p12, cfg, certPEM, gerr := generateKeystore("Android App: " + slug)
+		sum, gerr := s.generateAndStoreSigning(r.Context(), appID, slug)
 		if gerr != nil {
-			slog.Error("auto-signing generation failed", "slug", slug, "err", gerr)
+			slog.Error("auto-signing failed", "slug", slug, "err", gerr)
 			writeJSON(w, 201, out) // app exists; key can be uploaded later
 			return
 		}
-		cfgJSON, _ := json.Marshal(cfg)
-		encKS, e1 := encryptCreds(p12)
-		encCfg, e2 := encryptCreds(cfgJSON)
-		if e1 != nil || e2 != nil {
-			slog.Error("auto-signing encrypt failed", "slug", slug)
-			writeJSON(w, 201, out)
-			return
-		}
-		sum := sha256.Sum256(p12)
-		if err := q.SetSigningConfig(r.Context(), dbgen.SetSigningConfigParams{
-			SignKeystore: encKS, SignConfig: encCfg,
-			SignSha256: hex.EncodeToString(sum[:]), ID: appID,
-		}); err != nil {
-			slog.Error("auto-signing store failed", "slug", slug, "err", err)
-			writeJSON(w, 201, out)
-			return
-		}
-		_ = certPEM
 		out["signingKey"] = "generated"
-		out["signingSha256"] = hex.EncodeToString(sum[:])
+		out["signingSha256"] = sum
 	}
 	writeJSON(w, 201, out)
 }

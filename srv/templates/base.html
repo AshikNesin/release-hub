@@ -36,7 +36,7 @@
 <div class="wrap">
   <header>
     <h1><a href="/" style="color:var(--fg)">release-hub</a></h1>
-    {{if .Authenticated}}<a class="muted" href="/logout">logout</a>{{end}}
+    {{if .Authenticated}}<a class="muted" href="/settings">settings</a> <a class="muted" href="/logout">logout</a>{{end}}
   </header>
   {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
   {{block "content" .}}{{end}}
