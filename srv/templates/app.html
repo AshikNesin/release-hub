@@ -30,6 +30,28 @@
     <code>{{.ManifestURL}}</code>
     <button class="btn ghost xs" data-copy="{{.ManifestURL}}">copy</button>
   </div>
+  {{if .PlayEnabled}}
+  <div class="playinfo">
+    <span class="keystored"><i></i>Google Play publishing on</span>
+    <span class="mlabel">service account</span>
+    <code>{{.PlayEmail}}</code>
+    <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play" class="inline" style="margin:0">
+      <input type="hidden" name="enable" value="false">
+      <button type="submit" class="btn ghost xs">disable</button>
+    </form>
+    <span class="mlabel">channels</span>
+    <code>internal → internal testing · public → production</code>
+  </div>
+  {{else if eq .Platform "android"}}
+  <div class="playsetup">
+    <span class="mlabel">Google Play</span>
+    <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play" enctype="multipart/form-data" class="inline">
+      <div><label>Service-account JSON key</label><input type="file" name="file" accept=".json,application/json" required></div>
+      <button type="submit" class="btn primary">Enable Play publishing</button>
+    </form>
+    <p class="hint" style="margin:6px 0 0">Play Console → Users &amp; permissions → API access → service account with release access; <code>channel=internal</code> .aab uploads then go to internal testing, <code>channel=public</code> to production.</p>
+  </div>
+  {{end}}
   <table>
     <thead><tr><th>Version</th><th>Channel</th><th>Size</th><th>Notes</th><th>Uploaded</th><th></th></tr></thead>
     <tbody>

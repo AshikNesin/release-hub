@@ -259,13 +259,15 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		CreatedAt                        time.Time
 	}
 	type platSection struct {
-		Platform, PackageName  string
-		Releases               []relRow
-		ManifestURL, UploadURL string
-		HasSigningKey          bool
-		SignSha256             string // keystore fingerprint (not secret)
-		SignAlias              string // key alias (not secret)
-	}
+	Platform, PackageName  string
+	Releases               []relRow
+	ManifestURL, UploadURL string
+	HasSigningKey          bool
+	SignSha256             string // keystore fingerprint (not secret)
+	SignAlias              string // key alias (not secret)
+	PlayEnabled            bool
+	PlayEmail              string // service-account email (identifier, not secret)
+}
 	sections := make([]platSection, 0, len(plats))
 	for _, p := range plats {
 		releases, err := q.ListReleases(r.Context(), p.ID)
@@ -304,6 +306,8 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			HasSigningKey: p.SignSha256 != "",
 			SignSha256:    p.SignSha256,
 			SignAlias:     alias,
+			PlayEnabled:   p.PlayEnabled == 1,
+			PlayEmail:     playEmail(p.PlayCredentials),
 		})
 	}
 	s.render(w, 200, "app.html", struct {
@@ -313,7 +317,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		SuggestedPkg string // prefill for Add-platform: bundle_prefix + slug
 		HasAndroid   bool   // hide android from the picker when it exists
 	}{
-		uiData{Title: app.Slug, Authenticated: true, AssetVersion: assetVersion},
+		uiData{Title: app.Slug, Authenticated: true, Flash: flashFrom(r), AssetVersion: assetVersion},
 		app, sections,
 		suggestPackage(s.bundlePrefix(r.Context()), app.Slug),
 		func() bool {
@@ -325,6 +329,25 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			return false
 		}(),
 	})
+}
+
+// playEmail extracts the service-account identifier from stored (encrypted)
+// Play credentials, for display. Anything else stays sealed in the DB.
+func playEmail(encCreds string) string {
+	if encCreds == "" {
+		return ""
+	}
+	raw, err := decryptCreds(encCreds)
+	if err != nil {
+		return ""
+	}
+	var probe struct {
+		ClientEmail string `json:"client_email"`
+	}
+	if json.Unmarshal(raw, &probe) != nil {
+		return ""
+	}
+	return probe.ClientEmail
 }
 
 func (s *Server) render(w http.ResponseWriter, status int, name string, data any) {
@@ -339,6 +362,42 @@ func (s *Server) render(w http.ResponseWriter, status int, name string, data any
 	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
 		slog.Error("render template", "name", name, "error", err)
 	}
+}
+
+// handlePlayConfigUI POST /apps/{slug}/platforms/{platform}/play —
+// session-auth twin of the bearer API: upload service-account JSON from the
+// browser, or disable with enable=false. Redirects back with a flash.
+func (s *Server) handlePlayConfigUI(w http.ResponseWriter, r *http.Request) {
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
+	if !ok {
+		return
+	}
+	back := "/apps/" + r.PathValue("slug")
+	setFlash := func(msg string) {
+		http.SetCookie(w, &http.Cookie{
+			Name: "rh_flash", Value: msg, Path: "/", HttpOnly: true,
+			SameSite: http.SameSiteLaxMode, MaxAge: 30,
+		})
+	}
+	if r.FormValue("enable") == "false" {
+		if err := dbgen.New(s.DB).SetPlayConfig(r.Context(), dbgen.SetPlayConfigParams{
+			PlayEnabled: 0, PlayCredentials: "", ID: plat.ID,
+		}); err != nil {
+			http.Error(w, "disable failed: "+err.Error(), 500)
+			return
+		}
+		setFlash("Google Play publishing disabled.")
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	email, err := s.storePlayCredentials(r, plat.ID)
+	if err != nil {
+		setFlash("Play setup failed: " + err.Error())
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	setFlash("Google Play publishing enabled for " + email + ".")
+	http.Redirect(w, r, back, http.StatusSeeOther)
 }
 
 // ---- settings ----

@@ -150,6 +150,79 @@ func TestUploadAndManifestFlow(t *testing.T) {
 
 // App → platforms: one slug, android + ios variants, independent releases
 // and signing keys per platform.
+func TestApiSetPlayUpdatesPlatformRowNotAppRow(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	client := ts.Client()
+
+	tok := "rh_playtest"
+	if _, err := s.DB.Exec(
+		"INSERT INTO api_tokens (name, token_hash) VALUES ('test', ?)", hashToken(tok)); err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+	// Two apps, two android platforms — app ids and platform-row ids must NOT
+	// line up for this regression test to bite.
+	for _, slug := range []string{"alpha", "beta"} {
+		req, _ := http.NewRequest("POST", ts.URL+"/api/apps", bytes.NewBufferString("slug="+slug))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		req, _ = http.NewRequest("POST", ts.URL+"/api/apps/"+slug+"/platforms",
+			bytes.NewBufferString("platform=android&packageName=io.test."+slug))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err = client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+
+	// Enable Play for the FIRST app's platform via the API.
+	creds := []byte(`{"client_email": "sa@test.iam.gserviceaccount.com", "private_key": "x"}`)
+	body := &bytes.Buffer{}
+	mw := multipart.NewWriter(body)
+	fw, _ := mw.CreateFormFile("file", "sa.json")
+	fw.Write(creds)
+	mw.Close()
+	req, _ := http.NewRequest("POST", ts.URL+"/api/apps/alpha/play", body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("set play: %d", resp.StatusCode)
+	}
+	var out struct {
+		PlayEnabled    bool   `json:"playEnabled"`
+		ServiceAccount string `json:"serviceAccount"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if !out.PlayEnabled || out.ServiceAccount != "sa@test.iam.gserviceaccount.com" {
+		t.Fatalf("unexpected response: %+v", out)
+	}
+
+	// Exactly the alpha platform row must carry credentials — not beta's,
+	// not some accidental id overlap.
+	var alphaPlay, betaPlay int
+	s.DB.QueryRow(`SELECT ap.play_enabled FROM app_platforms ap
+		JOIN apps a ON a.id = ap.app_id WHERE a.slug = 'alpha'`).Scan(&alphaPlay)
+	s.DB.QueryRow(`SELECT ap.play_enabled FROM app_platforms ap
+		JOIN apps a ON a.id = ap.app_id WHERE a.slug = 'beta'`).Scan(&betaPlay)
+	if alphaPlay != 1 || betaPlay != 0 {
+		t.Fatalf("play flags wrong: alpha=%d beta=%d (app/platform id mixup)", alphaPlay, betaPlay)
+	}
+}
+
 func TestAppPlatforms(t *testing.T) {
 	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
 	s, ts := newTestServer(t)

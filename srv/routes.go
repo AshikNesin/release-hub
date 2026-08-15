@@ -22,6 +22,7 @@ func (s *Server) routes() *http.ServeMux {
 	}))
 	mux.HandleFunc("POST /apps", s.requireUI(s.handleCreateAppUI))
 	mux.HandleFunc("POST /apps/{slug}/platforms", s.requireUI(s.handleAddPlatformUI))
+	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/play", s.requireUI(s.handlePlayConfigUI))
 	mux.HandleFunc("POST /tokens", s.requireUI(s.handleCreateTokenUI))
 	mux.HandleFunc("GET /apps/{slug}", s.requireUI(s.handleAppDetail))
 	mux.HandleFunc("GET /settings", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
