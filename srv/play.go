@@ -3,12 +3,14 @@ package srv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"strings"
 
 	"google.golang.org/api/androidpublisher/v3"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
 
@@ -83,14 +85,20 @@ func classifyPlayError(err error) error {
 	if err == nil {
 		return nil
 	}
-	msg := err.Error()
-	switch {
-	case strings.Contains(msg, "invalid_grant"), strings.Contains(msg, "invalid_client"):
-		return fmt.Errorf("credentials rejected (invalid_grant) — the service-account JSON key is wrong or revoked; upload a fresh key in Settings")
-	case strings.Contains(msg, "403"), strings.Contains(msg, "Forbidden"):
-		return fmt.Errorf("403 Forbidden — the service account has no access to this package. Either it wasn't invited in Play Console (Users & permissions → Invite new users, grant 'Create and manage releases'), or API access isn't linked yet (Setup → API access), or the app doesn't exist in Play yet")
-	case strings.Contains(msg, "404"):
-		return fmt.Errorf("404 Not Found — no app with this package exists in Play yet; create it in Play Console first (the API cannot create apps)")
+	var gerr *googleapi.Error
+	if !errors.As(err, &gerr) {
+		if strings.Contains(err.Error(), "invalid_grant") || strings.Contains(err.Error(), "invalid_client") {
+			return fmt.Errorf("credentials rejected (invalid_grant) — the service-account JSON key is wrong or revoked; upload a fresh key in Settings")
+		}
+		return err
+	}
+	switch gerr.Code {
+	case 401:
+		return fmt.Errorf("%s — the service-account JSON key is wrong or revoked; upload a fresh key in Settings", gerr.Message)
+	case 403:
+		return fmt.Errorf("%s — no access to this package. Causes in order of likelihood: (1) app not created in Play yet (the API cannot create apps), (2) service account not invited in Play Console → Users & permissions → Invite new users with 'Create and manage releases', (3) API access not linked in Play Console → Setup → API access. Note: a newly invited service account or fresh API link can take up to 24h (usually minutes) to take effect.", gerr.Message)
+	case 404:
+		return fmt.Errorf("%s — no app with this package exists in Play yet; create it in Play Console first (the API cannot create apps)", gerr.Message)
 	default:
 		return err
 	}
