@@ -1,12 +1,14 @@
 {{template "base.html" .}}
 {{define "content"}}
-<div class="box" style="max-width:360px;margin:64px auto">
-  <h2>Sign in</h2>
-  <form method="post" action="/login">
-    <label for="password">Admin password</label>
-    <input type="password" id="password" name="password" style="width:100%" autofocus required>
-    {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
-    <button type="submit" style="width:100%;margin-top:12px">Sign in</button>
-  </form>
+<div class="auth">
+  <div class="card">
+    <h1>release-hub</h1>
+    <form method="post" action="/login">
+      <label>Admin password</label>
+      <input type="password" name="password" autofocus required>
+      {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+      <button type="submit" class="btn primary">Sign in</button>
+    </form>
+  </div>
 </div>
 {{end}}

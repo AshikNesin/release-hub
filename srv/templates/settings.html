@@ -1,28 +1,18 @@
 {{template "base.html" .}}
 {{define "content"}}
-<div class="page-head">
-  <div>
-    <h1>Settings</h1>
-    <div class="sub">Server-wide configuration</div>
-  </div>
+<div class="pagehead">
+  <h1>Settings</h1>
+  <div class="sub">signing certificate subject used for newly generated keys</div>
 </div>
 
-<div class="box">
-  <h2>Signing certificate name</h2>
-  <p class="sub">
-    Distinguished name used when a signing keystore is auto-generated for a new
-    Android platform. Applies to <b>newly generated keys only</b> — existing
-    keystores keep their certificate (changing it would break update signature
-    continuity).
-  </p>
+<section>
+  <div class="sect">Certificate subject</div>
+  <p class="hint" style="margin:0 0 14px">Applies to newly generated keys only — existing keystores keep their certificate.</p>
   <form method="post" action="/settings" class="inline">
     {{range .Fields}}
-    <div>
-      <label>{{.Label}}</label>
-      <input name="{{.Name}}" value="{{.Value}}" placeholder="{{.Hint}}">
-    </div>
+    <div><label>{{.Label}}</label><input name="{{.Name}}" value="{{.Value}}" placeholder="{{.Hint}}"></div>
     {{end}}
-    <button type="submit" class="primary">Save settings</button>
+    <button type="submit" class="btn primary">Save</button>
   </form>
-</div>
+</section>
 {{end}}
