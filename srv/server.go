@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	"embed"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"context"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -27,10 +29,16 @@ type Server struct {
 	DB           *sql.DB
 	Hostname     string
 	TemplatesDir string
-	StaticDir    string
 	BaseURL      string  // public base URL for links
 	Storage      Storage // local FS or S3 (see storage.go)
+
+	// embeddedTemplates: serve go:embed'ded templates instead of
+	// TemplatesDir (set when the on-disk dir is absent — e.g. Docker).
+	embeddedTemplates bool
 }
+
+//go:embed templates/*.html
+var embeddedTemplatesFS embed.FS
 
 // auth
 
@@ -57,9 +65,16 @@ func New(dbPath, hostname string) (*Server, error) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	baseDir := filepath.Dir(thisFile)
 	srv := &Server{
-		Hostname:     hostname,
+		Hostname: hostname,
+		// Prefer the on-disk copy next to the source (dev checkout); fall back
+		// to the go:embed copies baked into the binary. The fallback is what
+		// makes the Docker image self-contained: runtime.Caller returns the
+		// BUILD-time path (/src/srv/...), which doesn't exist in the runtime
+		// image — only the binary is copied over.
 		TemplatesDir: filepath.Join(baseDir, "templates"),
-		StaticDir:    filepath.Join(baseDir, "static"),
+	}
+	if _, err := os.Stat(srv.TemplatesDir); err != nil {
+		srv.embeddedTemplates = true
 	}
 	if err := srv.setUpDatabase(dbPath); err != nil {
 		return nil, err
@@ -217,14 +232,29 @@ func (s *Server) setUpDatabase(dbPath string) error {
 	return nil
 }
 
-// renderTemplate parses base + page template. Pages define a "content" block
-// and expect a {{template "base.html" .}} header line.
-func renderTemplate(w http.ResponseWriter, dir, name string, data any) error {
-	base := filepath.Join(dir, "base.html")
-	page := filepath.Join(dir, name)
-	tmpl, err := template.ParseFiles(page, base)
+// parsePageTemplate parses base + page template. Pages define a "content"
+// block and expect a {{template "base.html" .}} header line. Sources: the
+// on-disk templates dir (dev checkout) or the go:embed FS (Docker binary).
+func parsePageTemplate(dir, name string) (*template.Template, error) {
+	var tmpl *template.Template
+	var err error
+	if _, statErr := os.Stat(filepath.Join(dir, name)); statErr == nil {
+		tmpl, err = template.ParseFiles(filepath.Join(dir, name), filepath.Join(dir, "base.html"))
+	} else {
+		tmpl, err = template.ParseFS(embeddedTemplatesFS, "templates/"+name, "templates/base.html")
+	}
 	if err != nil {
-		return fmt.Errorf("parse %q: %w", name, err)
+		return nil, fmt.Errorf("parse %q: %w", name, err)
+	}
+	return tmpl, nil
+}
+
+// renderTemplate is the legacy signature kept for callers that don't have a
+// Server handy.
+func renderTemplate(w http.ResponseWriter, dir, name string, data any) error {
+	tmpl, err := parsePageTemplate(dir, name)
+	if err != nil {
+		return err
 	}
 	if err := tmpl.ExecuteTemplate(w, "base.html", data); err != nil {
 		return fmt.Errorf("execute %q: %w", name, err)
