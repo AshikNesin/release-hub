@@ -1,6 +1,13 @@
 {{template "base.html" .}}
 {{define "content"}}
-<div class="card">
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <div class="sub">Server-wide configuration</div>
+  </div>
+</div>
+
+<div class="box">
   <h2>Signing certificate name</h2>
   <p class="sub">
     Distinguished name used when a signing keystore is auto-generated for a new
@@ -15,7 +22,7 @@
       <input name="{{.Name}}" value="{{.Value}}" placeholder="{{.Hint}}">
     </div>
     {{end}}
-    <button type="submit">Save settings</button>
+    <button type="submit" class="primary">Save settings</button>
   </form>
 </div>
 {{end}}

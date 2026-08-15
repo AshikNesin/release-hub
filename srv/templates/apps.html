@@ -1,44 +1,56 @@
 {{template "base.html" .}}
 {{define "content"}}
-<div class="card">
-  <h2>Apps</h2>
+<div class="page-head">
+  <div>
+    <h1>Apps</h1>
+    <div class="sub">One product per slug; each platform variant has its own package, keys and releases.</div>
+  </div>
+</div>
+
+<div class="box">
   <table>
+    <thead>
     <tr><th>App</th><th>Package</th><th>Platform</th><th>Latest (direct)</th></tr>
+    </thead>
+    <tbody>
     {{range .Apps}}
     <tr>
-      <td><a href="/apps/{{.Slug}}">{{.Slug}}</a></td>
+      <td><a href="/apps/{{.Slug}}"><b>{{.Slug}}</b></a></td>
       <td class="muted">{{.PackageName}}</td>
-      <td><span class="badge {{.Platform}}">{{.Platform}}</span></td>
+      <td><span class="tag {{.Platform}}">{{.Platform}}</span></td>
       <td class="muted">{{.Latest}}</td>
     </tr>
     {{else}}
     <tr><td colspan="4" class="muted">No apps yet — register one below or via <code>POST /api/apps</code>.</td></tr>
     {{end}}
+    </tbody>
   </table>
 </div>
 
-<div class="card">
-  <h3 class="muted">Register app</h3>
+<div class="box">
+  <h3>Register app</h3>
   <form method="post" action="/apps" class="inline">
     <div><label>Slug</label><input name="slug" placeholder="tinyfirewall" required></div>
-    <button type="submit">Add</button>
+    <button type="submit" class="primary">Add</button>
   </form>
   <p class="muted small" style="margin:8px 0 0">Just a name — add the android/ios platforms (package names, signing keys) from the app's page.</p>
 </div>
 
-<div class="card">
-  <h3 class="muted">API tokens</h3>
+<div class="box">
+  <h3>API tokens</h3>
   <table>
-    <tr><th>Name</th><th>Created</th><th>Last used</th></tr>
+    <thead><tr><th>Name</th><th>Created</th><th>Last used</th></tr></thead>
+    <tbody>
     {{range .Tokens}}
-    <tr><td>{{.Name}}</td><td class="muted">{{.CreatedAt.Format "2006-01-02 15:04"}}</td><td class="muted">{{if .LastUsedAt}}{{.LastUsedAt.Format "2006-01-02 15:04"}}{{else}}never{{end}}</td></tr>
+    <tr><td><b>{{.Name}}</b></td><td class="muted">{{.CreatedAt.Format "2006-01-02 15:04"}}</td><td class="muted">{{if .LastUsedAt}}{{.LastUsedAt.Format "2006-01-02 15:04"}}{{else}}never{{end}}</td></tr>
     {{else}}
     <tr><td colspan="3" class="muted">None. Create one for CI/curl:</td></tr>
     {{end}}
+    </tbody>
   </table>
-  <form method="post" action="/tokens" class="inline" style="margin-top:10px">
+  <form method="post" action="/tokens" class="inline" style="margin-top:12px">
     <div><label>Token name</label><input name="name" placeholder="ci" required></div>
-    <button type="submit">Create token</button>
+    <button type="submit" class="primary">Create token</button>
   </form>
 </div>
 {{end}}

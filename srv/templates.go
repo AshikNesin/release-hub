@@ -33,6 +33,16 @@ func staticHandler() http.Handler {
 		b, _ := embeddedStaticFS.ReadFile("static/app.js")
 		w.Write(b)
 	})
+	mux.HandleFunc("GET /static/Inter-Regular.woff2", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "font/woff2")
+		b, _ := embeddedStaticFS.ReadFile("static/Inter-Regular.woff2")
+		w.Write(b)
+	})
+	mux.HandleFunc("GET /static/Inter-Bold.woff2", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "font/woff2")
+		b, _ := embeddedStaticFS.ReadFile("static/Inter-Bold.woff2")
+		w.Write(b)
+	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	})

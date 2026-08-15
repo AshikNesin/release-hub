@@ -1,28 +1,39 @@
 {{template "base.html" .}}
 {{define "content"}}
-<div class="card">
-  <h2 style="font-size:16px">{{.App.Slug}} <span class="muted small">product</span></h2>
-  {{if not .Platforms}}<p class="muted" style="margin:0">No platforms yet — add the android or ios variant below.</p>{{end}}
+<div class="page-head">
+  <div>
+    <h1>{{.App.Slug}}</h1>
+    <div class="sub">product — one slug, one or more platforms</div>
+  </div>
 </div>
 
+{{if not .Platforms}}
+<div class="box">
+  <p class="muted" style="margin:0">No platforms yet — add the android or ios variant of this app below.</p>
+</div>
+{{end}}
+
 {{range .Platforms}}
-<div class="card">
+<div class="box">
   <div class="plat-head">
-    <span class="badge {{.Platform}}">{{.Platform}}</span>
-    <span class="pkg">{{.PackageName}}</span>
-    {{if .HasSigningKey}}<span class="badge key">signing key stored</span>{{end}}
+    <span class="tag {{.Platform}}">{{.Platform}}</span>
+    <span class="pkg mono">{{.PackageName}}</span>
+    {{if .HasSigningKey}}<span class="tag green">signing key stored</span>{{end}}
   </div>
-  <p class="muted small" style="margin:8px 0 4px">Update manifest (point the app's UPDATE_URL here):</p>
+  <p class="muted small" style="margin:8px 0 0">Update manifest (point the app's UPDATE_URL here):</p>
   <div class="copywrap">
     <code>{{.ManifestURL}}</code>
-    <button class="ghost" data-copy="{{.ManifestURL}}">copy</button>
+    <button class="ghost" data-copy="{{.ManifestURL}}">Copy</button>
   </div>
   <table style="margin-top:12px">
+    <thead>
     <tr><th>Version</th><th>Channel</th><th>Size</th><th>Notes</th><th>Uploaded</th><th></th></tr>
+    </thead>
+    <tbody>
     {{range .Releases}}
     <tr>
-      <td>{{.VersionName}} <span class="muted">({{.VersionCode}})</span></td>
-      <td><span class="badge {{.Channel}}">{{.Channel}}</span></td>
+      <td><b>{{.VersionName}}</b> <span class="muted">({{.VersionCode}})</span></td>
+      <td><span class="tag {{.Channel}}">{{.Channel}}</span></td>
       <td class="muted">{{printf "%.1f" .SizeMB}} MB</td>
       <td class="muted">{{.Notes}}</td>
       <td class="muted">{{.CreatedAt.Format "Jan 2 15:04"}}</td>
@@ -30,18 +41,19 @@
     </tr>
     {{else}}
     <tr><td colspan="6" class="muted">No releases yet. Upload via:</td></tr>
-    <tr><td colspan="6"><div class="copywrap"><code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=direct {{.UploadURL}}</code><button class="ghost" data-copy="curl -H &quot;Authorization: Bearer $TOKEN&quot; -F file=app.apk -F channel=direct {{.UploadURL}}">copy</button></div></td></tr>
+    <tr><td colspan="6"><div class="copywrap"><code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=direct {{.UploadURL}}</code><button class="ghost" data-copy="curl -H &quot;Authorization: Bearer $TOKEN&quot; -F file=app.apk -F channel=direct {{.UploadURL}}">Copy</button></div></td></tr>
     {{end}}
+    </tbody>
   </table>
 </div>
 {{end}}
 
-<div class="card">
-  <h3 class="muted">Add platform</h3>
+<div class="box">
+  <h3>Add platform</h3>
   <form method="post" action="/apps/{{.App.Slug}}/platforms" class="inline">
     <div><label>Platform</label><select name="platform"><option>ios</option><option>android</option></select></div>
     <div><label>Package / bundle name</label><input name="packageName" placeholder="io.example.app" required></div>
-    <button type="submit">Add platform</button>
+    <button type="submit" class="primary">Add platform</button>
   </form>
   <p class="muted small" style="margin:8px 0 0">Android platforms get an auto-generated signing keystore immediately.</p>
 </div>
