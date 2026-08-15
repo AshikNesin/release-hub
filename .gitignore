@@ -1,0 +1,6 @@
+# compiled binary (make build output)
+srv/srv
+
+# runtime data
+db.sqlite3*
+artifacts/
