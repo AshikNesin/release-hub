@@ -232,17 +232,18 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, resp)
 }
 
-// publishToPlay pushes an .aab to Google Play when configured for the app.
-// Returns ("", nil) when not applicable (not an .aab, or no credentials).
+// publishToPlay pushes an .aab to Google Play when the app has Play enabled
+// and credentials stored. Returns ("", nil) when not applicable.
 func (s *Server) publishToPlay(r *http.Request, app dbgen.App, key, channel, versionName, notes string) (string, error) {
-	if s.PlayCredsDir == "" || !strings.HasSuffix(strings.ToLower(key), ".aab") {
+	if app.PlayEnabled == 0 || app.PlayCredentials == "" ||
+		!strings.HasSuffix(strings.ToLower(key), ".aab") {
 		return "", nil
 	}
-	credFile := filepath.Join(s.PlayCredsDir, app.PackageName+".json")
-	if _, err := os.Stat(credFile); err != nil {
-		return "", nil // this app doesn't use Play
+	creds, err := decryptCreds(app.PlayCredentials)
+	if err != nil {
+		return "", fmt.Errorf("decrypt play credentials: %w", err)
 	}
-	pub, err := NewPlayPublisher(r.Context(), app.PackageName, credFile)
+	pub, err := NewPlayPublisherFromJSON(r.Context(), app.PackageName, creds)
 	if err != nil {
 		return "", err
 	}
@@ -269,6 +270,60 @@ func (s *Server) publishToPlay(r *http.Request, app dbgen.App, key, channel, ver
 	}
 	slog.Info("play publish ok", "app", app.Slug, "channel", channel, "release", release)
 	return release, nil
+}
+
+// handleApiSetPlay POST /api/apps/{slug}/play
+// multipart form: file=<service-account.json> to enable; empty file field
+// (or enable=false) disables Play publishing for the app.
+func (s *Server) handleApiSetPlay(w http.ResponseWriter, r *http.Request) {
+	app, ok := s.appFromSlug(w, r, r.PathValue("slug"))
+	if !ok {
+		return
+	}
+	q := dbgen.New(s.DB)
+
+	if r.FormValue("enable") == "false" {
+		if err := q.SetPlayConfig(r.Context(), dbgen.SetPlayConfigParams{
+			PlayEnabled: 0, PlayCredentials: "", ID: app.ID,
+		}); err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"playEnabled": false})
+		return
+	}
+
+	f, hdr, err := r.FormFile("file")
+	if err != nil || hdr.Size == 0 {
+		writeErr(w, 400, "multipart file field with service-account JSON required (or enable=false to disable)")
+		return
+	}
+	defer f.Close()
+	raw, err := io.ReadAll(io.LimitReader(f, 1<<20))
+	if err != nil {
+		writeErr(w, 400, "read file: "+err.Error())
+		return
+	}
+	// validate it parses as a service-account JSON before storing
+	var probe struct {
+		ClientEmail string `json:"client_email"`
+	}
+	if json.Unmarshal(raw, &probe) != nil || probe.ClientEmail == "" {
+		writeErr(w, 400, "file is not a service-account JSON (missing client_email)")
+		return
+	}
+	enc, err := encryptCreds(raw)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if err := q.SetPlayConfig(r.Context(), dbgen.SetPlayConfigParams{
+		PlayEnabled: 1, PlayCredentials: enc, ID: app.ID,
+	}); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	writeJSON(w, 200, map[string]any{"playEnabled": true, "serviceAccount": probe.ClientEmail})
 }
 
 // handleApiReleases GET /api/apps/{slug}/releases

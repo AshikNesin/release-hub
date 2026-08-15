@@ -71,9 +71,10 @@ any provider in the default AWS chain (env, shared config, IAM role).
 
 ## Google Play (optional)
 
-When `-play-creds-dir` is set, apps that have a service-account JSON file
-named `<packageName>.json` in that directory get their **.aab** uploads
-pushed to Google Play automatically, alongside normal hub storage:
+Apps with Play enabled get their **.aab** uploads pushed to Google Play
+automatically, alongside normal hub storage. The service-account JSON is
+stored in the DB, encrypted at rest (AES-256-GCM, key from the
+`RELEASE_HUB_SECRET_KEY` env var — 32 bytes, base64- or hex-encoded):
 
 - `channel=public`   → Play **production** track
 - `channel=internal` → Play **internal testing** track
@@ -83,15 +84,25 @@ The release itself is recorded even if Play publishing fails — the API
 response includes `playRelease` or `playError` so CI can decide whether
 to fail.
 
-Setup (one-time):
+Setup (per app, one API call — no server filesystem access needed):
 
 1. Play Console → Users & permissions → API access → link a Google Cloud
    project and create a service account; grant it release permissions.
-2. Download the service-account JSON key.
-3. Save it as `/etc/release-hub/play/io.nesin.tinyfirewall.json` (i.e.
-   `<packageName>.json` inside the creds dir; one file per app — an
-   account with account-wide access can serve many apps).
-4. Start the hub with `-play-creds-dir /etc/release-hub/play`.
+2. Generate a 32-byte key: `openssl rand -base64 32`, export it as
+   `RELEASE_HUB_SECRET_KEY` for the hub process.
+3. Enable for the app:
+
+```bash
+curl -H "Authorization: Bearer $HUB_TOKEN" \
+     -F file=service-account.json \
+     https://hub.example.com/api/apps/tinyfirewall/play
+# → {"playEnabled":true,"serviceAccount":"hub@project.iam.gserviceaccount.com"}
+
+# disable:  -F enable=false
+```
+
+A shared service account with account-wide release access can serve
+many apps — one credential uploaded per app is fine.
 
 Upload example:
 
@@ -151,15 +162,14 @@ services:
   release-hub:
     build: .
     ports: ["9100:9100"]
-    volumes:
-      - release-hub-data:/data
-      - ./play-creds:/data/play:ro        # optional: service-account JSONs
+    volumes: [release-hub-data:/data]
+    environment:
+      RELEASE_HUB_SECRET_KEY: ${RELEASE_HUB_SECRET_KEY}
     restart: unless-stopped
     command: >-
       release-hub -listen :9100 -db /data/db.sqlite3
       -artifacts /data/artifacts
       -base-url https://hub.example.com
-      -play-creds-dir /data/play
       # -s3-bucket my-releases -s3-region eu-west-1
 volumes:
   release-hub-data:

@@ -29,9 +29,6 @@ var (
 	flagS3Endpoint = flag.String("s3-endpoint", envOr("AWS_ENDPOINT_URL_S3", ""), "custom S3 endpoint (R2/MinIO), optional")
 	flagS3Prefix   = flag.String("s3-prefix", "release-hub", "key prefix inside the bucket")
 	flagS3Public   = flag.String("s3-public-base", "", "public URL base for bucket objects (set when the bucket is public/CloudFront); otherwise presigned URLs are used")
-
-	// Optional Google Play publishing
-	flagPlayCreds = flag.String("play-creds-dir", "", "dir with per-app service-account JSON files named <packageName>.json; .aab uploads for those apps are also pushed to Play (public→production, internal→internal)")
 )
 
 func main() {
@@ -67,6 +64,5 @@ func run() error {
 	} else {
 		server.Storage = &srv.LocalStorage{Dir: *flagArtifacts, BaseURL: *flagBaseURL}
 	}
-	server.PlayCredsDir = *flagPlayCreds
 	return server.Serve(*flagListen)
 }

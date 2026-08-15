@@ -17,11 +17,13 @@ type ApiToken struct {
 }
 
 type App struct {
-	ID          int64     `json:"id"`
-	Slug        string    `json:"slug"`
-	PackageName string    `json:"package_name"`
-	Platform    string    `json:"platform"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID              int64     `json:"id"`
+	Slug            string    `json:"slug"`
+	PackageName     string    `json:"package_name"`
+	Platform        string    `json:"platform"`
+	CreatedAt       time.Time `json:"created_at"`
+	PlayEnabled     int64     `json:"play_enabled"`
+	PlayCredentials string    `json:"play_credentials"`
 }
 
 type Config struct {

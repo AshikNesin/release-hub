@@ -30,11 +30,6 @@ type Server struct {
 	StaticDir    string
 	BaseURL      string  // public base URL for links
 	Storage      Storage // local FS or S3 (see storage.go)
-
-	// PlayCredsDir holds optional per-app service-account JSON files named
-	// <packageName>.json. Apps with a file here get their .aab releases
-	// pushed to the matching Play track (public→production, internal→internal).
-	PlayCredsDir string
 }
 
 // auth
@@ -270,6 +265,7 @@ func (s *Server) Serve(addr string) error {
 	mux.HandleFunc("POST /api/apps/{slug}/releases", s.requireAPI(s.handleApiUpload))
 	mux.HandleFunc("GET /api/apps/{slug}/releases", s.requireAPI(s.handleApiReleases))
 	mux.HandleFunc("POST /api/tokens", s.requireAPI(s.handleApiCreateToken))
+	mux.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
 
 	// Public (devices): manifest + artifact download need no auth.
 	mux.HandleFunc("GET /api/apps/{slug}/manifest", s.handleManifest)

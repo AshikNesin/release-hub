@@ -49,6 +49,23 @@ func NewPlayPublisher(ctx context.Context, pkgName, credentialsFile string) (*Pl
 	return &PlayPublisher{svc: svc, pkgName: pkgName}, nil
 }
 
+// NewPlayPublisherFromJSON builds a client from service-account JSON bytes
+// (e.g. stored encrypted in the DB).
+func NewPlayPublisherFromJSON(ctx context.Context, pkgName string, creds []byte) (*PlayPublisher, error) {
+	tmp, err := os.CreateTemp("", "playcreds-*.json")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(creds); err != nil {
+		return nil, err
+	}
+	if err := tmp.Close(); err != nil {
+		return nil, err
+	}
+	return NewPlayPublisher(ctx, pkgName, tmp.Name())
+}
+
 // trackFor maps hub channels to Play tracks.
 func trackFor(channel string) (string, bool) {
 	switch channel {

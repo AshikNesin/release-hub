@@ -29,7 +29,7 @@ func (q *Queries) ApiTokenByHash(ctx context.Context, tokenHash string) (ApiToke
 }
 
 const appBySlug = `-- name: AppBySlug :one
-SELECT id, slug, package_name, platform, created_at FROM apps WHERE slug = ?
+SELECT id, slug, package_name, platform, created_at, play_enabled, play_credentials FROM apps WHERE slug = ?
 `
 
 func (q *Queries) AppBySlug(ctx context.Context, slug string) (App, error) {
@@ -41,6 +41,8 @@ func (q *Queries) AppBySlug(ctx context.Context, slug string) (App, error) {
 		&i.PackageName,
 		&i.Platform,
 		&i.CreatedAt,
+		&i.PlayEnabled,
+		&i.PlayCredentials,
 	)
 	return i, err
 }
@@ -266,7 +268,7 @@ func (q *Queries) ListApiTokens(ctx context.Context) ([]ApiToken, error) {
 }
 
 const listApps = `-- name: ListApps :many
-SELECT id, slug, package_name, platform, created_at FROM apps ORDER BY slug
+SELECT id, slug, package_name, platform, created_at, play_enabled, play_credentials FROM apps ORDER BY slug
 `
 
 func (q *Queries) ListApps(ctx context.Context) ([]App, error) {
@@ -284,6 +286,8 @@ func (q *Queries) ListApps(ctx context.Context) ([]App, error) {
 			&i.PackageName,
 			&i.Platform,
 			&i.CreatedAt,
+			&i.PlayEnabled,
+			&i.PlayCredentials,
 		); err != nil {
 			return nil, err
 		}

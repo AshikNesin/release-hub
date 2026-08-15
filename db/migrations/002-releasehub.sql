@@ -43,3 +43,6 @@ CREATE TABLE IF NOT EXISTS config (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+INSERT OR IGNORE INTO migrations (migration_number, migration_name)
+VALUES (002, '002-releasehub');

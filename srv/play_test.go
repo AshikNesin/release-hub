@@ -19,3 +19,29 @@ func TestTrackFor(t *testing.T) {
 		}
 	}
 }
+
+func TestEncryptDecryptCreds(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==") // 32 bytes b64
+	enc, err := encryptCreds([]byte(`{"client_email":"a@b.c"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enc == `{"client_email":"a@b.c"}` {
+		t.Fatal("not encrypted")
+	}
+	dec, err := decryptCreds(enc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(dec) != `{"client_email":"a@b.c"}` {
+		t.Fatalf("roundtrip mismatch: %s", dec)
+	}
+}
+
+func TestEncryptRequiresKey(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "")
+	t.Setenv("ALLOW_PLAINTEXT_CREDS", "")
+	if _, err := encryptCreds([]byte("x")); err == nil {
+		t.Fatal("expected error without secret key")
+	}
+}
