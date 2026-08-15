@@ -1,5 +1,5 @@
 -- name: SetPlayConfig :exec
-UPDATE apps SET play_enabled = ?, play_credentials = ? WHERE id = ?;
+UPDATE app_platforms SET play_enabled = ?, play_credentials = ? WHERE id = ?;
 
--- name: ListAppsWithPlay :many
-SELECT * FROM apps WHERE play_enabled = 1;
+-- name: ListPlatformsWithPlay :many
+SELECT ap.* FROM app_platforms ap WHERE ap.play_enabled = 1;

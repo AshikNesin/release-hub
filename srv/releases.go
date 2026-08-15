@@ -74,19 +74,35 @@ func (s *Server) handleApiListApps(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	type appOut struct {
-		Slug        string `json:"slug"`
-		PackageName string `json:"packageName"`
+	type platOut struct {
 		Platform    string `json:"platform"`
+		PackageName string `json:"packageName"`
+	}
+	type appOut struct {
+		Slug      string     `json:"slug"`
+		Platforms []platOut  `json:"platforms"`
 	}
 	out := make([]appOut, 0, len(apps))
 	for _, a := range apps {
-		out = append(out, appOut{a.Slug, a.PackageName, a.Platform})
+		plats, err := q.ListPlatformsByApp(r.Context(), a.ID)
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		po := make([]platOut, 0, len(plats))
+		for _, p := range plats {
+			po = append(po, platOut{p.Platform, p.PackageName})
+		}
+		out = append(out, appOut{a.Slug, po})
 	}
 	writeJSON(w, 200, out)
 }
 
 // handleApiCreateApp POST /api/apps  (form: slug, packageName, platform)
+//
+// Creates the app (product) plus its first platform variant. Later platforms
+// are added with POST /api/apps/{slug}/platforms, so one slug covers both
+// the android and ios versions of the same product.
 func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 	slug := strings.ToLower(strings.TrimSpace(r.FormValue("slug")))
 	pkg := strings.TrimSpace(r.FormValue("packageName"))
@@ -107,21 +123,25 @@ func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := dbgen.New(s.DB)
-	res, err := q.CreateApp(r.Context(), dbgen.CreateAppParams{Slug: slug, PackageName: pkg, Platform: platform})
+	res, err := q.CreateApp(r.Context(), slug)
 	if err != nil {
 		writeErr(w, 409, "app already exists or invalid: "+err.Error())
 		return
 	}
-	out := map[string]string{"slug": slug, "channel": platform}
-	// Android apps: auto-generate a dedicated signing keystore so the app is
-	// deploy-ready immediately — no manual keytool/upload step. Developer
-	// experience: register the app, set HUB_TOKEN, run deploy.sh. The key is
-	// generated once at creation and never rotates (rotation would break
-	// installed-base update signature continuity); uploading a keystore via
-	// /signing still overrides it for apps with an existing key history.
+	appID, _ := res.LastInsertId()
+	out := map[string]string{"slug": slug, "platform": platform}
+	// Android platforms: auto-generate a dedicated signing keystore so the app
+	// is deploy-ready immediately — no manual keytool/upload step. The key is
+	// generated once and never rotates (rotation would break installed-base
+	// update signature continuity); uploading a keystore via /signing still
+	// overrides it for apps with an existing key history.
 	if platform == "android" {
-		appID, _ := res.LastInsertId()
-		sum, gerr := s.generateAndStoreSigning(r.Context(), appID, slug)
+		platID, err := s.addPlatform(r.Context(), appID, platform, pkg)
+		if err != nil {
+			writeErr(w, 500, "add platform: "+err.Error())
+			return
+		}
+		sum, gerr := s.generateAndStoreSigning(r.Context(), platID, slug)
 		if gerr != nil {
 			slog.Error("auto-signing failed", "slug", slug, "err", gerr)
 			writeJSON(w, 201, out) // app exists; key can be uploaded later
@@ -129,8 +149,85 @@ func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 		}
 		out["signingKey"] = "generated"
 		out["signingSha256"] = sum
+	} else if _, err := s.addPlatform(r.Context(), appID, platform, pkg); err != nil {
+		writeErr(w, 500, "add platform: "+err.Error())
+		return
 	}
 	writeJSON(w, 201, out)
+}
+
+// handleApiAddPlatform POST /api/apps/{slug}/platforms
+// (form: platform, packageName) — adds e.g. the ios variant of an app that
+// already exists as android. Android platforms get a generated signing key.
+func (s *Server) handleApiAddPlatform(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	app, ok := s.appFromSlug(w, r, slug)
+	if !ok {
+		return
+	}
+	platform := strings.TrimSpace(r.FormValue("platform"))
+	pkg := strings.TrimSpace(r.FormValue("packageName"))
+	if platform != "android" && platform != "ios" {
+		writeErr(w, 400, "platform must be android or ios")
+		return
+	}
+	if pkg == "" {
+		writeErr(w, 400, "packageName required")
+		return
+	}
+	platID, err := s.addPlatform(r.Context(), app.ID, platform, pkg)
+	if err != nil {
+		writeErr(w, 409, err.Error())
+		return
+	}
+	out := map[string]string{"slug": slug, "platform": platform}
+	if platform == "android" {
+		sum, gerr := s.generateAndStoreSigning(r.Context(), platID, slug)
+		if gerr != nil {
+			slog.Error("auto-signing failed", "slug", slug, "platform", platform, "err", gerr)
+			writeJSON(w, 201, out)
+			return
+		}
+		out["signingKey"] = "generated"
+		out["signingSha256"] = sum
+	}
+	writeJSON(w, 201, out)
+}
+
+func (s *Server) addPlatform(ctx context.Context, appID int64, platform, pkg string) (int64, error) {
+	res, err := dbgen.New(s.DB).CreateAppPlatform(ctx, dbgen.CreateAppPlatformParams{
+		AppID: appID, Platform: platform, PackageName: pkg,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("platform already exists or invalid: %w", err)
+	}
+	id, _ := res.LastInsertId()
+	return id, nil
+}
+
+// platformFromRequest resolves (slug, platform) to the platform row used by
+// signing/play/upload/manifest endpoints. Platform comes from the path
+// ({platform}) or ?platform=, defaulting to android.
+func (s *Server) platformFromRequest(w http.ResponseWriter, r *http.Request, slug string) (dbgen.AppPlatform, bool) {
+	platform := r.PathValue("platform")
+	if platform == "" {
+		platform = r.URL.Query().Get("platform")
+	}
+	if platform == "" {
+		platform = "android"
+	}
+	if platform != "android" && platform != "ios" {
+		writeErr(w, 400, "platform must be android or ios")
+		return dbgen.AppPlatform{}, false
+	}
+	pl, err := dbgen.New(s.DB).PlatformBySlugAndPlatform(r.Context(), dbgen.PlatformBySlugAndPlatformParams{
+		Slug: slug, Platform: platform,
+	})
+	if err != nil {
+		writeErr(w, 404, "unknown app/platform: "+slug+"/"+platform)
+		return dbgen.AppPlatform{}, false
+	}
+	return pl, true
 }
 
 // appFromSlug resolves ?app= or path param to an app row.
@@ -157,7 +254,7 @@ func (s *Server) appFromSlug(w http.ResponseWriter, r *http.Request, slug string
 //   notes       release notes
 func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	app, ok := s.appFromSlug(w, r, slug)
+	plat, ok := s.platformFromRequest(w, r, slug)
 	if !ok {
 		return
 	}
@@ -177,7 +274,7 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := dbgen.New(s.DB)
-	maxCode, err := maxVersionCode(r.Context(), q, app.ID)
+	maxCode, err := maxVersionCode(r.Context(), q, plat.ID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -209,9 +306,9 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Stream to storage while hashing; key = <slug>/<versionCode>_<filename>
+	// Stream to storage while hashing; key = <slug>/<platform>/<versionCode>_<filename>
 	fileName := fmt.Sprintf("%d_%s", versionCode, filepath.Base(hdr.Filename))
-	key := app.Slug + "/" + fileName
+	key := slug + "/" + plat.Platform + "/" + fileName
 	size, sha, err := s.Storage.Save(r.Context(), key, file)
 	if err != nil {
 		writeErr(w, 500, "store artifact: "+err.Error())
@@ -219,7 +316,7 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := q.CreateRelease(r.Context(), dbgen.CreateReleaseParams{
-		AppID: app.ID, VersionCode: versionCode, VersionName: versionName,
+		AppPlatformID: plat.ID, VersionCode: versionCode, VersionName: versionName,
 		Channel: channel, Notes: r.FormValue("notes"),
 		Sha256: sha, SizeBytes: size, FileName: fileName,
 	}); err != nil {
@@ -233,15 +330,15 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := map[string]any{
-		"slug": app.Slug, "versionCode": versionCode, "versionName": versionName,
+		"slug": slug, "platform": plat.Platform, "versionCode": versionCode, "versionName": versionName,
 		"channel": channel, "sha256": sha, "size": size,
 		"apkUrl": dlURL,
 	}
 
 	// Optional Play Store publishing for .aab artifacts when this app has a
 	// service-account key in PlayCredsDir.
-	if playRelease, err := s.publishToPlay(r, app, key, channel, versionName, r.FormValue("notes")); err != nil {
-		slog.Warn("play publish failed", "app", app.Slug, "error", err)
+	if playRelease, err := s.publishToPlay(r, plat, key, channel, versionName, r.FormValue("notes")); err != nil {
+		slog.Warn("play publish failed", "app", slug, "error", err)
 		resp["playError"] = err.Error() // stored + served; release itself succeeded
 	} else if playRelease != "" {
 		resp["playRelease"] = playRelease
@@ -251,16 +348,16 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 
 // publishToPlay pushes an .aab to Google Play when the app has Play enabled
 // and credentials stored. Returns ("", nil) when not applicable.
-func (s *Server) publishToPlay(r *http.Request, app dbgen.App, key, channel, versionName, notes string) (string, error) {
-	if app.PlayEnabled == 0 || app.PlayCredentials == "" ||
+func (s *Server) publishToPlay(r *http.Request, plat dbgen.AppPlatform, key, channel, versionName, notes string) (string, error) {
+	if plat.PlayEnabled == 0 || plat.PlayCredentials == "" ||
 		!strings.HasSuffix(strings.ToLower(key), ".aab") {
 		return "", nil
 	}
-	creds, err := decryptCreds(app.PlayCredentials)
+	creds, err := decryptCreds(plat.PlayCredentials)
 	if err != nil {
 		return "", fmt.Errorf("decrypt play credentials: %w", err)
 	}
-	pub, err := NewPlayPublisherFromJSON(r.Context(), app.PackageName, creds)
+	pub, err := NewPlayPublisherFromJSON(r.Context(), plat.PackageName, creds)
 	if err != nil {
 		return "", err
 	}
@@ -285,7 +382,7 @@ func (s *Server) publishToPlay(r *http.Request, app dbgen.App, key, channel, ver
 	if err != nil {
 		return "", err
 	}
-	slog.Info("play publish ok", "app", app.Slug, "channel", channel, "release", release)
+	slog.Info("play publish ok", "app", plat.AppID, "channel", channel, "release", release)
 	return release, nil
 }
 
@@ -345,18 +442,19 @@ func (s *Server) handleApiSetPlay(w http.ResponseWriter, r *http.Request) {
 
 // handleApiReleases GET /api/apps/{slug}/releases
 func (s *Server) handleApiReleases(w http.ResponseWriter, r *http.Request) {
-	app, ok := s.appFromSlug(w, r, r.PathValue("slug"))
+	slug := r.PathValue("slug")
+	plat, ok := s.platformFromRequest(w, r, slug)
 	if !ok {
 		return
 	}
-	releases, err := dbgen.New(s.DB).ListReleases(r.Context(), app.ID)
+	releases, err := dbgen.New(s.DB).ListReleases(r.Context(), plat.ID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
 	}
 	out := make([]map[string]any, 0, len(releases))
 	for _, rel := range releases {
-		u, _ := s.Storage.PublicURL(r.Context(), app.Slug+"/"+rel.FileName)
+		u, _ := s.Storage.PublicURL(r.Context(), slug+"/"+plat.Platform+"/"+rel.FileName)
 		out = append(out, map[string]any{
 			"versionCode": rel.VersionCode, "versionName": rel.VersionName,
 			"channel": rel.Channel, "sha256": rel.Sha256, "size": rel.SizeBytes,
@@ -371,7 +469,7 @@ func (s *Server) handleApiReleases(w http.ResponseWriter, r *http.Request) {
 // Wire-compatible with Tiny Firewall's AppUpdater (UPDATE_URL). 404 until a
 // release exists on the channel.
 func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
-	app, ok := s.appFromSlug(w, r, r.PathValue("slug"))
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
 	if !ok {
 		return
 	}
@@ -380,7 +478,7 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 		channel = "direct"
 	}
 	releases, err := dbgen.New(s.DB).LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{
-		AppID: app.ID, Channel: channel,
+		AppPlatformID: plat.ID, Channel: channel,
 	})
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		writeErr(w, 500, err.Error())
@@ -393,7 +491,7 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rel := releases[0]
-	dlURL, err := s.Storage.PublicURL(r.Context(), app.Slug+"/"+rel.FileName)
+	dlURL, err := s.Storage.PublicURL(r.Context(), r.PathValue("slug")+"/"+plat.Platform+"/"+rel.FileName)
 	if err != nil {
 		writeErr(w, 500, "sign url: "+err.Error())
 		return
@@ -413,7 +511,13 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	file := filepath.Base(r.PathValue("file"))
-	key := slug + "/" + file
+	// New layout: /artifacts/{slug}/{platform}/{file}. Legacy two-segment
+	// paths (pre-platform restructure) are served as-is via platform="".
+	platform := r.PathValue("platform")
+	key := slug + "/" + platform + "/" + file
+	if platform == "" {
+		key = slug + "/" + file
+	}
 	if _, isLocal := s.Storage.(*LocalStorage); !isLocal {
 		u, err := s.Storage.PublicURL(r.Context(), key)
 		if err != nil {

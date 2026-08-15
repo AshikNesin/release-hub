@@ -1,7 +1,7 @@
--- apps
+-- apps (product identity: one slug, many platforms)
 
 -- name: CreateApp :execresult
-INSERT INTO apps (slug, package_name, platform) VALUES (?, ?, ?);
+INSERT INTO apps (slug) VALUES (?);
 
 -- name: ListApps :many
 SELECT * FROM apps ORDER BY slug;
@@ -12,28 +12,49 @@ SELECT * FROM apps WHERE slug = ?;
 -- name: DeleteApp :exec
 DELETE FROM apps WHERE slug = ?;
 
--- releases
+-- app platforms
+
+-- name: CreateAppPlatform :execresult
+INSERT INTO app_platforms (app_id, platform, package_name) VALUES (?, ?, ?);
+
+-- name: ListPlatformsByApp :many
+SELECT * FROM app_platforms WHERE app_id = ? ORDER BY platform;
+
+-- name: AppPlatformByAppAndPlatform :one
+SELECT * FROM app_platforms WHERE app_id = ? AND platform = ?;
+
+-- name: CountPlatformsBySlug :one
+SELECT COUNT(*) AS n FROM app_platforms ap JOIN apps a ON a.id = ap.app_id WHERE a.slug = ?;
+
+-- name: PlatformBySlugAndPlatform :one
+SELECT ap.* FROM app_platforms ap JOIN apps a ON a.id = ap.app_id
+WHERE a.slug = ? AND ap.platform = ?;
+
+-- name: DeleteAppPlatform :exec
+DELETE FROM app_platforms WHERE id = ?;
+
+-- releases (per platform)
 
 -- name: CreateRelease :execresult
-INSERT INTO releases (app_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name)
+INSERT INTO releases (app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListReleases :many
-SELECT * FROM releases WHERE app_id = ? ORDER BY version_code DESC;
+SELECT * FROM releases WHERE app_platform_id = ? ORDER BY version_code DESC;
 
 -- name: LatestReleaseForChannel :many
 SELECT * FROM releases
-WHERE app_id = ? AND channel = ?
+WHERE app_platform_id = ? AND channel = ?
 ORDER BY version_code DESC LIMIT 1;
 
 -- name: ReleaseByAppAndCode :one
-SELECT * FROM releases WHERE app_id = ? AND version_code = ?;
+SELECT * FROM releases WHERE app_platform_id = ? AND version_code = ?;
 
 -- name: MaxVersionCode :one
-SELECT COALESCE(MAX(version_code), 0) AS max_code FROM releases WHERE app_id = ?;
+SELECT COALESCE(MAX(version_code), 0) AS max_code FROM releases WHERE app_platform_id = ?;
 
 -- name: DeleteRelease :exec
-DELETE FROM releases WHERE app_id = ? AND version_code = ?;
+DELETE FROM releases WHERE app_platform_id = ? AND version_code = ?;
 
 -- api tokens
 

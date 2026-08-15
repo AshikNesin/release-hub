@@ -17,16 +17,22 @@ type ApiToken struct {
 }
 
 type App struct {
+	ID        int64     `json:"id"`
+	Slug      string    `json:"slug"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type AppPlatform struct {
 	ID              int64     `json:"id"`
-	Slug            string    `json:"slug"`
-	PackageName     string    `json:"package_name"`
+	AppID           int64     `json:"app_id"`
 	Platform        string    `json:"platform"`
-	CreatedAt       time.Time `json:"created_at"`
+	PackageName     string    `json:"package_name"`
 	PlayEnabled     int64     `json:"play_enabled"`
 	PlayCredentials string    `json:"play_credentials"`
 	SignKeystore    string    `json:"sign_keystore"`
 	SignConfig      string    `json:"sign_config"`
 	SignSha256      string    `json:"sign_sha256"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type Config struct {
@@ -41,16 +47,16 @@ type Migration struct {
 }
 
 type Release struct {
-	ID          int64     `json:"id"`
-	AppID       int64     `json:"app_id"`
-	VersionCode int64     `json:"version_code"`
-	VersionName string    `json:"version_name"`
-	Channel     string    `json:"channel"`
-	Notes       string    `json:"notes"`
-	Sha256      string    `json:"sha256"`
-	SizeBytes   int64     `json:"size_bytes"`
-	FileName    string    `json:"file_name"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID            int64     `json:"id"`
+	AppPlatformID int64     `json:"app_platform_id"`
+	VersionCode   int64     `json:"version_code"`
+	VersionName   string    `json:"version_name"`
+	Channel       string    `json:"channel"`
+	Notes         string    `json:"notes"`
+	Sha256        string    `json:"sha256"`
+	SizeBytes     int64     `json:"size_bytes"`
+	FileName      string    `json:"file_name"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type Session struct {

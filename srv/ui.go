@@ -126,13 +126,20 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	type appRow struct {
 		Slug, PackageName, Platform, Latest string
 	}
-	rows := make([]appRow, 0, len(apps))
+	rows := make([]appRow, 0)
 	for _, a := range apps {
-		latest := "—"
-		if rels, err := q.LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{AppID: a.ID, Channel: "direct"}); err == nil && len(rels) > 0 {
-			latest = fmt.Sprintf("%s (%d)", rels[0].VersionName, rels[0].VersionCode)
+		plats, err := q.ListPlatformsByApp(r.Context(), a.ID)
+		if err != nil {
+			http.Error(w, "db error", 500)
+			return
 		}
-		rows = append(rows, appRow{a.Slug, a.PackageName, a.Platform, latest})
+		for _, p := range plats {
+			latest := "—"
+			if rels, err := q.LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{AppPlatformID: p.ID, Channel: "direct"}); err == nil && len(rels) > 0 {
+				latest = fmt.Sprintf("%s (%d)", rels[0].VersionName, rels[0].VersionCode)
+			}
+			rows = append(rows, appRow{a.Slug, p.PackageName, p.Platform, latest})
+		}
 	}
 	tokens, _ := q.ListApiTokens(r.Context())
 	s.render(w, 200, "apps.html", struct {
@@ -149,19 +156,61 @@ func (s *Server) handleCreateAppUI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	platform := r.FormValue("platform")
-	res, err := dbgen.New(s.DB).CreateApp(r.Context(), dbgen.CreateAppParams{
-		Slug: slug, PackageName: r.FormValue("packageName"), Platform: platform,
-	})
+	if platform != "android" && platform != "ios" {
+		platform = "android"
+	}
+	pkg := strings.TrimSpace(r.FormValue("packageName"))
+	if pkg == "" {
+		http.Error(w, "packageName required", 400)
+		return
+	}
+	res, err := dbgen.New(s.DB).CreateApp(r.Context(), slug)
 	if err != nil {
 		http.Error(w, "create failed: "+err.Error(), 409)
 		return
 	}
-	// Same auto-signing behavior as the API: android apps get a generated
-	// keystore using the configured certificate subject (Settings page).
+	appID, _ := res.LastInsertId()
+	platID, err := s.addPlatform(r.Context(), appID, platform, pkg)
+	if err != nil {
+		http.Error(w, "add platform failed: "+err.Error(), 500)
+		return
+	}
+	// Same auto-signing behavior as the API: android platforms get a
+	// generated keystore using the configured certificate subject (Settings).
 	if platform == "android" {
-		appID, _ := res.LastInsertId()
-		if _, err := s.generateAndStoreSigning(r.Context(), appID, slug); err != nil {
+		if _, err := s.generateAndStoreSigning(r.Context(), platID, slug); err != nil {
 			slog.Error("auto-signing failed (UI)", "slug", slug, "err", err)
+		}
+	}
+	http.Redirect(w, r, "/apps/"+slug, http.StatusSeeOther)
+}
+
+// handleAddPlatformUI POST /apps/{slug}/platforms — add another platform
+// variant to an existing app from the app detail page.
+func (s *Server) handleAddPlatformUI(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	app, ok := s.appFromSlug(w, r, slug)
+	if !ok {
+		return
+	}
+	platform := r.FormValue("platform")
+	if platform != "android" && platform != "ios" {
+		http.Error(w, "invalid platform", 400)
+		return
+	}
+	pkg := strings.TrimSpace(r.FormValue("packageName"))
+	if pkg == "" {
+		http.Error(w, "packageName required", 400)
+		return
+	}
+	platID, err := s.addPlatform(r.Context(), app.ID, platform, pkg)
+	if err != nil {
+		http.Error(w, "add platform failed: "+err.Error(), 409)
+		return
+	}
+	if platform == "android" {
+		if _, err := s.generateAndStoreSigning(r.Context(), platID, slug); err != nil {
+			slog.Error("auto-signing failed (UI platform add)", "slug", slug, "err", err)
 		}
 	}
 	http.Redirect(w, r, "/apps/"+slug, http.StatusSeeOther)
@@ -201,7 +250,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := dbgen.New(s.DB)
-	releases, err := q.ListReleases(r.Context(), app.ID)
+	plats, err := q.ListPlatformsByApp(r.Context(), app.ID)
 	if err != nil {
 		http.Error(w, "db error", 500)
 		return
@@ -212,27 +261,43 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		SizeMB                           float64
 		CreatedAt                        time.Time
 	}
-	rows := make([]relRow, 0, len(releases))
-	for _, rel := range releases {
-		rows = append(rows, relRow{
-			VersionName: rel.VersionName, Channel: rel.Channel, Notes: rel.Notes,
-			URL: "/artifacts/" + app.Slug + "/" + rel.FileName,
-			VersionCode: rel.VersionCode,
-			SizeMB:      float64(rel.SizeBytes) / (1 << 20),
-			CreatedAt:   rel.CreatedAt,
+	type platSection struct {
+		Platform, PackageName          string
+		Releases                       []relRow
+		ManifestURL, UploadURL         string
+		HasSigningKey                  bool
+	}
+	sections := make([]platSection, 0, len(plats))
+	for _, p := range plats {
+		releases, err := q.ListReleases(r.Context(), p.ID)
+		if err != nil {
+			http.Error(w, "db error", 500)
+			return
+		}
+		rows := make([]relRow, 0, len(releases))
+		for _, rel := range releases {
+			rows = append(rows, relRow{
+				VersionName: rel.VersionName, Channel: rel.Channel, Notes: rel.Notes,
+				URL: "/artifacts/" + app.Slug + "/" + p.Platform + "/" + rel.FileName,
+				VersionCode: rel.VersionCode,
+				SizeMB:      float64(rel.SizeBytes) / (1 << 20),
+				CreatedAt:   rel.CreatedAt,
+			})
+		}
+		sections = append(sections, platSection{
+			Platform: p.Platform, PackageName: p.PackageName, Releases: rows,
+			ManifestURL: s.BaseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
+			UploadURL:   s.BaseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
+			HasSigningKey: p.SignSha256 != "",
 		})
 	}
 	s.render(w, 200, "app.html", struct {
 		uiData
-		App         dbgen.App
-		Releases    []relRow
-		ManifestURL string
-		UploadURL   string
+		App      dbgen.App
+		Platforms []platSection
 	}{
 		uiData{Title: app.Slug, Authenticated: true},
-		app, rows,
-		s.BaseURL + "/api/apps/" + app.Slug + "/manifest",
-		s.BaseURL + "/api/apps/" + app.Slug + "/releases",
+		app, sections,
 	})
 }
 

@@ -39,7 +39,7 @@ type signingConfig struct {
 // Stores the keystore encrypted; sha256 recorded in plaintext so gradle
 // builds can verify what they fetched. keyPassword defaults to storePassword.
 func (s *Server) handleApiSetSigning(w http.ResponseWriter, r *http.Request) {
-	app, ok := s.appFromSlug(w, r, r.PathValue("slug"))
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
 	if !ok {
 		return
 	}
@@ -80,7 +80,7 @@ func (s *Server) handleApiSetSigning(w http.ResponseWriter, r *http.Request) {
 	sum := sha256.Sum256(ks)
 	if err := dbgen.New(s.DB).SetSigningConfig(r.Context(), dbgen.SetSigningConfigParams{
 		SignKeystore: encKS, SignConfig: encCfg,
-		SignSha256: hex.EncodeToString(sum[:]), ID: app.ID,
+		SignSha256: hex.EncodeToString(sum[:]), ID: plat.ID,
 	}); err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -93,20 +93,20 @@ func (s *Server) handleApiSetSigning(w http.ResponseWriter, r *http.Request) {
 // headers for CI: any authenticated build env can produce signed releases.
 // It is a bearer-auth endpoint — never expose it publicly.
 func (s *Server) handleApiGetSigning(w http.ResponseWriter, r *http.Request) {
-	app, ok := s.appFromSlug(w, r, r.PathValue("slug"))
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
 	if !ok {
 		return
 	}
-	if app.SignKeystore == "" {
+	if plat.SignKeystore == "" {
 		writeErr(w, 404, "no signing keystore stored for this app")
 		return
 	}
-	ks, err := decryptCreds(app.SignKeystore)
+	ks, err := decryptCreds(plat.SignKeystore)
 	if err != nil {
 		writeErr(w, 500, "decrypt keystore: "+err.Error())
 		return
 	}
-	cfgRaw, err := decryptCreds(app.SignConfig)
+	cfgRaw, err := decryptCreds(plat.SignConfig)
 	if err != nil {
 		writeErr(w, 500, "decrypt config: "+err.Error())
 		return
@@ -125,12 +125,12 @@ func (s *Server) handleApiGetSigning(w http.ResponseWriter, r *http.Request) {
 
 // handleApiDeleteSigning POST /api/apps/{slug}/signing/delete — wipes stored key material.
 func (s *Server) handleApiDeleteSigning(w http.ResponseWriter, r *http.Request) {
-	app, ok := s.appFromSlug(w, r, r.PathValue("slug"))
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
 	if !ok {
 		return
 	}
 	if err := dbgen.New(s.DB).SetSigningConfig(r.Context(), dbgen.SetSigningConfigParams{
-		SignKeystore: "", SignConfig: "", SignSha256: "", ID: app.ID,
+		SignKeystore: "", SignConfig: "", SignSha256: "", ID: plat.ID,
 	}); err != nil {
 		writeErr(w, 500, err.Error())
 		return

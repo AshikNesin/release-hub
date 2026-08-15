@@ -23,17 +23,30 @@ update-manifest API so coding environments only talk to one endpoint.
 
 ## API
 
+## Apps and platforms
+
+An app is a product (one slug); each platform variant — android, ios — has
+its own package/bundle name, signing key, Play credentials, releases and
+version codes. `POST /api/apps` creates the product plus its first platform;
+`POST /api/apps/{slug}/platforms` adds the others (e.g. the ios version of
+an app that already ships on android).
+
 ```
-POST /api/apps                     form: slug, packageName, platform
-GET  /api/apps
-POST /api/apps/{slug}/releases     multipart: file, channel, versionCode?,
-                                   versionName?, notes  (versionCode must
-                                   increase; default max+1)
-GET  /api/apps/{slug}/releases
-POST /api/tokens                   form: name → token shown once
+POST /api/apps                              form: slug, packageName, platform
+GET  /api/apps                              → [{slug, platforms:[{platform, packageName}]}]
+POST /api/apps/{slug}/platforms             form: platform, packageName
+POST /api/apps/{slug}/releases              multipart: file, channel, versionCode?,
+                                            versionName?, notes  (versionCode must
+                                            increase; default max+1)
+POST /api/apps/{slug}/{platform}/releases   same, explicit platform
+GET  /api/apps/{slug}/releases              (also /{platform}/… everywhere)
+POST /api/tokens                            form: name → token shown once
 GET  /api/apps/{slug}/manifest?channel=direct    (public)
-GET  /artifacts/{slug}/{file}                       (public)
+GET  /artifacts/{slug}/{platform}/{file}         (public)
 ```
+
+Platform defaults to `android` when omitted from the path, so
+`/api/apps/{slug}/manifest` keeps working for android-only apps.
 
 Upload example:
 

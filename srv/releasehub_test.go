@@ -8,7 +8,9 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -43,7 +45,9 @@ func (s *Server) muxForTest() *http.ServeMux {
 	m.HandleFunc("GET /apps/{slug}", s.requireUI(s.handleAppDetail))
 	m.HandleFunc("GET /api/apps", s.requireAPI(s.handleApiListApps))
 	m.HandleFunc("POST /api/apps", s.requireAPI(s.handleApiCreateApp))
+	m.HandleFunc("POST /api/apps/{slug}/platforms", s.requireAPI(s.handleApiAddPlatform))
 	m.HandleFunc("POST /api/apps/{slug}/releases", s.requireAPI(s.handleApiUpload))
+	m.HandleFunc("POST /api/apps/{slug}/{platform}/releases", s.requireAPI(s.handleApiUpload))
 	m.HandleFunc("GET /api/apps/{slug}/releases", s.requireAPI(s.handleApiReleases))
 	m.HandleFunc("POST /api/tokens", s.requireAPI(s.handleApiCreateToken))
 	m.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
@@ -51,7 +55,8 @@ func (s *Server) muxForTest() *http.ServeMux {
 	m.HandleFunc("GET /api/apps/{slug}/signing", s.requireAPI(s.handleApiGetSigning))
 	m.HandleFunc("POST /api/apps/{slug}/signing/delete", s.requireAPI(s.handleApiDeleteSigning))
 	m.HandleFunc("GET /api/apps/{slug}/manifest", s.handleManifest)
-	m.HandleFunc("GET /artifacts/{slug}/{file}", s.handleArtifact)
+	m.HandleFunc("GET /api/apps/{slug}/{platform}/signing", s.requireAPI(s.handleApiGetSigning))
+	m.HandleFunc("GET /artifacts/{slug}/{platform}/{file}", s.handleArtifact)
 	return m
 }
 
@@ -163,3 +168,73 @@ func TestUploadAndManifestFlow(t *testing.T) {
 }
 
 
+
+// App → platforms: one slug, android + ios variants, independent releases
+// and signing keys per platform.
+func TestAppPlatforms(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	tok := "rh_plat_test"
+	if _, err := s.DB.Exec("INSERT INTO api_tokens (name, token_hash) VALUES ('t', ?)", hashToken(tok)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create app (defaults to android, gets a signing key)
+	form := url.Values{"slug": {"multiapp"}, "packageName": {"io.multi"}, "platform": {"android"}}
+	req, _ := http.NewRequest("POST", ts.URL+"/api/apps", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := new(bytes.Buffer)
+	body.ReadFrom(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 201 || !strings.Contains(body.String(), `"signingKey":"generated"`) {
+		t.Fatalf("create app: %d %s", resp.StatusCode, body.String())
+	}
+
+	// Add the ios platform to the same slug
+	form = url.Values{"platform": {"ios"}, "packageName": {"io.multi.ios"}}
+	req, _ = http.NewRequest("POST", ts.URL+"/api/apps/multiapp/platforms", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body.Reset(); body.ReadFrom(resp.Body); resp.Body.Close()
+	if resp.StatusCode != 201 {
+		t.Fatalf("add platform: %d %s", resp.StatusCode, body.String())
+	}
+
+	// Listing shows both platforms under one slug
+	req, _ = http.NewRequest("GET", ts.URL+"/api/apps", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body.Reset(); body.ReadFrom(resp.Body); resp.Body.Close()
+	got := body.String()
+	if !strings.Contains(got, `"slug":"multiapp"`) || !strings.Contains(got, `"platform":"android"`) || !strings.Contains(got, `"platform":"ios"`) {
+		t.Fatalf("list apps missing platforms: %s", got)
+	}
+
+	// Android signing exists; ios signing 404s (no key for that platform)
+	req, _ = http.NewRequest("GET", ts.URL+"/api/apps/multiapp/android/signing", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = ts.Client().Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		t.Fatalf("android signing: %v %v", err, resp.StatusCode)
+	}
+	resp.Body.Close()
+	req, _ = http.NewRequest("GET", ts.URL+"/api/apps/multiapp/ios/signing", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = ts.Client().Do(req)
+	if err != nil || resp.StatusCode != 404 {
+		t.Fatalf("ios signing should 404: %v %v", err, resp.StatusCode)
+	}
+	resp.Body.Close()
+}

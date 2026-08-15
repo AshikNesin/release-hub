@@ -9,30 +9,30 @@ import (
 	"context"
 )
 
-const listAppsWithPlay = `-- name: ListAppsWithPlay :many
-SELECT id, slug, package_name, platform, created_at, play_enabled, play_credentials, sign_keystore, sign_config, sign_sha256 FROM apps WHERE play_enabled = 1
+const listPlatformsWithPlay = `-- name: ListPlatformsWithPlay :many
+SELECT ap.id, ap.app_id, ap.platform, ap.package_name, ap.play_enabled, ap.play_credentials, ap.sign_keystore, ap.sign_config, ap.sign_sha256, ap.created_at FROM app_platforms ap WHERE ap.play_enabled = 1
 `
 
-func (q *Queries) ListAppsWithPlay(ctx context.Context) ([]App, error) {
-	rows, err := q.db.QueryContext(ctx, listAppsWithPlay)
+func (q *Queries) ListPlatformsWithPlay(ctx context.Context) ([]AppPlatform, error) {
+	rows, err := q.db.QueryContext(ctx, listPlatformsWithPlay)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []App{}
+	items := []AppPlatform{}
 	for rows.Next() {
-		var i App
+		var i AppPlatform
 		if err := rows.Scan(
 			&i.ID,
-			&i.Slug,
-			&i.PackageName,
+			&i.AppID,
 			&i.Platform,
-			&i.CreatedAt,
+			&i.PackageName,
 			&i.PlayEnabled,
 			&i.PlayCredentials,
 			&i.SignKeystore,
 			&i.SignConfig,
 			&i.SignSha256,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -48,7 +48,7 @@ func (q *Queries) ListAppsWithPlay(ctx context.Context) ([]App, error) {
 }
 
 const setPlayConfig = `-- name: SetPlayConfig :exec
-UPDATE apps SET play_enabled = ?, play_credentials = ? WHERE id = ?
+UPDATE app_platforms SET play_enabled = ?, play_credentials = ? WHERE id = ?
 `
 
 type SetPlayConfigParams struct {

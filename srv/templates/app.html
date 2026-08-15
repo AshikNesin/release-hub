@@ -1,15 +1,18 @@
 {{template "base.html" .}}
 {{define "content"}}
-<h2 style="font-size:15px;margin:0 0 4px">{{.App.Slug}} <span class="badge">{{.App.Platform}}</span></h2>
-<p class="muted" style="margin:0 0 16px">{{.App.PackageName}}</p>
+<h2 style="font-size:15px;margin:0 0 4px">{{.App.Slug}}</h2>
+<p class="muted" style="margin:0 0 16px">product identity — one slug, one or more platforms</p>
 
+{{range .Platforms}}
 <div class="card">
+  <h3 style="font-size:13px;margin:0 0 8px">
+    <span class="badge">{{.Platform}}</span>
+    <span class="muted">{{.PackageName}}</span>
+    {{if .HasSigningKey}}<span class="muted">· signing key stored</span>{{end}}
+  </h3>
   <p class="muted" style="margin:0 0 8px">Update manifest (point the app's UPDATE_URL here):</p>
   <code>{{.ManifestURL}}</code>
-</div>
-
-<div class="card">
-  <table>
+  <table style="margin-top:12px">
     <tr><th>Version</th><th>Channel</th><th>Size</th><th>Notes</th><th>Uploaded</th><th></th></tr>
     {{range .Releases}}
     <tr>
@@ -25,5 +28,15 @@
     <tr><td colspan="6"><code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=direct {{.UploadURL}}</code></td></tr>
     {{end}}
   </table>
+</div>
+{{end}}
+
+<div class="card">
+  <h3 style="font-size:13px;margin:0 0 10px;color:var(--muted)">Add platform</h3>
+  <form method="post" action="/apps/{{.App.Slug}}/platforms" class="inline">
+    <div><label>Platform</label><select name="platform"><option>ios</option><option>android</option></select></div>
+    <div><label>Package / bundle name</label><input name="packageName" placeholder="io.example.app" required></div>
+    <button type="submit">Add platform</button>
+  </form>
 </div>
 {{end}}

@@ -29,25 +29,52 @@ func (q *Queries) ApiTokenByHash(ctx context.Context, tokenHash string) (ApiToke
 }
 
 const appBySlug = `-- name: AppBySlug :one
-SELECT id, slug, package_name, platform, created_at, play_enabled, play_credentials, sign_keystore, sign_config, sign_sha256 FROM apps WHERE slug = ?
+SELECT id, slug, created_at FROM apps WHERE slug = ?
 `
 
 func (q *Queries) AppBySlug(ctx context.Context, slug string) (App, error) {
 	row := q.db.QueryRowContext(ctx, appBySlug, slug)
 	var i App
+	err := row.Scan(&i.ID, &i.Slug, &i.CreatedAt)
+	return i, err
+}
+
+const appPlatformByAppAndPlatform = `-- name: AppPlatformByAppAndPlatform :one
+SELECT id, app_id, platform, package_name, play_enabled, play_credentials, sign_keystore, sign_config, sign_sha256, created_at FROM app_platforms WHERE app_id = ? AND platform = ?
+`
+
+type AppPlatformByAppAndPlatformParams struct {
+	AppID    int64  `json:"app_id"`
+	Platform string `json:"platform"`
+}
+
+func (q *Queries) AppPlatformByAppAndPlatform(ctx context.Context, arg AppPlatformByAppAndPlatformParams) (AppPlatform, error) {
+	row := q.db.QueryRowContext(ctx, appPlatformByAppAndPlatform, arg.AppID, arg.Platform)
+	var i AppPlatform
 	err := row.Scan(
 		&i.ID,
-		&i.Slug,
-		&i.PackageName,
+		&i.AppID,
 		&i.Platform,
-		&i.CreatedAt,
+		&i.PackageName,
 		&i.PlayEnabled,
 		&i.PlayCredentials,
 		&i.SignKeystore,
 		&i.SignConfig,
 		&i.SignSha256,
+		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const countPlatformsBySlug = `-- name: CountPlatformsBySlug :one
+SELECT COUNT(*) AS n FROM app_platforms ap JOIN apps a ON a.id = ap.app_id WHERE a.slug = ?
+`
+
+func (q *Queries) CountPlatformsBySlug(ctx context.Context, slug string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countPlatformsBySlug, slug)
+	var n int64
+	err := row.Scan(&n)
+	return n, err
 }
 
 const createApiToken = `-- name: CreateApiToken :execresult
@@ -67,41 +94,51 @@ func (q *Queries) CreateApiToken(ctx context.Context, arg CreateApiTokenParams) 
 
 const createApp = `-- name: CreateApp :execresult
 
-INSERT INTO apps (slug, package_name, platform) VALUES (?, ?, ?)
+INSERT INTO apps (slug) VALUES (?)
 `
 
-type CreateAppParams struct {
-	Slug        string `json:"slug"`
-	PackageName string `json:"package_name"`
-	Platform    string `json:"platform"`
+// apps (product identity: one slug, many platforms)
+func (q *Queries) CreateApp(ctx context.Context, slug string) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createApp, slug)
 }
 
-// apps
-func (q *Queries) CreateApp(ctx context.Context, arg CreateAppParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createApp, arg.Slug, arg.PackageName, arg.Platform)
+const createAppPlatform = `-- name: CreateAppPlatform :execresult
+
+INSERT INTO app_platforms (app_id, platform, package_name) VALUES (?, ?, ?)
+`
+
+type CreateAppPlatformParams struct {
+	AppID       int64  `json:"app_id"`
+	Platform    string `json:"platform"`
+	PackageName string `json:"package_name"`
+}
+
+// app platforms
+func (q *Queries) CreateAppPlatform(ctx context.Context, arg CreateAppPlatformParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createAppPlatform, arg.AppID, arg.Platform, arg.PackageName)
 }
 
 const createRelease = `-- name: CreateRelease :execresult
 
-INSERT INTO releases (app_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name)
+INSERT INTO releases (app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateReleaseParams struct {
-	AppID       int64  `json:"app_id"`
-	VersionCode int64  `json:"version_code"`
-	VersionName string `json:"version_name"`
-	Channel     string `json:"channel"`
-	Notes       string `json:"notes"`
-	Sha256      string `json:"sha256"`
-	SizeBytes   int64  `json:"size_bytes"`
-	FileName    string `json:"file_name"`
+	AppPlatformID int64  `json:"app_platform_id"`
+	VersionCode   int64  `json:"version_code"`
+	VersionName   string `json:"version_name"`
+	Channel       string `json:"channel"`
+	Notes         string `json:"notes"`
+	Sha256        string `json:"sha256"`
+	SizeBytes     int64  `json:"size_bytes"`
+	FileName      string `json:"file_name"`
 }
 
-// releases
+// releases (per platform)
 func (q *Queries) CreateRelease(ctx context.Context, arg CreateReleaseParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, createRelease,
-		arg.AppID,
+		arg.AppPlatformID,
 		arg.VersionCode,
 		arg.VersionName,
 		arg.Channel,
@@ -147,6 +184,15 @@ func (q *Queries) DeleteApp(ctx context.Context, slug string) error {
 	return err
 }
 
+const deleteAppPlatform = `-- name: DeleteAppPlatform :exec
+DELETE FROM app_platforms WHERE id = ?
+`
+
+func (q *Queries) DeleteAppPlatform(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteAppPlatform, id)
+	return err
+}
+
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
 DELETE FROM sessions WHERE expires_at < ?
 `
@@ -157,16 +203,16 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context, expiresAt time.Time
 }
 
 const deleteRelease = `-- name: DeleteRelease :exec
-DELETE FROM releases WHERE app_id = ? AND version_code = ?
+DELETE FROM releases WHERE app_platform_id = ? AND version_code = ?
 `
 
 type DeleteReleaseParams struct {
-	AppID       int64 `json:"app_id"`
-	VersionCode int64 `json:"version_code"`
+	AppPlatformID int64 `json:"app_platform_id"`
+	VersionCode   int64 `json:"version_code"`
 }
 
 func (q *Queries) DeleteRelease(ctx context.Context, arg DeleteReleaseParams) error {
-	_, err := q.db.ExecContext(ctx, deleteRelease, arg.AppID, arg.VersionCode)
+	_, err := q.db.ExecContext(ctx, deleteRelease, arg.AppPlatformID, arg.VersionCode)
 	return err
 }
 
@@ -193,18 +239,18 @@ func (q *Queries) GetConfig(ctx context.Context, key string) (string, error) {
 }
 
 const latestReleaseForChannel = `-- name: LatestReleaseForChannel :many
-SELECT id, app_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases
-WHERE app_id = ? AND channel = ?
+SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases
+WHERE app_platform_id = ? AND channel = ?
 ORDER BY version_code DESC LIMIT 1
 `
 
 type LatestReleaseForChannelParams struct {
-	AppID   int64  `json:"app_id"`
-	Channel string `json:"channel"`
+	AppPlatformID int64  `json:"app_platform_id"`
+	Channel       string `json:"channel"`
 }
 
 func (q *Queries) LatestReleaseForChannel(ctx context.Context, arg LatestReleaseForChannelParams) ([]Release, error) {
-	rows, err := q.db.QueryContext(ctx, latestReleaseForChannel, arg.AppID, arg.Channel)
+	rows, err := q.db.QueryContext(ctx, latestReleaseForChannel, arg.AppPlatformID, arg.Channel)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +260,7 @@ func (q *Queries) LatestReleaseForChannel(ctx context.Context, arg LatestRelease
 		var i Release
 		if err := rows.Scan(
 			&i.ID,
-			&i.AppID,
+			&i.AppPlatformID,
 			&i.VersionCode,
 			&i.VersionName,
 			&i.Channel,
@@ -271,7 +317,7 @@ func (q *Queries) ListApiTokens(ctx context.Context) ([]ApiToken, error) {
 }
 
 const listApps = `-- name: ListApps :many
-SELECT id, slug, package_name, platform, created_at, play_enabled, play_credentials, sign_keystore, sign_config, sign_sha256 FROM apps ORDER BY slug
+SELECT id, slug, created_at FROM apps ORDER BY slug
 `
 
 func (q *Queries) ListApps(ctx context.Context) ([]App, error) {
@@ -283,17 +329,44 @@ func (q *Queries) ListApps(ctx context.Context) ([]App, error) {
 	items := []App{}
 	for rows.Next() {
 		var i App
+		if err := rows.Scan(&i.ID, &i.Slug, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPlatformsByApp = `-- name: ListPlatformsByApp :many
+SELECT id, app_id, platform, package_name, play_enabled, play_credentials, sign_keystore, sign_config, sign_sha256, created_at FROM app_platforms WHERE app_id = ? ORDER BY platform
+`
+
+func (q *Queries) ListPlatformsByApp(ctx context.Context, appID int64) ([]AppPlatform, error) {
+	rows, err := q.db.QueryContext(ctx, listPlatformsByApp, appID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AppPlatform{}
+	for rows.Next() {
+		var i AppPlatform
 		if err := rows.Scan(
 			&i.ID,
-			&i.Slug,
-			&i.PackageName,
+			&i.AppID,
 			&i.Platform,
-			&i.CreatedAt,
+			&i.PackageName,
 			&i.PlayEnabled,
 			&i.PlayCredentials,
 			&i.SignKeystore,
 			&i.SignConfig,
 			&i.SignSha256,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -309,11 +382,11 @@ func (q *Queries) ListApps(ctx context.Context) ([]App, error) {
 }
 
 const listReleases = `-- name: ListReleases :many
-SELECT id, app_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases WHERE app_id = ? ORDER BY version_code DESC
+SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases WHERE app_platform_id = ? ORDER BY version_code DESC
 `
 
-func (q *Queries) ListReleases(ctx context.Context, appID int64) ([]Release, error) {
-	rows, err := q.db.QueryContext(ctx, listReleases, appID)
+func (q *Queries) ListReleases(ctx context.Context, appPlatformID int64) ([]Release, error) {
+	rows, err := q.db.QueryContext(ctx, listReleases, appPlatformID)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +396,7 @@ func (q *Queries) ListReleases(ctx context.Context, appID int64) ([]Release, err
 		var i Release
 		if err := rows.Scan(
 			&i.ID,
-			&i.AppID,
+			&i.AppPlatformID,
 			&i.VersionCode,
 			&i.VersionName,
 			&i.Channel,
@@ -347,31 +420,59 @@ func (q *Queries) ListReleases(ctx context.Context, appID int64) ([]Release, err
 }
 
 const maxVersionCode = `-- name: MaxVersionCode :one
-SELECT COALESCE(MAX(version_code), 0) AS max_code FROM releases WHERE app_id = ?
+SELECT COALESCE(MAX(version_code), 0) AS max_code FROM releases WHERE app_platform_id = ?
 `
 
-func (q *Queries) MaxVersionCode(ctx context.Context, appID int64) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, maxVersionCode, appID)
+func (q *Queries) MaxVersionCode(ctx context.Context, appPlatformID int64) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, maxVersionCode, appPlatformID)
 	var max_code interface{}
 	err := row.Scan(&max_code)
 	return max_code, err
 }
 
-const releaseByAppAndCode = `-- name: ReleaseByAppAndCode :one
-SELECT id, app_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases WHERE app_id = ? AND version_code = ?
+const platformBySlugAndPlatform = `-- name: PlatformBySlugAndPlatform :one
+SELECT ap.id, ap.app_id, ap.platform, ap.package_name, ap.play_enabled, ap.play_credentials, ap.sign_keystore, ap.sign_config, ap.sign_sha256, ap.created_at FROM app_platforms ap JOIN apps a ON a.id = ap.app_id
+WHERE a.slug = ? AND ap.platform = ?
 `
 
-type ReleaseByAppAndCodeParams struct {
-	AppID       int64 `json:"app_id"`
-	VersionCode int64 `json:"version_code"`
+type PlatformBySlugAndPlatformParams struct {
+	Slug     string `json:"slug"`
+	Platform string `json:"platform"`
 }
 
-func (q *Queries) ReleaseByAppAndCode(ctx context.Context, arg ReleaseByAppAndCodeParams) (Release, error) {
-	row := q.db.QueryRowContext(ctx, releaseByAppAndCode, arg.AppID, arg.VersionCode)
-	var i Release
+func (q *Queries) PlatformBySlugAndPlatform(ctx context.Context, arg PlatformBySlugAndPlatformParams) (AppPlatform, error) {
+	row := q.db.QueryRowContext(ctx, platformBySlugAndPlatform, arg.Slug, arg.Platform)
+	var i AppPlatform
 	err := row.Scan(
 		&i.ID,
 		&i.AppID,
+		&i.Platform,
+		&i.PackageName,
+		&i.PlayEnabled,
+		&i.PlayCredentials,
+		&i.SignKeystore,
+		&i.SignConfig,
+		&i.SignSha256,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const releaseByAppAndCode = `-- name: ReleaseByAppAndCode :one
+SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases WHERE app_platform_id = ? AND version_code = ?
+`
+
+type ReleaseByAppAndCodeParams struct {
+	AppPlatformID int64 `json:"app_platform_id"`
+	VersionCode   int64 `json:"version_code"`
+}
+
+func (q *Queries) ReleaseByAppAndCode(ctx context.Context, arg ReleaseByAppAndCodeParams) (Release, error) {
+	row := q.db.QueryRowContext(ctx, releaseByAppAndCode, arg.AppPlatformID, arg.VersionCode)
+	var i Release
+	err := row.Scan(
+		&i.ID,
+		&i.AppPlatformID,
 		&i.VersionCode,
 		&i.VersionName,
 		&i.Channel,

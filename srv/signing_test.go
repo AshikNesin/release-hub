@@ -26,7 +26,10 @@ func TestSigningRoundtrip(t *testing.T) {
 	if _, err := s.DB.Exec("INSERT INTO api_tokens (name, token_hash) VALUES ('t', ?)", hashToken(tok)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.DB.Exec("INSERT INTO apps (slug, package_name, platform) VALUES ('sg', 'io.sg', 'android')"); err != nil {
+	if _, err := s.DB.Exec("INSERT INTO apps (slug) VALUES ('sg')"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec("INSERT INTO app_platforms (app_id, platform, package_name) VALUES (1, 'android', 'io.sg')"); err != nil {
 		t.Fatal(err)
 	}
 
