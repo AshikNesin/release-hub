@@ -95,7 +95,7 @@ func TestUploadAndManifestFlow(t *testing.T) {
 	mw := multipart.NewWriter(body)
 	fw, _ := mw.CreateFormFile("file", "demo.apk")
 	fw.Write([]byte("fake-apk-bytes"))
-	mw.WriteField("channel", "api-share")
+	mw.WriteField("channel", "direct")
 	mw.WriteField("versionCode", "10")
 	mw.WriteField("versionName", "1.0")
 	mw.Close()

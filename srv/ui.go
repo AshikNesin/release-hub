@@ -129,7 +129,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	rows := make([]appRow, 0, len(apps))
 	for _, a := range apps {
 		latest := "—"
-		if rels, err := q.LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{AppID: a.ID, Channel: "api-share"}); err == nil && len(rels) > 0 {
+		if rels, err := q.LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{AppID: a.ID, Channel: "direct"}); err == nil && len(rels) > 0 {
 			latest = fmt.Sprintf("%s (%d)", rels[0].VersionName, rels[0].VersionCode)
 		}
 		rows = append(rows, appRow{a.Slug, a.PackageName, a.Platform, latest})

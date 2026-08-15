@@ -6,9 +6,9 @@ update-manifest API so coding environments only talk to one endpoint.
 
 ## Channels
 
-- `public` — production releases (future: Play/App Store promotion)
-- `internal` — testing tracks
-- `api-share` — direct APK distribution + update manifest for in-app updaters
+- `public` — production releases (Play production track)
+- `internal` — testing tracks (Play internal testing)
+- `direct` — direct APK distribution + update manifest for in-app updaters
   (wire-compatible with Tiny Firewall's `AppUpdater` / `UPDATE_URL`)
 
 ## Auth
@@ -31,7 +31,7 @@ POST /api/apps/{slug}/releases     multipart: file, channel, versionCode?,
                                    increase; default max+1)
 GET  /api/apps/{slug}/releases
 POST /api/tokens                   form: name → token shown once
-GET  /api/apps/{slug}/manifest?channel=api-share   (public)
+GET  /api/apps/{slug}/manifest?channel=direct    (public)
 GET  /artifacts/{slug}/{file}                       (public)
 ```
 
@@ -39,7 +39,7 @@ Upload example:
 
 ```bash
 curl -H "Authorization: Bearer $HUB_TOKEN" \
-     -F file=app-release.apk -F channel=api-share \
+     -F file=app-release.apk -F channel=direct \
      -F versionCode=142 -F versionName=1.15 \
      https://hub.example.com/api/apps/tinyfirewall/releases
 ```
@@ -114,7 +114,7 @@ stored in the DB, encrypted at rest (AES-256-GCM, key from the
 
 - `channel=public`   → Play **production** track
 - `channel=internal` → Play **internal testing** track
-- `channel=api-share` (or any `.apk`) → hub only, Play untouched
+- `channel=direct` (or any `.apk`) → hub only, Play untouched
 
 The release itself is recorded even if Play publishing fails — the API
 response includes `playRelease` or `playError` so CI can decide whether
@@ -222,3 +222,8 @@ make build && make test
 ```
 
 systemd: `release-hub.service` (port 9100).
+
+
+> **Rename note**: the channel formerly called `api-share` is now `direct`.
+> The old name is still accepted on upload/manifest queries and maps to the
+> same channel; stored releases are migrated to the new name.

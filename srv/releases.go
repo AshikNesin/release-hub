@@ -43,7 +43,7 @@ const maxUploadBytes = 512 << 20 // 512 MiB per artifact
 
 // releaseManifest is the wire format consumed by Tiny Firewall's AppUpdater
 // (BuildConfig.UPDATE_URL). Keep it stable: versionCode must be the ABI-
-// adjusted on-device value for android APKs served on the api-share channel.
+// adjusted on-device value for android APKs served on the direct channel.
 type releaseManifest struct {
 	VersionCode int    `json:"versionCode"`
 	VersionName string `json:"versionName"`
@@ -132,9 +132,9 @@ func (s *Server) appFromSlug(w http.ResponseWriter, r *http.Request, slug string
 //
 // multipart form:
 //   file        artifact (.apk/.aab/.ipa)
-//   channel     public | internal | api-share   (default api-share)
+//   channel     direct | internal | public   (default direct)
 //   versionName human version (default derived from versionCode)
-//   versionCode integer; required for android APKs on api-share (the
+//   versionCode integer; required for android APKs on direct (the
 //              on-device BuildConfig.VERSION_CODE, i.e. ABI-adjusted);
 //              optional otherwise (auto = max+1)
 //   notes       release notes
@@ -151,12 +151,16 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	channel := r.FormValue("channel")
 	if channel == "" {
-		channel = "api-share"
+		channel = "direct"
+	}
+	// "api-share" is the old name for the direct channel; still accepted.
+	if channel == "api-share" {
+		channel = "direct"
 	}
 	switch channel {
-	case "public", "internal", "api-share":
+	case "public", "internal", "direct":
 	default:
-		writeErr(w, 400, "channel must be public, internal or api-share")
+		writeErr(w, 400, "channel must be direct, internal or public")
 		return
 	}
 	q := dbgen.New(s.DB)
@@ -350,7 +354,7 @@ func (s *Server) handleApiReleases(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
-// handleManifest GET /api/apps/{slug}/manifest?channel=api-share
+// handleManifest GET /api/apps/{slug}/manifest?channel=direct
 // Wire-compatible with Tiny Firewall's AppUpdater (UPDATE_URL). 404 until a
 // release exists on the channel.
 func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
@@ -360,7 +364,11 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 	}
 	channel := r.URL.Query().Get("channel")
 	if channel == "" {
-		channel = "api-share"
+		channel = "direct"
+	}
+	// accept the legacy name
+	if channel == "api-share" {
+		channel = "direct"
 	}
 	releases, err := dbgen.New(s.DB).LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{
 		AppID: app.ID, Channel: channel,

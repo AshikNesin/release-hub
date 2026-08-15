@@ -73,7 +73,7 @@ func trackFor(channel string) (string, bool) {
 		return "production", true
 	case "internal":
 		return "internal", true
-	case "api-share":
+	case "direct", "api-share":
 		return "", false // direct distribution; no Play involvement
 	}
 	return "", false

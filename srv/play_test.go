@@ -9,7 +9,8 @@ func TestTrackFor(t *testing.T) {
 	}{
 		"public":    {"production", true},
 		"internal":  {"internal", true},
-		"api-share": {"", false},
+		"api-share": {"", false}, // legacy alias
+		"direct":     {"", false},
 		"weird":     {"", false},
 	}
 	for ch, want := range cases {

@@ -22,7 +22,7 @@
     </tr>
     {{else}}
     <tr><td colspan="6" class="muted">No releases yet. Upload via:</td></tr>
-    <tr><td colspan="6"><code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=api-share {{.UploadURL}}</code></td></tr>
+    <tr><td colspan="6"><code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=direct {{.UploadURL}}</code></td></tr>
     {{end}}
   </table>
 </div>
