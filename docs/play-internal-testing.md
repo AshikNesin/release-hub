@@ -119,11 +119,25 @@ Promote later by uploading with `channel=public` (a separate production
 release, after the app's Console declarations — privacy policy, content
 forms — are complete).
 
+## FAQ
+
+**Do I need to create / enable the "Google Play Android Developer API"?**
+No creation — that name *is* the Publishing API (`androidpublisher` v3) the
+hub calls. Linking the Cloud project via Play Console **Setup → API
+access** enables it in the project automatically. Manual enabling (Google
+Cloud Console → APIs & Services → Library → "Google Play Android Developer
+API" → Enable) is only a fallback for a failed link wizard or a
+`403 … API has not been used in project` error. Note enabling the API
+alone grants nothing — access comes from the service-account invite in
+Play Console. Verify it's on: Cloud Console → APIs & Services → Enabled
+APIs & services.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
 | `playError`: 403 … not linked | Service account wasn't invited in Play Console, or API access not linked yet. Re-check **Setup → API access** (find it via console search) and the invite. |
+| `playError`: 403 … API has not been used in project | The link didn't enable the Play Android Developer API — enable it manually (see FAQ above). |
 | `playError`: 401 invalid_grant | Wrong/revoked JSON key — re-download a fresh key and re-upload it in the hub. |
 | `playError`: release failed … versionCode | Play rejected the version code (must strictly increase per app). Bump it. |
 | Upload OK but testers see nothing | Track has no tester list / opt-in not completed, or Play still processing the release (minutes). |
