@@ -39,9 +39,12 @@
       <input type="hidden" name="enable" value="false">
       <button type="submit" class="btn ghost xs">disable</button>
     </form>
+    <button class="btn ghost xs" data-play-check="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play/check">test connection</button>
+    <a class="btn ghost xs" href="https://play.google.com/console/u/0/developers" target="_blank" rel="noopener">open Play Console ↗</a>
     <span class="mlabel">channels</span>
     <code>internal → internal testing · public → production</code>
   </div>
+  <div class="playcheck" data-play-result hidden><code></code></div>
   {{else if eq .Platform "android"}}
   <div class="playsetup">
     <span class="mlabel">Google Play</span>
@@ -56,6 +59,8 @@
       <button type="submit" class="btn primary">Enable Play publishing</button>
     </form>
     <p class="hint" style="margin:6px 0 0">One shared service account covers every app (Play Console → Setup → API access; guide in <code>docs/play-internal-testing.md</code>). <code>channel=internal</code> .aab uploads go to internal testing, <code>channel=public</code> to production.</p>
+    <p class="hint" style="margin:6px 0 0">App not in Play yet? The API can't create apps — <a href="https://play.google.com/console/u/0/developers" target="_blank" rel="noopener">create it in Play Console</a> with package <code>{{.PackageName}}</code>, then enable publishing above.
+    </p>
   </div>
   {{end}}
   <table>

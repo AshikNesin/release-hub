@@ -276,6 +276,37 @@ func (s *Server) playAccountCreds(id int64) ([]byte, error) {
 	return creds, nil
 }
 
+// handleApiPlayPreflight GET/POST /api/apps/{slug}/play/preflight —
+// verify the platform's Play wiring (account → credentials → API access →
+// app exists) without uploading anything. Returns {ok, detail}.
+func (s *Server) handleApiPlayPreflight(w http.ResponseWriter, r *http.Request) {
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
+	if !ok {
+		return
+	}
+	if plat.PlayEnabled == 0 || plat.PlayAccountID == nil {
+		writeJSON(w, 200, map[string]any{"ok": false,
+			"detail": "Play publishing is not enabled for this app (no linked service account)."})
+		return
+	}
+	creds, err := s.playAccountCreds(*plat.PlayAccountID)
+	if err != nil {
+		writeJSON(w, 200, map[string]any{"ok": false, "detail": err.Error()})
+		return
+	}
+	pub, err := NewPlayPublisherFromJSON(r.Context(), plat.PackageName, creds)
+	if err != nil {
+		writeJSON(w, 200, map[string]any{"ok": false, "detail": err.Error()})
+		return
+	}
+	if err := pub.Preflight(r.Context()); err != nil {
+		writeJSON(w, 200, map[string]any{"ok": false, "detail": err.Error()})
+		return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true,
+		"detail": fmt.Sprintf("Play wiring OK for %s — ready to publish .aab releases.", plat.PackageName)})
+}
+
 // upsertPlayAccountFromRequest reads the multipart file field, validates it
 // as service-account JSON and stores it as a shared play account. If the
 // same service-account email already exists it is replaced. Returns the

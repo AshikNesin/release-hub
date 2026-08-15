@@ -458,6 +458,13 @@ func (s *Server) handlePlayConfigUI(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, back, http.StatusSeeOther)
 }
 
+// handlePlayPreflightUI GET /apps/{slug}/platforms/{platform}/play/check —
+// session-auth wrapper around the preflight API; returns JSON for the
+// button's fetch() on the app page.
+func (s *Server) handlePlayPreflightUI(w http.ResponseWriter, r *http.Request) {
+	s.handleApiPlayPreflight(w, r)
+}
+
 // ---- settings ----
 
 // signingSettingsField maps form field -> config key for the cert-subject

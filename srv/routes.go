@@ -23,6 +23,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /apps", s.requireUI(s.handleCreateAppUI))
 	mux.HandleFunc("POST /apps/{slug}/platforms", s.requireUI(s.handleAddPlatformUI))
 	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/play", s.requireUI(s.handlePlayConfigUI))
+	mux.HandleFunc("GET /apps/{slug}/platforms/{platform}/play/check", s.requireUI(s.handlePlayPreflightUI))
 	mux.HandleFunc("GET /settings", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(withFlash(r, flash(r)))
 		s.handleSettings(w, r)
@@ -46,6 +47,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/releases", s.requireAPI(s.handleApiReleases))
 	mux.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/play", s.requireAPI(s.handleApiSetPlay))
+	mux.HandleFunc("GET /api/apps/{slug}/play/preflight", s.requireAPI(s.handleApiPlayPreflight))
+	mux.HandleFunc("GET /api/apps/{slug}/{platform}/play/preflight", s.requireAPI(s.handleApiPlayPreflight))
 	mux.HandleFunc("GET /api/play-accounts", s.requireAPI(s.handleApiPlayAccounts))
 	mux.HandleFunc("POST /api/play-accounts", s.requireAPI(s.handleApiPlayAccounts))
 	mux.HandleFunc("POST /api/play-accounts/delete", s.requireAPI(s.handleApiDeletePlayAccount))

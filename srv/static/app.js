@@ -1,4 +1,4 @@
-// release-hub UI: copy-to-clipboard for URLs/commands.
+// release-hub UI: copy-to-clipboard + Play connection check.
 (function () {
   function flash(btn, text) {
     var old = btn.textContent;
@@ -18,5 +18,29 @@
         document.execCommand('copy'); document.body.removeChild(ta);
         flash(btn, 'copied');
       });
+  });
+
+  // Play preflight: hit the check endpoint, show ok/detail inline.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-play-check]');
+    if (!btn) return;
+    e.preventDefault();
+    var box = btn.closest('.playinfo, .playsetup').parentElement.querySelector('[data-play-result]');
+    if (!box) return;
+    var out = box.querySelector('code');
+    box.hidden = false;
+    out.textContent = 'checking…';
+    btn.disabled = true;
+    fetch(btn.getAttribute('data-play-check'), { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        out.textContent = (j.ok ? '✓ ' : '✗ ') + j.detail;
+        out.style.color = j.ok ? 'var(--green)' : '#c33';
+      })
+      .catch(function (err) {
+        out.textContent = '✗ request failed: ' + err;
+        out.style.color = '#c33';
+      })
+      .finally(function () { btn.disabled = false; });
   });
 })();

@@ -66,6 +66,36 @@ func NewPlayPublisherFromJSON(ctx context.Context, pkgName string, creds []byte)
 	return NewPlayPublisher(ctx, pkgName, tmp.Name())
 }
 
+// Preflight opens and immediately deletes a Play edit for the package —
+// the cheapest authenticated round-trip that doesn't require an existing
+// release. Distinguishes credential problems, permission/link problems and
+// "app doesn't exist in Play yet".
+func (p *PlayPublisher) Preflight(ctx context.Context) error {
+	appEdit, err := p.svc.Edits.Insert(p.pkgName, &androidpublisher.AppEdit{}).Context(ctx).Do()
+	if err != nil {
+		return classifyPlayError(err)
+	}
+	return p.svc.Edits.Delete(p.pkgName, appEdit.Id).Context(ctx).Do()
+}
+
+// classifyPlayError maps raw API errors to actionable hints.
+func classifyPlayError(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "invalid_grant"), strings.Contains(msg, "invalid_client"):
+		return fmt.Errorf("credentials rejected (invalid_grant) — the service-account JSON key is wrong or revoked; upload a fresh key in Settings")
+	case strings.Contains(msg, "403"), strings.Contains(msg, "Forbidden"):
+		return fmt.Errorf("403 Forbidden — the service account has no access to this package. Either it wasn't invited in Play Console (Users & permissions → Invite new users, grant 'Create and manage releases'), or API access isn't linked yet (Setup → API access), or the app doesn't exist in Play yet")
+	case strings.Contains(msg, "404"):
+		return fmt.Errorf("404 Not Found — no app with this package exists in Play yet; create it in Play Console first (the API cannot create apps)")
+	default:
+		return err
+	}
+}
+
 // trackFor maps hub channels to Play tracks.
 func trackFor(channel string) (string, bool) {
 	switch channel {

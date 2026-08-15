@@ -116,6 +116,9 @@ input:focus, select:focus {
 .playinfo code { background: #fff; border: 1px solid var(--line2); border-radius: 5px; padding: 3px 8px; }
 .playsetup { border: 1px dashed var(--line2); border-radius: 8px; padding: 12px 14px; margin: 0 0 14px; }
 .playsetup form.inline { margin: 8px 0 0; }
+.playcheck { margin: 0 0 14px; }
+.playcheck code { background: #fff; border: 1px solid var(--line2); border-radius: 5px; padding: 4px 10px; display: inline-block; max-width: 100%; }
+.btn[disabled] { opacity: .5; cursor: default; }
 .manifest { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; flex-wrap: wrap; }
 .manifest .mlabel { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--fg3); }
 .manifest code { background: #fff; border: 1px solid var(--line2); border-radius: 5px; padding: 5px 9px; }
