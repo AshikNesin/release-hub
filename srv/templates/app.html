@@ -49,7 +49,7 @@
       <div><label>Service-account JSON key</label><input type="file" name="file" accept=".json,application/json" required></div>
       <button type="submit" class="btn primary">Enable Play publishing</button>
     </form>
-    <p class="hint" style="margin:6px 0 0">Play Console → Users &amp; permissions → API access → service account with release access; <code>channel=internal</code> .aab uploads then go to internal testing, <code>channel=public</code> to production.</p>
+    <p class="hint" style="margin:6px 0 0">Play service-account JSON key with release access (Play Console → Setup → API access; detailed guide in <code>docs/play-internal-testing.md</code>). <code>channel=internal</code> .aab uploads go to internal testing, <code>channel=public</code> to production.</p>
   </div>
   {{end}}
   <table>

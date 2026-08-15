@@ -158,8 +158,10 @@ Setup (per app, one API call or the app page's Google Play form — no server
 filesystem access needed; detailed steps in
 [`docs/play-internal-testing.md`](docs/play-internal-testing.md)):
 
-1. Play Console → Users & permissions → API access → link a Google Cloud
-   project and create a service account; grant it release permissions.
+1. Play Console → **Setup → API access** (find it via the console's search
+   box; the page moves between redesigns) → link a Google Cloud project,
+   create a service account, and grant it release permissions — detailed
+   steps in the walkthrough doc.
 2. Generate a 32-byte key: `openssl rand -base64 32`, export it as
    `RELEASE_HUB_SECRET_KEY` for the hub process.
 3. Enable for the app:
