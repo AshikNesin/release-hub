@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS play_accounts (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Idempotent: safe to re-run against a partially applied migration.
 ALTER TABLE app_platforms ADD COLUMN play_account_id INTEGER REFERENCES play_accounts(id) ON DELETE SET NULL;
 
 -- Migrate any legacy per-platform credentials into shared account rows
@@ -20,3 +21,6 @@ SET play_account_id = (SELECT pa.id FROM play_accounts pa WHERE pa.credentials =
 WHERE play_credentials != '';
 
 ALTER TABLE app_platforms DROP COLUMN play_credentials;
+
+INSERT OR IGNORE INTO migrations (migration_number, migration_name)
+VALUES (007, '007-play-accounts');
