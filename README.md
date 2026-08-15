@@ -69,6 +69,63 @@ With S3:
 Credentials: static keys via `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, or
 any provider in the default AWS chain (env, shared config, IAM role).
 
+## Docker
+
+Multi-stage build (static binary, ~20MB image, runs as unprivileged user
+10001; the entrypoint chowns the volume then drops privileges via su-exec):
+
+```bash
+docker build -t release-hub .
+docker volume create release-hub-data
+docker run -d --name release-hub \
+  -p 9100:9100 \
+  -v release-hub-data:/data \
+  -e BASE_URL=...                       # see compose below for the flag
+  release-hub
+```
+
+`/data` holds db.sqlite3 + artifacts — back that volume up.
+
+Set `-base-url` to the public URL (it appears in manifests/download links):
+
+```bash
+docker run -d -p 9100:9100 -v release-hub-data:/data \
+  release-hub \
+  release-hub -listen :9100 -db /data/db.sqlite3 -artifacts /data/artifacts \
+  -base-url https://hub.example.com
+```
+
+**S3 variant** (artifacts skip the volume entirely):
+
+```bash
+docker run -d -p 9100:9100 \
+  -e AWS_ACCESS_KEY_ID=... -e AWS_SECRET_ACCESS_KEY=... \
+  release-hub \
+  release-hub -listen :9100 -db /data/db.sqlite3 \
+  -base-url https://hub.example.com \
+  -s3-bucket my-releases -s3-region eu-west-1
+```
+
+docker-compose:
+
+```yaml
+services:
+  release-hub:
+    build: .
+    ports: ["9100:9100"]
+    volumes: [release-hub-data:/data]
+    restart: unless-stopped
+    # command: >-   # override for S3 / custom base-url
+    #   release-hub -listen :9100 -db /data/db.sqlite3
+    #   -base-url https://hub.example.com
+    #   -s3-bucket my-releases -s3-region eu-west-1
+volumes:
+  release-hub-data:
+```
+
+Run behind a TLS-terminating proxy (Caddy/nginx/Traefik) in production —
+the session cookie and bearer tokens must not cross the network in cleartext.
+
 ## Dev
 
 ```

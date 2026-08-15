@@ -1,0 +1,6 @@
+.git
+srv/srv
+db.sqlite3*
+artifacts/
+*.md
+Makefile
