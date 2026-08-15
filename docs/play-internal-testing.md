@@ -17,6 +17,15 @@ testing** track; `channel=public` goes to **production**; `channel=direct`
   response carries `playRelease` (success, Play release name) or `playError`
   (failure reason) so CI can decide whether to fail the build.
 
+## Where things happen (read this first)
+
+The JSON key is **not created in Google Play** — setup spans two consoles:
+
+| Console | What you do there |
+|---|---|
+| **Play Console** (play.google.com/console) | Link a Google Cloud project (Setup → API access); later invite the service account as a user with release permissions |
+| **Google Cloud Console** (console.cloud.google.com) | Create the service account and download its **JSON key** — this file is the credential the hub stores |
+
 ## One-time: link API access in Play Console
 
 The console UI moves this page around between redesigns. Reliable ways in:
@@ -131,6 +140,10 @@ API" → Enable) is only a fallback for a failed link wizard or a
 alone grants nothing — access comes from the service-account invite in
 Play Console. Verify it's on: Cloud Console → APIs & Services → Enabled
 APIs & services.
+
+**There's no "create API key" option in Google Play — where is it?**
+In Google **Cloud** Console, not Play: IAM & Admin → Service Accounts →
+your account → Keys → Add key → JSON. See the table at the top.
 
 ## Troubleshooting
 
