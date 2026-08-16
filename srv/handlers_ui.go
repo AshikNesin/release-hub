@@ -278,17 +278,17 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		CreatedAt                        time.Time
 	}
 	type platSection struct {
-		Platform, PackageName  string
-		Releases               []relRow
-		ManifestURL, UploadURL string
-		Shares                 []shareRow
-		BetaTesters            string // hub-wide tester groups (display; the invite replaces the track list)
-		HasSigningKey          bool
-		SignSha256             string // keystore fingerprint (not secret)
-		SignAlias              string // key alias (not secret)
-		PlayEnabled            bool
-		PlayAccountID          int64  // linked shared service account (0 = none)
-		PlayEmail              string // service-account email (identifier, not secret)
+		Platform, PackageName, LatestVersion string
+		Releases                             []relRow
+		ManifestURL, UploadURL               string
+		Shares                               []shareRow
+		BetaTesters                          string // hub-wide tester groups (display; the invite replaces the track list)
+		HasSigningKey                        bool
+		SignSha256                           string // keystore fingerprint (not secret)
+		SignAlias                            string // key alias (not secret)
+		PlayEnabled                          bool
+		PlayAccountID                        int64  // linked shared service account (0 = none)
+		PlayEmail                            string // service-account email (identifier, not secret)
 	}
 	sections := make([]platSection, 0, len(plats))
 	betaTesters := strings.Join(s.playTesters(r.Context()), ", ")
@@ -307,6 +307,11 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 				SizeMB:      float64(rel.SizeBytes) / (1 << 20),
 				CreatedAt:   rel.CreatedAt,
 			})
+		}
+		// Latest across channels (highest versionCode) for the platform header.
+		latest := ""
+		if len(rows) > 0 {
+			latest = rows[0].VersionName
 		}
 		// Non-confidential signing info: keystore fingerprint + key alias.
 		// Passwords stay encrypted and are only released via the API to
@@ -334,7 +339,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 				shareRow{Label: "public", URL: dl + "public"})
 		}
 		sections = append(sections, platSection{
-			Platform: p.Platform, PackageName: p.PackageName, Releases: rows,
+			Platform: p.Platform, PackageName: p.PackageName, LatestVersion: latest, Releases: rows,
 			ManifestURL:   s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
 			UploadURL:     s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
 			Shares:        shares,
@@ -355,16 +360,25 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 	for _, acct := range s.mustListPlayAccounts(r) {
 		accounts = append(accounts, accountOption{acct.ID, playEmail(acct.Credentials)})
 	}
+	// Tab routing: ?tab=releases|distribution|configuration (default
+	// releases). Unknown values fall back to releases, not an error.
+	tab := r.URL.Query().Get("tab")
+	switch tab {
+	case "distribution", "configuration":
+	default:
+		tab = "releases"
+	}
 	s.render(w, 200, "app.html", struct {
 		uiData
 		App          dbgen.App
+		Tab          string
 		Platforms    []platSection
 		SuggestedPkg string // prefill for Add-platform: bundle_prefix + slug
 		HasAndroid   bool   // hide android from the picker when it exists
 		PlayAccounts []accountOption
 	}{
 		uiData{Title: app.Slug, Authenticated: true, Flash: flashFrom(r), AssetVersion: assetVersion},
-		app, sections,
+		app, tab, sections,
 		suggestPackage(s.bundlePrefix(r.Context()), app.Slug),
 		func() bool {
 			for _, p := range plats {
@@ -424,6 +438,17 @@ func (s *Server) render(w http.ResponseWriter, status int, name string, data any
 	}
 }
 
+// backTo reads the ?back= query param (validated against known tabs) and
+// builds the redirect target after a platform-scoped POST, so actions return
+// to the tab they were triggered from.
+func backTo(slug string, r *http.Request) string {
+	switch r.FormValue("back") {
+	case "distribution", "configuration":
+		return "/apps/" + slug + "?tab=" + r.FormValue("back")
+	}
+	return "/apps/" + slug
+}
+
 // handlePlayConfigUI POST /apps/{slug}/platforms/{platform}/play —
 // session-auth twin of the bearer API: enable this platform for Play against
 // a shared service account (picked with account=<id>, or a credentials file
@@ -434,7 +459,7 @@ func (s *Server) handlePlayConfigUI(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	back := "/apps/" + r.PathValue("slug")
+	back := backTo(r.PathValue("slug"), r)
 	setFlash := func(msg string) {
 		http.SetCookie(w, &http.Cookie{
 			Name: "rh_flash", Value: msg, Path: "/", HttpOnly: true,
@@ -502,7 +527,7 @@ func (s *Server) handlePlayPreflightUI(w http.ResponseWriter, r *http.Request) {
 // Session-auth wrapper that runs the API invite and redirects back with a
 // flash (the button is a form, not fetch — testers sync is infrequent).
 func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
-	back := "/apps/" + r.PathValue("slug")
+	back := backTo(r.PathValue("slug"), r)
 	setFlash := func(msg string) {
 		http.SetCookie(w, &http.Cookie{
 			Name: "rh_flash", Value: msg, Path: "/", HttpOnly: true,

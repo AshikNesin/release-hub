@@ -244,8 +244,12 @@ func TestAppPageShareLinks(t *testing.T) {
 		hashToken(sess)); err != nil {
 		t.Fatalf("seed session: %v", err)
 	}
-	get := func() string {
-		req, _ := http.NewRequest("GET", ts.URL+"/apps/demo", nil)
+	get := func(tab string) string {
+		u := ts.URL + "/apps/demo"
+		if tab != "" {
+			u += "?tab=" + tab
+		}
+		req, _ := http.NewRequest("GET", u, nil)
 		req.AddCookie(&http.Cookie{Name: "rh_session", Value: sess})
 		resp, err := client.Do(req)
 		if err != nil {
@@ -259,12 +263,13 @@ func TestAppPageShareLinks(t *testing.T) {
 		return string(b)
 	}
 
-	// Play disabled: only the direct share link.
-	page := get()
+	// Play disabled: only the direct share link — visible on the
+	// distribution tab (default tab is releases, where no links render).
+	page := get("distribution")
 	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/download?channel=direct\"") {
 		t.Fatal("missing direct share link")
 	}
-	if strings.Contains(page, "download?channel=\"") { // any share-row copy button beyond direct
+	if strings.Contains(page, "download?channel=\"internal\"") || strings.Contains(page, "download?channel=\"public\"") {
 		t.Fatal("Play share links must be hidden while Play publishing is disabled")
 	}
 	if strings.Contains(page, "invite testers") {
@@ -290,7 +295,7 @@ func TestAppPageShareLinks(t *testing.T) {
 		t.Fatalf("set play: %d", resp.StatusCode)
 	}
 
-	page = get()
+	page = get("distribution")
 	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/download?channel=internal\"") {
 		t.Fatal("missing internal share link")
 	}
@@ -299,6 +304,16 @@ func TestAppPageShareLinks(t *testing.T) {
 	}
 	if !strings.Contains(page, "invite testers") {
 		t.Fatal("missing invite-testers button with Play enabled")
+	}
+	// Configuration tab carries the manifest URL and signing-key fingerprint.
+	page = get("configuration")
+	if !strings.Contains(page, "hub.test/api/apps/demo/android/manifest") {
+		t.Fatal("missing manifest URL on configuration tab")
+	}
+	// Default tab is releases: no share links or Play rows leak onto it.
+	page = get("")
+	if strings.Contains(page, "download?channel=") || strings.Contains(page, "Enable Play publishing") {
+		t.Fatal("distribution/configuration content leaked onto the releases tab")
 	}
 }
 

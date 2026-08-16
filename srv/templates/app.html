@@ -11,76 +11,21 @@
 </section>
 {{end}}
 
+<nav class="tabs">
+  <a href="/apps/{{.App.Slug}}?tab=releases" class="{{if eq .Tab "releases"}}active{{end}}">Releases</a>
+  <a href="/apps/{{.App.Slug}}?tab=distribution" class="{{if eq .Tab "distribution"}}active{{end}}">Distribution</a>
+  <a href="/apps/{{.App.Slug}}?tab=configuration" class="{{if eq .Tab "configuration"}}active{{end}}">Configuration</a>
+</nav>
+
 {{range .Platforms}}
-<section>
+<div class="platcard">
   <div class="plathead">
     <span class="chip">{{.Platform}}</span>
     <span class="pkg mono">{{.PackageName}}</span>
-    {{if .HasSigningKey}}<span class="keystored"><i></i>signing key stored</span>{{end}}
+    {{if .LatestVersion}}<span class="latest">latest&nbsp;{{.LatestVersion}}</span>{{end}}
   </div>
-  {{if .HasSigningKey}}
-  <div class="signinfo">
-    <span class="mlabel">keystore</span>
-    <code>{{printf "%.16s" .SignSha256}}…</code>
-    {{if .SignAlias}}<span class="mlabel">alias</span><code>{{.SignAlias}}</code>{{end}}
-  </div>
-  {{end}}
-  <div class="manifest">
-    <span class="mlabel">manifest</span>
-    <code>{{.ManifestURL}}</code>
-    <button class="btn ghost xs" data-copy="{{.ManifestURL}}">copy</button>
-  </div>
-  {{if .Shares}}
-  <div class="share">
-    <span class="mlabel">share</span>
-    {{range .Shares}}
-    <span class="sharelink">
-      <span class="chip">{{.Label}}</span>
-      <button class="btn ghost xs" data-copy="{{.URL}}">copy link</button>
-    </span>
-    {{end}}
-    {{if .PlayEnabled}}<button class="btn ghost xs" data-tester-check="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/testers">invite testers</button>{{end}}
-  </div>
-  {{end}}
-  {{if and .PlayEnabled .BetaTesters}}
-  <div class="share" style="margin-top:-10px">
-    <span class="mlabel">testers</span>
-    <span style="font-size:12.5px;color:var(--fg3)">{{.BetaTesters}} — re-inviting replaces the track's list (see Settings)</span>
-  </div>
-  {{end}}
-  {{if .PlayEnabled}}
-  <div class="playinfo">
-    <span class="keystored"><i></i>Google Play publishing on</span>
-    <span class="mlabel">service account</span>
-    <code>{{if .PlayEmail}}{{.PlayEmail}}{{else}}#{{.PlayAccountID}}{{end}}</code>
-    <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play" class="inline" style="margin:0">
-      <input type="hidden" name="enable" value="false">
-      <button type="submit" class="btn ghost xs">disable</button>
-    </form>
-    <button class="btn ghost xs" data-play-check="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play/check">test connection</button>
-    <a class="btn ghost xs" href="https://play.google.com/console/u/0/developers" target="_blank" rel="noopener">open Play Console ↗</a>
-    <span class="mlabel">channels</span>
-    <code>internal → internal testing · public → production</code>
-  </div>
-  <div class="playcheck" data-play-result hidden><code></code></div>
-  {{else if eq .Platform "android"}}
-  <div class="playsetup">
-    <span class="mlabel">Google Play</span>
-    <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play" enctype="multipart/form-data" class="inline">
-      {{if $.PlayAccounts}}
-      <div><label>Service account (shared, manage in Settings)</label>
-        <select name="account" style="width:280px">
-          {{range $.PlayAccounts}}<option value="{{.ID}}">{{.Email}}</option>{{end}}
-        </select></div>
-      {{end}}
-      <div><label>{{if $.PlayAccounts}}Or upload a new key{{else}}Service-account JSON key{{end}}</label><input type="file" name="file" accept=".json,application/json"{{if not $.PlayAccounts}} required{{end}}></div>
-      <button type="submit" class="btn primary">Enable Play publishing</button>
-    </form>
-    <p class="hint" style="margin:6px 0 0">One shared service account covers every app (Play Console → Setup → API access; guide in <code>docs/play-internal-testing.md</code>). <code>channel=internal</code> .aab uploads go to internal testing, <code>channel=public</code> to production.</p>
-    <p class="hint" style="margin:6px 0 0">App not in Play yet? The API can't create apps — <a href="https://play.google.com/console/u/0/developers" target="_blank" rel="noopener">create it in Play Console</a> with package <code>{{.PackageName}}</code>, then enable publishing above.
-    </p>
-  </div>
-  {{end}}
+
+  {{if eq $.Tab "releases"}}
   <table>
     <thead><tr><th>Version</th><th>Channel</th><th>Size</th><th>Notes</th><th>Uploaded</th><th></th></tr></thead>
     <tbody>
@@ -94,7 +39,7 @@
       <td><a href="{{.URL}}">download</a></td>
     </tr>
     {{else}}
-    <tr><td colspan="6" style="color:var(--fg2)">No releases yet.</td></tr>
+    <tr><td colspan="6" style="color:var(--fg2)">No releases yet. Upload one:</td></tr>
     <tr><td colspan="6"><div class="uploadcmd">
       <code>curl -H "Authorization: Bearer $TOKEN" -F file=app.apk -F channel=direct {{.UploadURL}}</code>
       <button class="btn ghost xs" data-copy="curl -H &quot;Authorization: Bearer $TOKEN&quot; -F file=app.apk -F channel=direct {{.UploadURL}}">copy</button>
@@ -102,9 +47,88 @@
     {{end}}
     </tbody>
   </table>
-</section>
+  {{end}}
+
+  {{if eq $.Tab "distribution"}}
+  <table class="kv">
+    <tbody>
+    <tr><th>download links</th><td>
+      {{range .Shares}}
+      <span class="sharelink">
+        <span class="chip">{{.Label}}</span>
+        <code class="dl">{{.URL}}</code>
+        <button class="btn ghost xs" data-copy="{{.URL}}">copy link</button>
+      </span><br>
+      {{end}}
+    </td></tr>
+    {{if .PlayEnabled}}
+    <tr><th>internal testing</th><td>
+      {{if .BetaTesters}}
+      groups: <code class="dl">{{.BetaTesters}}</code> — <b>re-inviting replaces the track's list</b> (manage in Settings)
+      {{else}}
+      no beta tester groups configured (Settings → Beta testers)
+      {{end}}
+      <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/testers?back={{$.Tab}}" class="inline" style="margin:6px 0 0">
+        <button type="submit" class="btn ghost xs">invite testers</button>
+      </form>
+    </td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{end}}
+
+  {{if eq $.Tab "configuration"}}
+  <table class="kv">
+    <tbody>
+    <tr><th>package</th><td><code class="dl">{{.PackageName}}</code></td></tr>
+    <tr><th>manifest</th><td><div class="manifest" style="margin:0">
+      <code>{{.ManifestURL}}</code>
+      <button class="btn ghost xs" data-copy="{{.ManifestURL}}">copy</button>
+    </div></td></tr>
+    <tr><th>signing key</th><td>
+      {{if .HasSigningKey}}
+      <code>{{printf "%.16s" .SignSha256}}…</code>{{if .SignAlias}} · alias <code>{{.SignAlias}}</code>{{end}}
+      {{else}}<span style="color:var(--fg3)">none stored</span>{{end}}
+    </td></tr>
+    <tr><th>Google Play</th><td>
+      {{if .PlayEnabled}}
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="keystored"><i></i>publishing on</span>
+        <code>{{if .PlayEmail}}{{.PlayEmail}}{{else}}#{{.PlayAccountID}}{{end}}</code>
+        <button class="btn ghost xs" data-play-check="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play/check">test connection</button>
+        <a class="btn ghost xs" href="https://play.google.com/console/u/0/developers" target="_blank" rel="noopener">Play Console ↗</a>
+        <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play?back={{$.Tab}}" class="inline" style="margin:0">
+          <input type="hidden" name="enable" value="false">
+          <button type="submit" class="btn ghost xs">disable</button>
+        </form>
+      </div>
+      <p class="hint" style="margin:6px 0 0">channels: <code>internal</code> → internal testing · <code>public</code> → production</p>
+      {{else if eq .Platform "android"}}
+      <div class="playsetup">
+        <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play?back={{$.Tab}}" enctype="multipart/form-data" class="inline">
+          {{if $.PlayAccounts}}
+          <div><label>Service account (shared, manage in Settings)</label>
+            <select name="account" style="width:280px">
+              {{range $.PlayAccounts}}<option value="{{.ID}}">{{.Email}}</option>{{end}}
+            </select></div>
+          {{end}}
+          <div><label>{{if $.PlayAccounts}}Or upload a new key{{else}}Service-account JSON key{{end}}</label><input type="file" name="file" accept=".json,application/json"{{if not $.PlayAccounts}} required{{end}}></div>
+          <button type="submit" class="btn primary">Enable Play publishing</button>
+        </form>
+        <p class="hint" style="margin:6px 0 0">One shared service account covers every app (Play Console → Setup → API access; guide in <code>docs/play-internal-testing.md</code>). <code>channel=internal</code> .aab uploads go to internal testing, <code>channel=public</code> to production.</p>
+        <p class="hint" style="margin:6px 0 0">App not in Play yet? The API can't create apps — <a href="https://play.google.com/console/u/0/developers" target="_blank" rel="noopener">create it in Play Console</a> with package <code>{{.PackageName}}</code>, then enable publishing above.</p>
+      </div>
+      {{else}}
+      <span style="color:var(--fg3)">not configured</span>
+      {{end}}
+    </td></tr>
+    </tbody>
+  </table>
+  {{end}}
+</div>
 {{end}}
 
+{{if eq .Tab "configuration"}}
 <section>
   <div class="sect">Add platform</div>
   <form method="post" action="/apps/{{.App.Slug}}/platforms" class="inline">
@@ -117,4 +141,5 @@
   </form>
   <p class="hint">Prefilled from the bundle prefix in Settings (prefix + slug). Android platforms get an auto-generated signing keystore immediately.</p>
 </section>
+{{end}}
 {{end}}
