@@ -129,36 +129,63 @@ func TestUploadAndManifestFlow(t *testing.T) {
 		t.Fatalf("expected 404 for unknown channel, got %d", respM.StatusCode)
 	}
 
-	// share link: /apps/demo/get redirects to the latest direct artifact
-	// (follows to the served file, i.e. final hop is a 200), ?channel= works,
-	// and unknown channels 404 instead of panicking.
+	// share link: /apps/demo/download redirects to the latest direct
+	// artifact; Play channels redirect to their Play URLs; ?channel works;
+	// unknown channels 400 and empty channels 404 instead of panicking.
+	// (/get is the legacy alias for the same handler.)
 	client2 := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	respG, err := client2.Get(ts.URL + "/apps/demo/get")
+	for _, path := range []string{"/apps/demo/download", "/apps/demo/get"} {
+		respG, err := client2.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		respG.Body.Close()
+		if respG.StatusCode != 302 {
+			t.Fatalf("expected 302 from %s, got %d", path, respG.StatusCode)
+		}
+		if loc := respG.Header.Get("Location"); !strings.Contains(loc, "/artifacts/demo/android/10_demo.apk") {
+			t.Fatalf("unexpected redirect target from %s: %s", path, loc)
+		}
+	}
+	respP, err := client2.Get(ts.URL + "/apps/demo/download?channel=internal")
 	if err != nil {
 		t.Fatal(err)
 	}
-	respG.Body.Close()
-	if respG.StatusCode != 302 {
-		t.Fatalf("expected 302 from /get, got %d", respG.StatusCode)
+	respP.Body.Close()
+	if respP.StatusCode != 302 || respP.Header.Get("Location") != "https://play.google.com/apps/testing/io.demo" {
+		t.Fatalf("internal channel: %d %s", respP.StatusCode, respP.Header.Get("Location"))
 	}
-	if loc := respG.Header.Get("Location"); !strings.Contains(loc, "/artifacts/demo/android/10_demo.apk") {
-		t.Fatalf("unexpected redirect target: %s", loc)
-	}
-	respG2, err := client2.Get(ts.URL + "/apps/demo/get?channel=direct")
+	respS, err := client2.Get(ts.URL + "/apps/demo/download?channel=public")
 	if err != nil {
 		t.Fatal(err)
 	}
-	respG2.Body.Close()
-	if respG2.StatusCode != 302 {
-		t.Fatalf("expected 302 from /get?channel=direct, got %d", respG2.StatusCode)
+	respS.Body.Close()
+	if respS.StatusCode != 302 || !strings.Contains(respS.Header.Get("Location"), "store/apps/details?id=io.demo") {
+		t.Fatalf("public channel: %d %s", respS.StatusCode, respS.Header.Get("Location"))
 	}
-	respG3, err := client2.Get(ts.URL + "/apps/demo/get?channel=internal")
+	respB, err := client2.Get(ts.URL + "/apps/demo/download?channel=bogus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	respB.Body.Close()
+	if respB.StatusCode != 400 {
+		t.Fatalf("expected 400 for bogus channel, got %d", respB.StatusCode)
+	}
+	respG3, err := client2.Get(ts.URL + "/apps/demo/download?channel=direct")
 	if err != nil {
 		t.Fatal(err)
 	}
 	respG3.Body.Close()
-	if respG3.StatusCode != 404 {
-		t.Fatalf("expected 404 for empty channel on /get, got %d", respG3.StatusCode)
+	if respG3.StatusCode != 302 {
+		t.Fatalf("expected 302 from /download?channel=direct, got %d", respG3.StatusCode)
+	}
+	respI, err := client2.Get(ts.URL + "/apps/demo/get/ios")
+	if err != nil {
+		t.Fatal(err)
+	}
+	respI.Body.Close()
+	if respI.StatusCode != 404 {
+		t.Fatalf("expected 404 for unknown platform on /get, got %d", respI.StatusCode)
 	}
 
 	// versionCode regression must be rejected
@@ -234,11 +261,14 @@ func TestAppPageShareLinks(t *testing.T) {
 
 	// Play disabled: only the direct share link.
 	page := get()
-	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/get\"") {
+	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/download?channel=direct\"") {
 		t.Fatal("missing direct share link")
 	}
-	if strings.Contains(page, "play.google.com/apps/testing/") || strings.Contains(page, "store/apps/details?id=") {
+	if strings.Contains(page, "download?channel=\"") { // any share-row copy button beyond direct
 		t.Fatal("Play share links must be hidden while Play publishing is disabled")
+	}
+	if strings.Contains(page, "invite testers") {
+		t.Fatal("invite-testers button must be hidden while Play publishing is disabled")
 	}
 
 	// Enable Play → internal + public links appear, derived from the package.
@@ -261,11 +291,14 @@ func TestAppPageShareLinks(t *testing.T) {
 	}
 
 	page = get()
-	if !strings.Contains(page, "https://play.google.com/apps/testing/io.demo") {
-		t.Fatal("missing internal-testing opt-in link")
+	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/download?channel=internal\"") {
+		t.Fatal("missing internal share link")
 	}
-	if !strings.Contains(page, "https://play.google.com/store/apps/details?id=io.demo") {
-		t.Fatal("missing Play Store listing link")
+	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/download?channel=public\"") {
+		t.Fatal("missing public share link")
+	}
+	if !strings.Contains(page, "invite testers") {
+		t.Fatal("missing invite-testers button with Play enabled")
 	}
 }
 
@@ -390,7 +423,7 @@ func TestSharedPlayAccountFlow(t *testing.T) {
 		t.Fatal(err)
 	}
 	var acct struct {
-		ID            int64  `json:"id"`
+		ID             int64  `json:"id"`
 		ServiceAccount string `json:"serviceAccount"`
 	}
 	json.NewDecoder(resp.Body).Decode(&acct)

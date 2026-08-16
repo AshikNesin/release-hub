@@ -124,8 +124,10 @@ func trackFor(channel string) (string, bool) {
 }
 
 // Publish uploads an AAB and assigns it to the Play track for the channel.
+// For the internal track, testers (Google Group addresses) are set in the
+// same edit so a release and its tester list always land together.
 // Returns the Play release name.
-func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionName, notes string) (string, error) {
+func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionName, notes string, testers []string) (string, error) {
 	track, ok := trackFor(channel)
 	if !ok {
 		return "", fmt.Errorf("play: channel %q has no Play track", channel)
@@ -180,8 +182,46 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 	if err != nil {
 		return "", fmt.Errorf("play: set track %s: %w", track, err)
 	}
+	// Internal track: set the tester list (Google Groups) in the same edit.
+	// Without this the track's tester list stays empty and the opt-in link
+	// (play.google.com/apps/testing/<pkg>) shows "app not available" for
+	// everyone — the API cannot invite individual emails, only groups.
+	if track == "internal" {
+		if _, err := p.svc.Edits.Testers.
+			Update(p.pkgName, appEdit.Id, track, &androidpublisher.Testers{GoogleGroups: testers}).
+			Context(ctx).
+			Do(); err != nil {
+			return "", fmt.Errorf("play: set testers: %w", err)
+		}
+	}
 	if _, err := p.svc.Edits.Commit(p.pkgName, appEdit.Id).Context(ctx).Do(); err != nil {
 		return "", fmt.Errorf("play: commit: %w", err)
 	}
 	return releaseName, nil
+}
+
+// SetTesters replaces the tester list (Google Group addresses) on a Play
+// track without touching releases — the manual "invite testers" action.
+// The API cannot invite individual emails, only Google Groups; groups can
+// be created free at groups.google.com.
+func (p *PlayPublisher) SetTesters(ctx context.Context, track string, groups []string) error {
+	appEdit, err := p.svc.Edits.Insert(p.pkgName, &androidpublisher.AppEdit{}).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("play: open edit: %w", err)
+	}
+	defer func() {
+		if err := p.svc.Edits.Delete(p.pkgName, appEdit.Id).Context(ctx).Do(); err != nil {
+			slog.Debug("play: cleanup edit", "error", err)
+		}
+	}()
+	if _, err := p.svc.Edits.Testers.
+		Update(p.pkgName, appEdit.Id, track, &androidpublisher.Testers{GoogleGroups: groups}).
+		Context(ctx).
+		Do(); err != nil {
+		return fmt.Errorf("play: set testers on %s: %w", track, err)
+	}
+	if _, err := p.svc.Edits.Commit(p.pkgName, appEdit.Id).Context(ctx).Do(); err != nil {
+		return fmt.Errorf("play: commit: %w", err)
+	}
+	return nil
 }

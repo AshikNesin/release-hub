@@ -65,19 +65,37 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleGetRelease GET /apps/{slug}/get and /apps/{slug}/get/{platform}
-// Stable, shareable "latest on channel" link: 302 to the newest release's
-// artifact URL on ?channel= (default direct). 404 when the channel has no
-// release yet. This is the URL the app page's share row copies — it stays
-// valid across versions, unlike a versioned artifact URL.
+// handleGetRelease GET /apps/{slug}/download and /apps/{slug}/download/{platform}
+// Stable, shareable download link: ?channel=direct|internal|public
+// (default direct).
+//   - direct:   302 → newest direct-channel artifact on this hub
+//   - internal: 302 → Play internal-testing opt-in page (join as tester,
+//     then install from Play)
+//   - public:   302 → Play Store listing
+//
+// This is the URL the app page's share row copies — it stays valid across
+// versions, unlike a versioned artifact URL. /get is kept as a legacy alias.
 func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) {
-	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
-	if !ok {
-		return
-	}
+	slug := r.PathValue("slug")
 	channel := r.URL.Query().Get("channel")
 	if channel == "" {
 		channel = "direct"
+	}
+	plat, ok := s.platformFromRequest(w, r, slug)
+	if !ok {
+		return
+	}
+	switch channel {
+	case "internal":
+		http.Redirect(w, r, playInternalTestingURL(plat.PackageName), http.StatusFound)
+		return
+	case "public":
+		http.Redirect(w, r, playStoreURL(plat.PackageName), http.StatusFound)
+		return
+	case "direct":
+	default:
+		writeErr(w, 400, "channel must be direct, internal or public")
+		return
 	}
 	releases, err := dbgen.New(s.DB).LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{
 		AppPlatformID: plat.ID, Channel: channel,
@@ -91,7 +109,7 @@ func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rel := releases[0]
-	dlURL, err := s.storage.PublicURL(r.Context(), r.PathValue("slug")+"/"+plat.Platform+"/"+rel.FileName)
+	dlURL, err := s.storage.PublicURL(r.Context(), slug+"/"+plat.Platform+"/"+rel.FileName)
 	if err != nil {
 		writeErr(w, 500, "sign url: "+err.Error())
 		return

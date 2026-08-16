@@ -278,17 +278,17 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		CreatedAt                        time.Time
 	}
 	type platSection struct {
-	Platform, PackageName  string
-	Releases               []relRow
-	ManifestURL, UploadURL string
-	Shares                 []shareRow
-	HasSigningKey          bool
-	SignSha256             string // keystore fingerprint (not secret)
-	SignAlias              string // key alias (not secret)
-	PlayEnabled            bool
-	PlayAccountID          int64  // linked shared service account (0 = none)
-	PlayEmail              string // service-account email (identifier, not secret)
-}
+		Platform, PackageName  string
+		Releases               []relRow
+		ManifestURL, UploadURL string
+		Shares                 []shareRow
+		HasSigningKey          bool
+		SignSha256             string // keystore fingerprint (not secret)
+		SignAlias              string // key alias (not secret)
+		PlayEnabled            bool
+		PlayAccountID          int64  // linked shared service account (0 = none)
+		PlayEmail              string // service-account email (identifier, not secret)
+	}
 	sections := make([]platSection, 0, len(plats))
 	for _, p := range plats {
 		releases, err := q.ListReleases(r.Context(), p.ID)
@@ -321,13 +321,15 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		acctID, acctEmail := s.playAccountInfo(p)
-		// Share links: direct always (latest APK on this hub); the two Play
-		// links only while Play publishing is enabled for the platform.
-		shares := []shareRow{{Label: "direct", URL: s.baseURL + "/apps/" + app.Slug + "/get"}}
+		// Share links: one stable /download URL per channel — direct always
+		// (latest APK on this hub); the two Play channels only while Play
+		// publishing is enabled for the platform.
+		dl := s.baseURL + "/apps/" + app.Slug + "/download?channel="
+		shares := []shareRow{{Label: "direct", URL: dl + "direct"}}
 		if p.PlayEnabled == 1 {
 			shares = append(shares,
-				shareRow{Label: "internal", URL: playInternalTestingURL(p.PackageName)},
-				shareRow{Label: "public", URL: playStoreURL(p.PackageName)})
+				shareRow{Label: "internal", URL: dl + "internal"},
+				shareRow{Label: "public", URL: dl + "public"})
 		}
 		sections = append(sections, platSection{
 			Platform: p.Platform, PackageName: p.PackageName, Releases: rows,
@@ -493,6 +495,54 @@ func (s *Server) handlePlayPreflightUI(w http.ResponseWriter, r *http.Request) {
 	s.handleApiPlayPreflight(w, r)
 }
 
+// handleInviteTestersUI POST /apps/{slug}/platforms/{platform}/testers
+// Session-auth wrapper that runs the API invite and redirects back with a
+// flash (the button is a form, not fetch — testers sync is infrequent).
+func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
+	back := "/apps/" + r.PathValue("slug")
+	setFlash := func(msg string) {
+		http.SetCookie(w, &http.Cookie{
+			Name: "rh_flash", Value: msg, Path: "/", HttpOnly: true,
+			SameSite: http.SameSiteLaxMode, MaxAge: 30,
+		})
+	}
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
+	if !ok {
+		return
+	}
+	groups := s.playTesters(r.Context())
+	if len(groups) == 0 {
+		setFlash("No beta testers configured — add Google Group addresses in Settings.")
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	if plat.PlayEnabled == 0 || plat.PlayAccountID == nil {
+		setFlash("Enable Play publishing first — the invite uses its service account.")
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	creds, err := s.playAccountCreds(*plat.PlayAccountID)
+	if err != nil {
+		setFlash("Play account failed: " + err.Error())
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	pub, err := NewPlayPublisherFromJSON(r.Context(), plat.PackageName, creds)
+	if err != nil {
+		setFlash("Play setup failed: " + err.Error())
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	if err := pub.SetTesters(r.Context(), "internal", groups); err != nil {
+		setFlash("Inviting testers failed: " + err.Error())
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	slog.Info("play testers updated (UI)", "app", r.PathValue("slug"), "groups", len(groups))
+	setFlash(fmt.Sprintf("Invited %d tester group(s) to the internal track.", len(groups)))
+	http.Redirect(w, r, back, http.StatusSeeOther)
+}
+
 // ---- settings ----
 
 // signingSettingsField maps form field -> config key for the cert-subject
@@ -557,6 +607,16 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		// Beta testers: Google Group addresses pushed to the Play internal
+		// track on every internal publish (and via the app page's invite
+		// button). Normalized to comma-separated on save.
+		if posted.Has("play_testers") {
+			groups := normalizeTesterGroups(r.FormValue("play_testers"))
+			if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: "play_testers", Value: strings.Join(groups, ", ")}); err != nil {
+				http.Error(w, "save failed: "+err.Error(), 500)
+				return
+			}
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name: "rh_flash", Value: "Settings saved. New keys will use this certificate name.",
 			Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 30,
@@ -571,6 +631,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		fields = append(fields, field{f.Field, v, f.Label, f.Hint, f.Placeholder})
 	}
 	tokens, _ := q.ListApiTokens(r.Context())
+	betaTesters, _ := q.GetConfig(r.Context(), "play_testers")
 	type playAcctRow struct {
 		ID, Email string
 		Platforms []string // "slug (platform)" using this account
@@ -592,11 +653,26 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		uiData
 		Fields       []field
 		BundlePrefix string
+		BetaTesters  string
 		Tokens       []dbgen.ApiToken
 		NewToken     string
 		PlayAccounts []playAcctRow
 	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion},
-		fields, s.bundlePrefix(r.Context()), tokens, flashFrom(r), playRows})
+		fields, s.bundlePrefix(r.Context()), betaTesters, tokens, flashFrom(r), playRows})
+}
+
+// normalizeTesterGroups splits a comma/newline/space-separated tester list
+// into clean group addresses (deduped, order preserved).
+func normalizeTesterGroups(v string) []string {
+	seen := make(map[string]bool)
+	groups := make([]string, 0, 4)
+	for _, g := range strings.FieldsFunc(v, func(r rune) bool { return r == ',' || r == '\n' || r == '\r' || r == '\t' || r == ' ' || r == ';' }) {
+		if g = strings.ToLower(strings.TrimSpace(g)); g != "" && !seen[g] {
+			seen[g] = true
+			groups = append(groups, g)
+		}
+	}
+	return groups
 }
 
 // handlePlayAccountsUI POST /settings/play — add/replace/delete the shared

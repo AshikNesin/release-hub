@@ -24,6 +24,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /apps/{slug}/platforms", s.requireUI(s.handleAddPlatformUI))
 	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/play", s.requireUI(s.handlePlayConfigUI))
 	mux.HandleFunc("GET /apps/{slug}/platforms/{platform}/play/check", s.requireUI(s.handlePlayPreflightUI))
+	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/testers", s.requireUI(s.handleInviteTestersUI))
 	mux.HandleFunc("GET /settings", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(withFlash(r, flash(r)))
 		s.handleSettings(w, r)
@@ -47,6 +48,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/releases", s.requireAPI(s.handleApiReleases))
 	mux.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/play", s.requireAPI(s.handleApiSetPlay))
+	mux.HandleFunc("POST /api/apps/{slug}/testers", s.requireAPI(s.handleApiInviteTesters))
+	mux.HandleFunc("POST /api/apps/{slug}/{platform}/testers", s.requireAPI(s.handleApiInviteTesters))
 	mux.HandleFunc("GET /api/apps/{slug}/play/preflight", s.requireAPI(s.handleApiPlayPreflight))
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/play/preflight", s.requireAPI(s.handleApiPlayPreflight))
 	mux.HandleFunc("GET /api/play-accounts", s.requireAPI(s.handleApiPlayAccounts))
@@ -62,8 +65,10 @@ func (s *Server) routes() *http.ServeMux {
 	// Public (devices): manifest + artifact download need no auth.
 	mux.HandleFunc("GET /api/apps/{slug}/manifest", s.handleManifest)
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/manifest", s.handleManifest)
-	mux.HandleFunc("GET /apps/{slug}/get", s.handleGetRelease)
-	mux.HandleFunc("GET /apps/{slug}/get/{platform}", s.handleGetRelease)
+	mux.HandleFunc("GET /apps/{slug}/download", s.handleGetRelease)
+	mux.HandleFunc("GET /apps/{slug}/download/{platform}", s.handleGetRelease)
+	mux.HandleFunc("GET /apps/{slug}/get", s.handleGetRelease)            // legacy alias
+	mux.HandleFunc("GET /apps/{slug}/get/{platform}", s.handleGetRelease) // legacy alias
 	mux.HandleFunc("GET /artifacts/{slug}/{platform}/{file}", s.handleArtifact)
 	mux.HandleFunc("GET /artifacts/{slug}/{file}", s.handleArtifact) // legacy path shape
 

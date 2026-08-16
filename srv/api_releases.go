@@ -193,12 +193,57 @@ func (s *Server) publishToPlay(r *http.Request, plat dbgen.AppPlatform, key, cha
 	if err := tmp.Close(); err != nil {
 		return "", err
 	}
-	release, err := pub.Publish(r.Context(), tmp.Name(), channel, versionName, notes)
+	release, err := pub.Publish(r.Context(), tmp.Name(), channel, versionName, notes, s.playTesters(r.Context()))
 	if err != nil {
 		return "", err
 	}
 	slog.Info("play publish ok", "app", plat.AppID, "channel", channel, "release", release)
 	return release, nil
+}
+
+// playTesters reads the hub-wide beta-tester list (Google Group addresses,
+// comma/newline separated) from config. Empty when unset.
+func (s *Server) playTesters(ctx context.Context) []string {
+	v, err := dbgen.New(s.DB).GetConfig(ctx, "play_testers")
+	if err != nil {
+		return nil
+	}
+	return normalizeTesterGroups(v)
+}
+
+// handleApiInviteTesters POST /api/apps/{slug}/{platform}/testers
+// Push the hub-wide beta-tester groups to the platform's Play internal
+// track. Requires Play publishing enabled (needs the service account).
+func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) {
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
+	if !ok {
+		return
+	}
+	if plat.PlayEnabled == 0 || plat.PlayAccountID == nil {
+		writeErr(w, 400, "Play publishing is not enabled for this platform")
+		return
+	}
+	groups := s.playTesters(r.Context())
+	if len(groups) == 0 {
+		writeErr(w, 400, "no beta testers configured — add Google Group addresses in Settings")
+		return
+	}
+	creds, err := s.playAccountCreds(*plat.PlayAccountID)
+	if err != nil {
+		writeErr(w, 500, "play account: "+err.Error())
+		return
+	}
+	pub, err := NewPlayPublisherFromJSON(r.Context(), plat.PackageName, creds)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if err := pub.SetTesters(r.Context(), "internal", groups); err != nil {
+		writeErr(w, 502, err.Error())
+		return
+	}
+	slog.Info("play testers updated", "app", r.PathValue("slug"), "groups", len(groups))
+	writeJSON(w, 200, map[string]any{"ok": true, "track": "internal", "groups": groups})
 }
 
 // handleApiSetPlay POST /api/apps/{slug}/play
@@ -366,7 +411,7 @@ func (s *Server) handleApiPlayAccounts(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		type row struct {
-			ID int64  `json:"id"`
+			ID    int64  `json:"id"`
 			Email string `json:"email"`
 			Label string `json:"label"`
 		}

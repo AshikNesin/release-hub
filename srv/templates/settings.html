@@ -15,6 +15,16 @@
 </section>
 
 <section>
+  <div class="sect">Beta testers</div>
+  <form method="post" action="/settings" class="inline">
+    <div style="flex:1;min-width:280px"><label>Google Group addresses (comma or newline separated)</label>
+      <input name="play_testers" value="{{.BetaTesters}}" placeholder="beta-testers@googlegroups.com" style="width:100%"></div>
+    <button type="submit" class="btn primary">Save</button>
+  </form>
+  <p class="hint">Invited to the internal-testing track of every Play-published app — automatically on each internal release, or via <i>invite testers</i> on an app's page. The Play API can only invite Google Groups (create one free at groups.google.com and add your testers' emails there); the copied <code>internal</code> link then works for every group member.</p>
+</section>
+
+<section>
   <div class="sect">API tokens</div>
   {{if .NewToken}}
   <div class="flash">New token (copy it now, shown only once): <code>{{.NewToken}}</code></div>

@@ -39,6 +39,7 @@
       <button class="btn ghost xs" data-copy="{{.URL}}">copy link</button>
     </span>
     {{end}}
+    {{if .PlayEnabled}}<button class="btn ghost xs" data-tester-check="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/testers">invite testers</button>{{end}}
   </div>
   {{end}}
   {{if .PlayEnabled}}
