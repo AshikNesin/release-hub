@@ -283,6 +283,8 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		ManifestURL, UploadURL               string
 		Shares                               []shareRow
 		BetaTesters                          string // hub-wide tester groups (display; the invite replaces the track list)
+		PruneKeepOverride                    string // platform retention override ("" = inherit)
+		PruneKeepEffective                   string // what actually applies, for display
 		HasSigningKey                        bool
 		SignSha256                           string // keystore fingerprint (not secret)
 		SignAlias                            string // key alias (not secret)
@@ -328,6 +330,10 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		acctID, acctEmail := s.playAccountInfo(p)
+		override := ""
+		if p.PruneKeep != nil {
+			override = strconv.FormatInt(*p.PruneKeep, 10)
+		}
 		// Share links: one stable /download URL per channel — direct always
 		// (latest APK on this hub); the two Play channels only while Play
 		// publishing is enabled for the platform.
@@ -340,10 +346,18 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		sections = append(sections, platSection{
 			Platform: p.Platform, PackageName: p.PackageName, LatestVersion: latest, Releases: rows,
-			ManifestURL:   s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
-			UploadURL:     s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
-			Shares:        shares,
-			BetaTesters:   betaTesters,
+			ManifestURL:       s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
+			UploadURL:         s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
+			Shares:            shares,
+			BetaTesters:       betaTesters,
+			PruneKeepOverride: override,
+			PruneKeepEffective: inheritLabel(func() *int64 {
+				if p.PruneKeep != nil {
+					return p.PruneKeep
+				}
+				k := int64(s.pruneConfig(r.Context(), p))
+				return &k
+			}()),
 			HasSigningKey: p.SignSha256 != "",
 			SignSha256:    p.SignSha256,
 			SignAlias:     alias,
@@ -571,6 +585,98 @@ func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, back, http.StatusSeeOther)
 }
 
+// handleDeleteReleaseUI POST /apps/{slug}/platforms/{platform}/releases/{versionCode}/delete
+// Delete a direct-channel release from the Releases tab (row button).
+func (s *Server) handleDeleteReleaseUI(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	back := backTo(slug, r)
+	setFlash := func(msg string) {
+		http.SetCookie(w, &http.Cookie{
+			Name: "rh_flash", Value: msg, Path: "/", HttpOnly: true,
+			SameSite: http.SameSiteLaxMode, MaxAge: 30,
+		})
+	}
+	plat, ok := s.platformFromRequest(w, r, slug)
+	if !ok {
+		return
+	}
+	versionCode, err := strconv.ParseInt(r.PathValue("versionCode"), 10, 64)
+	if err != nil {
+		setFlash("Bad version code.")
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	rel, err := dbgen.New(s.DB).ReleaseByAppAndCode(r.Context(), dbgen.ReleaseByAppAndCodeParams{
+		AppPlatformID: plat.ID, VersionCode: versionCode,
+	})
+	if err != nil {
+		setFlash("No such release.")
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	if rel.Channel != "direct" {
+		setFlash("Only direct-channel releases can be deleted (internal/public are managed by Play).")
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	found, err := s.deleteRelease(r.Context(), plat, slug, versionCode)
+	if err != nil || !found {
+		setFlash("Delete failed: " + err.Error())
+	} else {
+		setFlash(fmt.Sprintf("Deleted release %s (%d).", rel.VersionName, versionCode))
+	}
+	http.Redirect(w, r, back, http.StatusSeeOther)
+}
+
+// handleRetentionUI POST /apps/{slug}/platforms/{platform}/retention
+// Set the platform's prune override (blank = inherit the global setting).
+func (s *Server) handleRetentionUI(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	back := backTo(slug, r)
+	setFlash := func(msg string) {
+		http.SetCookie(w, &http.Cookie{
+			Name: "rh_flash", Value: msg, Path: "/", HttpOnly: true,
+			SameSite: http.SameSiteLaxMode, MaxAge: 30,
+		})
+	}
+	plat, ok := s.platformFromRequest(w, r, slug)
+	if !ok {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		setFlash("Bad form.")
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	keep, err := parseKeep(r.FormValue("keep"))
+	if err != nil {
+		setFlash("Retention: " + err.Error())
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	if err := dbgen.New(s.DB).SetPruneKeep(r.Context(), dbgen.SetPruneKeepParams{
+		PruneKeep: keep, ID: plat.ID,
+	}); err != nil {
+		setFlash("Retention: save failed — " + err.Error())
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	msg := fmt.Sprintf("Retention set: keep %s.", inheritLabel(keep))
+	setFlash(msg)
+	http.Redirect(w, r, back, http.StatusSeeOther)
+}
+
+// inheritLabel renders a prune-keep value for flash messages.
+func inheritLabel(keep *int64) string {
+	if keep == nil {
+		return "the global setting (inherit)"
+	}
+	if *keep == 0 {
+		return "everything (never prune)"
+	}
+	return fmt.Sprintf("newest %d direct releases", *keep)
+}
+
 // ---- settings ----
 
 // signingSettingsField maps form field -> config key for the cert-subject
@@ -645,6 +751,22 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		// Global release retention: keep newest N direct releases per
+		// platform (0 = keep everything; blank also = keep everything).
+		// Platforms can override this on their Configuration tab.
+		if posted.Has("prune_keep") {
+			v := strings.TrimSpace(r.FormValue("prune_keep"))
+			if v != "" {
+				if n, err := strconv.Atoi(v); err != nil || n < 0 {
+					http.Error(w, "release retention must be a number ≥ 0", 400)
+					return
+				}
+			}
+			if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: "prune_keep", Value: v}); err != nil {
+				http.Error(w, "save failed: "+err.Error(), 500)
+				return
+			}
+		}
 		http.SetCookie(w, &http.Cookie{
 			Name: "rh_flash", Value: "Settings saved. New keys will use this certificate name.",
 			Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 30,
@@ -660,6 +782,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	tokens, _ := q.ListApiTokens(r.Context())
 	betaTesters, _ := q.GetConfig(r.Context(), "play_testers")
+	pruneKeep, _ := q.GetConfig(r.Context(), "prune_keep")
 	type playAcctRow struct {
 		ID, Email string
 		Platforms []string // "slug (platform)" using this account
@@ -682,11 +805,12 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		Fields       []field
 		BundlePrefix string
 		BetaTesters  string
+		PruneKeep    string
 		Tokens       []dbgen.ApiToken
 		NewToken     string
 		PlayAccounts []playAcctRow
 	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion},
-		fields, s.bundlePrefix(r.Context()), betaTesters, tokens, flashFrom(r), playRows})
+		fields, s.bundlePrefix(r.Context()), betaTesters, pruneKeep, tokens, flashFrom(r), playRows})
 }
 
 // normalizeTesterGroups splits a comma/newline/space-separated tester list

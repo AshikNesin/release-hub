@@ -2,9 +2,11 @@ package srv
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -13,6 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"srv.exe.dev/db/dbgen"
 )
 
 func newTestServer(t *testing.T) (*Server, *httptest.Server) {
@@ -315,6 +319,149 @@ func TestAppPageShareLinks(t *testing.T) {
 	if strings.Contains(page, "download?channel=") || strings.Contains(page, "Enable Play publishing") {
 		t.Fatal("distribution/configuration content leaked onto the releases tab")
 	}
+}
+
+// Release retention: direct-channel deletes, auto-prune after upload with
+// the global setting, and the per-platform override.
+func TestReleaseRetention(t *testing.T) {
+	s, ts := newTestServer(t)
+	client := ts.Client()
+	client2 := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
+	tok := "rh_prunetest"
+	if _, err := s.DB.Exec(
+		"INSERT INTO api_tokens (name, token_hash) VALUES ('test', ?)", hashToken(tok)); err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+	for _, f := range []struct{ path, body string }{
+		{"/api/apps", "slug=prune"},
+		{"/api/apps/prune/platforms", "platform=android&packageName=io.prune"},
+	} {
+		req, _ := http.NewRequest("POST", ts.URL+f.path, bytes.NewBufferString(f.body))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 201 {
+			t.Fatalf("%s: %d", f.path, resp.StatusCode)
+		}
+	}
+
+	upload := func(code int64, channel string) map[string]any {
+		body := &bytes.Buffer{}
+		mw := multipart.NewWriter(body)
+		fw, _ := mw.CreateFormFile("file", fmt.Sprintf("app-%d.apk", code))
+		fw.Write([]byte("bytes-" + fmt.Sprint(code)))
+		mw.WriteField("channel", channel)
+		mw.WriteField("versionCode", fmt.Sprint(code))
+		mw.WriteField("versionName", "1."+fmt.Sprint(code))
+		mw.Close()
+		req, _ := http.NewRequest("POST", ts.URL+"/api/apps/prune/android/releases", body)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 201 {
+			t.Fatalf("upload %d: %d", code, resp.StatusCode)
+		}
+		var out map[string]any
+		json.NewDecoder(resp.Body).Decode(&out)
+		return out
+	}
+	releases := func() []dbgen.Release {
+		rels, err := dbgen.New(s.DB).ListReleases(context.Background(), 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rels
+	}
+
+	// No retention configured: nothing pruned.
+	upload(10, "direct")
+	upload(20, "direct")
+	upload(30, "direct")
+	if got := len(releases()); got != 3 {
+		t.Fatalf("expected 3 releases with no retention, got %d", got)
+	}
+
+	// Global keep=2: the oldest (10) is pruned on the next upload.
+	if _, err := s.DB.Exec("INSERT INTO config (key, value) VALUES ('prune_keep', '2')"); err != nil {
+		t.Fatal(err)
+	}
+	out := upload(40, "direct")
+	if _, ok := out["pruned"]; !ok {
+		t.Fatal("expected pruned count in upload response")
+	}
+	rels := releases()
+	if len(rels) != 2 || rels[0].VersionCode != 40 || rels[1].VersionCode != 30 {
+		t.Fatalf("keep=2 should leave 30/40, got %v", rels)
+	}
+	// The pruned artifact is gone from storage.
+	if _, err := s.storage.Open(context.Background(), "prune/android/10_app-10.apk"); err == nil {
+		t.Fatal("pruned artifact still in storage")
+	}
+
+	// internal uploads are never pruned (Play owns those).
+	upload(50, "internal")
+	if _, ok := upload(60, "internal")["pruned"]; ok {
+		t.Fatal("internal channel must not prune")
+	}
+
+	// Platform override 1 wins over the global 2.
+	if _, err := s.DB.Exec("UPDATE app_platforms SET prune_keep = 1 WHERE id = 1"); err != nil {
+		t.Fatal(err)
+	}
+	upload(70, "direct")
+	rels = releases()
+	// direct channel only: 40 remains (60/50 are internal), 20/30/70 → 70 only
+	direct := 0
+	for _, r := range rels {
+		if r.Channel == "direct" {
+			direct++
+		}
+	}
+	if direct != 1 {
+		t.Fatalf("override keep=1 should leave a single direct release, got %d", direct)
+	}
+
+	// Manual delete: direct works, internal is refused.
+	req, _ := http.NewRequest("DELETE", ts.URL+"/api/apps/prune/android/releases/70", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("delete direct: %d", resp.StatusCode)
+	}
+	req, _ = http.NewRequest("DELETE", ts.URL+"/api/apps/prune/android/releases/60", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Fatalf("delete internal must 400, got %d", resp.StatusCode)
+	}
+	req, _ = http.NewRequest("DELETE", ts.URL+"/api/apps/prune/android/releases/999", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 404 {
+		t.Fatalf("delete missing: %d", resp.StatusCode)
+	}
+	_ = client2
 }
 
 // App → platforms: one slug, android + ios variants, independent releases

@@ -20,6 +20,12 @@
       });
   });
 
+  // Destructive forms (release delete) ask for confirmation.
+  document.addEventListener('submit', function (e) {
+    var f = e.target.closest('form[data-confirm]');
+    if (f && !window.confirm(f.getAttribute('data-confirm'))) e.preventDefault();
+  });
+
   // Play preflight: hit the check endpoint, show ok/detail inline.
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-play-check]');

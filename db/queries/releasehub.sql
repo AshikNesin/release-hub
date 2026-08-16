@@ -94,3 +94,14 @@ SELECT value FROM config WHERE key = ?;
 
 -- name: SetConfig :exec
 INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+
+-- release retention (direct channel): prune + per-platform override
+
+-- name: ListReleasesByChannel :many
+SELECT * FROM releases WHERE app_platform_id = ? AND channel = ? ORDER BY version_code DESC;
+
+-- name: SetPruneKeep :exec
+UPDATE app_platforms SET prune_keep = ? WHERE id = ?;
+
+-- name: PlatformsForPrune :many
+SELECT ap.* FROM app_platforms ap;

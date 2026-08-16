@@ -26,6 +26,16 @@
 </section>
 
 <section>
+  <div class="sect">Release retention</div>
+  <form method="post" action="/settings" class="inline">
+    <div><label>Keep newest direct releases per app</label>
+      <input name="prune_keep" value="{{.PruneKeep}}" placeholder="keep everything" style="width:160px" inputmode="numeric"></div>
+    <button type="submit" class="btn primary">Save</button>
+  </form>
+  <p class="hint">After each direct upload, older direct releases beyond this count are deleted (artifact file included) — keeps storage bounded. Blank or 0 keeps everything. Applies to every app unless overridden on the app's Configuration tab; Play channels are never pruned.</p>
+</section>
+
+<section>
   <div class="sect">API tokens</div>
   {{if .NewToken}}
   <div class="flash">New token (copy it now, shown only once): <code>{{.NewToken}}</code></div>

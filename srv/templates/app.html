@@ -17,7 +17,7 @@
   <a href="/apps/{{.App.Slug}}?tab=configuration" class="{{if eq .Tab "configuration"}}active{{end}}">Configuration</a>
 </nav>
 
-{{range .Platforms}}
+{{range $plat := .Platforms}}
 <div class="platcard">
   <div class="plathead">
     <span class="chip">{{.Platform}}</span>
@@ -36,7 +36,14 @@
       <td class="num" style="color:var(--fg2)">{{printf "%.1f" .SizeMB}} MB</td>
       <td style="color:var(--fg2)">{{.Notes}}</td>
       <td class="num" style="color:var(--fg2)">{{.CreatedAt.Format "Jan 2 15:04"}}</td>
-      <td><a href="{{.URL}}">download</a></td>
+      <td class="rowactions">
+        <a href="{{.URL}}">download</a>
+        {{if eq .Channel "direct"}}
+        <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{$plat.Platform}}/releases/{{.VersionCode}}/delete?back=releases" class="inline" style="margin:0" data-confirm="Delete release {{.VersionName}} ({{.VersionCode}})? The artifact file is removed too.">
+          <button type="submit" class="btn ghost xs danger">delete</button>
+        </form>
+        {{end}}
+      </td>
     </tr>
     {{else}}
     <tr><td colspan="6" style="color:var(--fg2)">No releases yet. Upload one:</td></tr>
@@ -89,6 +96,16 @@
       {{if .HasSigningKey}}
       <code>{{printf "%.16s" .SignSha256}}…</code>{{if .SignAlias}} · alias <code>{{.SignAlias}}</code>{{end}}
       {{else}}<span style="color:var(--fg3)">none stored</span>{{end}}
+    </td></tr>
+    <tr><th>retention</th><td>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:12.5px;color:var(--fg2)">keep {{.PruneKeepEffective}}</span>
+        <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/retention?back=configuration" class="inline" style="margin:0">
+          <input type="text" name="keep" value="{{.PruneKeepOverride}}" placeholder="global" style="width:90px" inputmode="numeric" title="blank = use the global Settings value; 0 = keep everything">
+          <button type="submit" class="btn ghost xs">save</button>
+        </form>
+      </div>
+      <p class="hint">After a direct upload, older direct releases beyond the keep count are deleted (artifact included). Blank inherits the global setting (Settings → Release retention); 0 keeps everything. Play channels are never pruned.</p>
     </td></tr>
     <tr><th>Google Play</th><td>
       {{if .PlayEnabled}}

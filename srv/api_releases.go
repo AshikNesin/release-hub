@@ -157,7 +157,50 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	} else if playRelease != "" {
 		resp["playRelease"] = playRelease
 	}
+	// Retention: keep only the newest N direct releases (Settings, or the
+	// platform's override). Runs after the upload is fully committed.
+	if channel == "direct" {
+		if n := s.pruneDirectReleases(r.Context(), plat, slug, s.pruneConfig(r.Context(), plat)); n > 0 {
+			resp["pruned"] = n
+		}
+	}
 	writeJSON(w, 201, resp)
+}
+
+// handleApiDeleteRelease DELETE /api/apps/{slug}/{platform}/releases/{versionCode}
+// (and POST …/releases/{versionCode}/delete — the UI form twin).
+// Direct-channel releases only: internal/public mirror what Play published.
+func (s *Server) handleApiDeleteRelease(w http.ResponseWriter, r *http.Request) {
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
+	if !ok {
+		return
+	}
+	versionCode, err := strconv.ParseInt(r.PathValue("versionCode"), 10, 64)
+	if err != nil {
+		writeErr(w, 400, "invalid versionCode")
+		return
+	}
+	rel, err := dbgen.New(s.DB).ReleaseByAppAndCode(r.Context(), dbgen.ReleaseByAppAndCodeParams{
+		AppPlatformID: plat.ID, VersionCode: versionCode,
+	})
+	if err != nil {
+		writeErr(w, 404, "no such release")
+		return
+	}
+	if rel.Channel != "direct" {
+		writeErr(w, 400, "only direct-channel releases can be deleted (internal/public are managed by Play)")
+		return
+	}
+	found, err := s.deleteRelease(r.Context(), plat, r.PathValue("slug"), versionCode)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if !found {
+		writeErr(w, 404, "no such release")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
 // publishToPlay pushes an .aab to Google Play when the platform is enabled

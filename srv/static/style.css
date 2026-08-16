@@ -142,6 +142,11 @@ table.kv .hint { margin-top:6px; }
 .sharelink { display: inline-flex; align-items: center; gap: 6px; }
 .sharelink .btn.ghost { border-color: transparent; color: var(--fg3); }
 .sharelink .btn.ghost:hover { border-color: var(--line); color: var(--fg); }
+.btn.ghost.danger { color: #b91c1c; }
+.btn.ghost.danger:hover { border-color: #fca5a5; color: #991b1b; background: #fef2f2; }
+.rowactions { white-space: nowrap; }
+.rowactions form { display: inline; }
+.rowactions > * + * { margin-left: 12px; }
 .uploadcmd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .uploadcmd code { background: #fff; border: 1px solid var(--line2); border-radius: 5px; padding: 6px 9px; font-size: 12px; }
 

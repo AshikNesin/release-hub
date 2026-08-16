@@ -25,6 +25,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/play", s.requireUI(s.handlePlayConfigUI))
 	mux.HandleFunc("GET /apps/{slug}/platforms/{platform}/play/check", s.requireUI(s.handlePlayPreflightUI))
 	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/testers", s.requireUI(s.handleInviteTestersUI))
+	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/releases/{versionCode}/delete", s.requireUI(s.handleDeleteReleaseUI))
+	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/retention", s.requireUI(s.handleRetentionUI))
 	mux.HandleFunc("GET /settings", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(withFlash(r, flash(r)))
 		s.handleSettings(w, r)
@@ -44,6 +46,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/apps/{slug}/platforms", s.requireAPI(s.handleApiAddPlatform))
 	mux.HandleFunc("POST /api/apps/{slug}/releases", s.requireAPI(s.handleApiUpload))
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/releases", s.requireAPI(s.handleApiUpload))
+	mux.HandleFunc("DELETE /api/apps/{slug}/releases/{versionCode}", s.requireAPI(s.handleApiDeleteRelease))
+	mux.HandleFunc("DELETE /api/apps/{slug}/{platform}/releases/{versionCode}", s.requireAPI(s.handleApiDeleteRelease))
 	mux.HandleFunc("GET /api/apps/{slug}/releases", s.requireAPI(s.handleApiReleases))
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/releases", s.requireAPI(s.handleApiReleases))
 	mux.HandleFunc("POST /api/apps/{slug}/play", s.requireAPI(s.handleApiSetPlay))
