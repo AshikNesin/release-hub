@@ -30,6 +30,17 @@
     <code>{{.ManifestURL}}</code>
     <button class="btn ghost xs" data-copy="{{.ManifestURL}}">copy</button>
   </div>
+  {{if .Shares}}
+  <div class="share">
+    <span class="mlabel">share</span>
+    {{range .Shares}}
+    <span class="sharelink">
+      <span class="chip">{{.Label}}</span>
+      <button class="btn ghost xs" data-copy="{{.URL}}">copy link</button>
+    </span>
+    {{end}}
+  </div>
+  {{end}}
   {{if .PlayEnabled}}
   <div class="playinfo">
     <span class="keystored"><i></i>Google Play publishing on</span>

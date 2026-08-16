@@ -122,6 +122,11 @@ input:focus, select:focus {
 .manifest { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; flex-wrap: wrap; }
 .manifest .mlabel { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--fg3); }
 .manifest code { background: #fff; border: 1px solid var(--line2); border-radius: 5px; padding: 5px 9px; }
+.share { display: flex; align-items: center; gap: 14px; margin: -6px 0 16px; flex-wrap: wrap; }
+.share .mlabel { font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--fg3); }
+.sharelink { display: inline-flex; align-items: center; gap: 6px; }
+.sharelink .btn.ghost { border-color: transparent; color: var(--fg3); }
+.sharelink .btn.ghost:hover { border-color: var(--line); color: var(--fg); }
 .uploadcmd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .uploadcmd code { background: #fff; border: 1px solid var(--line2); border-radius: 5px; padding: 6px 9px; font-size: 12px; }
 

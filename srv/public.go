@@ -65,6 +65,40 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleGetRelease GET /apps/{slug}/get and /apps/{slug}/get/{platform}
+// Stable, shareable "latest on channel" link: 302 to the newest release's
+// artifact URL on ?channel= (default direct). 404 when the channel has no
+// release yet. This is the URL the app page's share row copies — it stays
+// valid across versions, unlike a versioned artifact URL.
+func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) {
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
+	if !ok {
+		return
+	}
+	channel := r.URL.Query().Get("channel")
+	if channel == "" {
+		channel = "direct"
+	}
+	releases, err := dbgen.New(s.DB).LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{
+		AppPlatformID: plat.ID, Channel: channel,
+	})
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if len(releases) == 0 {
+		writeErr(w, 404, "no release on channel "+channel)
+		return
+	}
+	rel := releases[0]
+	dlURL, err := s.storage.PublicURL(r.Context(), r.PathValue("slug")+"/"+plat.Platform+"/"+rel.FileName)
+	if err != nil {
+		writeErr(w, 500, "sign url: "+err.Error())
+		return
+	}
+	http.Redirect(w, r, dlURL, http.StatusFound)
+}
+
 // handleArtifact GET /artifacts/{slug}/{file} — public. For local storage
 // this streams from disk; for S3 it 302s to a presigned URL so the hub never
 // proxies bucket traffic.

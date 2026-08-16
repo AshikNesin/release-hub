@@ -240,8 +240,26 @@ func (s *Server) handleCreateTokenUI(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
-// ---- app detail ----
+// shareRow is one copyable distribution link on the app page ("share"
+// row): direct = latest APK on this hub; internal/public = Play opt-in /
+// listing links derived from the package name.
+type shareRow struct {
+	Label, URL string
+}
 
+// playInternalTestingURL and playStoreURL are the user-facing links for a
+// package on Google Play. internaltesting/ is the opt-in page testers use to
+// join the internal-testing track; details is the public listing.
+func playInternalTestingURL(pkg string) string {
+	return "https://play.google.com/apps/testing/" + pkg
+}
+
+func playStoreURL(pkg string) string {
+	return "https://play.google.com/store/apps/details?id=" + pkg
+}
+
+// handleAppDetail GET /apps/{slug} — per-platform sections: signing info,
+// manifest URL, share links, Play config, and the release table.
 func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 	app, ok := s.appFromSlug(w, r, r.PathValue("slug"))
 	if !ok {
@@ -263,6 +281,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 	Platform, PackageName  string
 	Releases               []relRow
 	ManifestURL, UploadURL string
+	Shares                 []shareRow
 	HasSigningKey          bool
 	SignSha256             string // keystore fingerprint (not secret)
 	SignAlias              string // key alias (not secret)
@@ -302,10 +321,19 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		acctID, acctEmail := s.playAccountInfo(p)
+		// Share links: direct always (latest APK on this hub); the two Play
+		// links only while Play publishing is enabled for the platform.
+		shares := []shareRow{{Label: "direct", URL: s.baseURL + "/apps/" + app.Slug + "/get"}}
+		if p.PlayEnabled == 1 {
+			shares = append(shares,
+				shareRow{Label: "internal", URL: playInternalTestingURL(p.PackageName)},
+				shareRow{Label: "public", URL: playStoreURL(p.PackageName)})
+		}
 		sections = append(sections, platSection{
 			Platform: p.Platform, PackageName: p.PackageName, Releases: rows,
 			ManifestURL:   s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
 			UploadURL:     s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
+			Shares:        shares,
 			HasSigningKey: p.SignSha256 != "",
 			SignSha256:    p.SignSha256,
 			SignAlias:     alias,

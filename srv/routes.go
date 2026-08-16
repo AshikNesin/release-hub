@@ -62,6 +62,8 @@ func (s *Server) routes() *http.ServeMux {
 	// Public (devices): manifest + artifact download need no auth.
 	mux.HandleFunc("GET /api/apps/{slug}/manifest", s.handleManifest)
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/manifest", s.handleManifest)
+	mux.HandleFunc("GET /apps/{slug}/get", s.handleGetRelease)
+	mux.HandleFunc("GET /apps/{slug}/get/{platform}", s.handleGetRelease)
 	mux.HandleFunc("GET /artifacts/{slug}/{platform}/{file}", s.handleArtifact)
 	mux.HandleFunc("GET /artifacts/{slug}/{file}", s.handleArtifact) // legacy path shape
 

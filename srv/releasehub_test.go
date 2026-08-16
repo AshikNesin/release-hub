@@ -129,6 +129,38 @@ func TestUploadAndManifestFlow(t *testing.T) {
 		t.Fatalf("expected 404 for unknown channel, got %d", respM.StatusCode)
 	}
 
+	// share link: /apps/demo/get redirects to the latest direct artifact
+	// (follows to the served file, i.e. final hop is a 200), ?channel= works,
+	// and unknown channels 404 instead of panicking.
+	client2 := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	respG, err := client2.Get(ts.URL + "/apps/demo/get")
+	if err != nil {
+		t.Fatal(err)
+	}
+	respG.Body.Close()
+	if respG.StatusCode != 302 {
+		t.Fatalf("expected 302 from /get, got %d", respG.StatusCode)
+	}
+	if loc := respG.Header.Get("Location"); !strings.Contains(loc, "/artifacts/demo/android/10_demo.apk") {
+		t.Fatalf("unexpected redirect target: %s", loc)
+	}
+	respG2, err := client2.Get(ts.URL + "/apps/demo/get?channel=direct")
+	if err != nil {
+		t.Fatal(err)
+	}
+	respG2.Body.Close()
+	if respG2.StatusCode != 302 {
+		t.Fatalf("expected 302 from /get?channel=direct, got %d", respG2.StatusCode)
+	}
+	respG3, err := client2.Get(ts.URL + "/apps/demo/get?channel=internal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	respG3.Body.Close()
+	if respG3.StatusCode != 404 {
+		t.Fatalf("expected 404 for empty channel on /get, got %d", respG3.StatusCode)
+	}
+
 	// versionCode regression must be rejected
 	body2 := &bytes.Buffer{}
 	mw2 := multipart.NewWriter(body2)
@@ -146,6 +178,94 @@ func TestUploadAndManifestFlow(t *testing.T) {
 	resp3.Body.Close()
 	if resp3.StatusCode != 409 {
 		t.Fatalf("expected 409 for version regression, got %d", resp3.StatusCode)
+	}
+}
+
+// App page share row: direct always (stable /get link); internal/public
+// (Play links) only while Play publishing is enabled for the platform.
+func TestAppPageShareLinks(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	client := ts.Client()
+
+	tok := "rh_sharetest"
+	if _, err := s.DB.Exec(
+		"INSERT INTO api_tokens (name, token_hash) VALUES ('test', ?)", hashToken(tok)); err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+	for _, f := range []struct{ path, body, ct string }{
+		{"/api/apps", "slug=demo", "application/x-www-form-urlencoded"},
+		{"/api/apps/demo/platforms", "platform=android&packageName=io.demo", "application/x-www-form-urlencoded"},
+	} {
+		req, _ := http.NewRequest("POST", ts.URL+f.path, bytes.NewBufferString(f.body))
+		req.Header.Set("Content-Type", f.ct)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 201 {
+			t.Fatalf("%s: %d", f.path, resp.StatusCode)
+		}
+	}
+
+	// UI session cookie (page needs session auth).
+	sess := "sess_sharetest"
+	if _, err := s.DB.Exec(
+		"INSERT INTO sessions (token_hash, created_at, expires_at) VALUES (?, datetime('now'), datetime('now', '+1 day'))",
+		hashToken(sess)); err != nil {
+		t.Fatalf("seed session: %v", err)
+	}
+	get := func() string {
+		req, _ := http.NewRequest("GET", ts.URL+"/apps/demo", nil)
+		req.AddCookie(&http.Cookie{Name: "rh_session", Value: sess})
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("app page: %d", resp.StatusCode)
+		}
+		b, _ := io.ReadAll(resp.Body)
+		return string(b)
+	}
+
+	// Play disabled: only the direct share link.
+	page := get()
+	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/get\"") {
+		t.Fatal("missing direct share link")
+	}
+	if strings.Contains(page, "play.google.com/apps/testing/") || strings.Contains(page, "store/apps/details?id=") {
+		t.Fatal("Play share links must be hidden while Play publishing is disabled")
+	}
+
+	// Enable Play → internal + public links appear, derived from the package.
+	creds := []byte(`{"client_email": "sa@test.iam.gserviceaccount.com", "private_key": "x"}`)
+	body := &bytes.Buffer{}
+	mw := multipart.NewWriter(body)
+	fw, _ := mw.CreateFormFile("file", "sa.json")
+	fw.Write(creds)
+	mw.Close()
+	req, _ := http.NewRequest("POST", ts.URL+"/api/apps/demo/play", body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("set play: %d", resp.StatusCode)
+	}
+
+	page = get()
+	if !strings.Contains(page, "https://play.google.com/apps/testing/io.demo") {
+		t.Fatal("missing internal-testing opt-in link")
+	}
+	if !strings.Contains(page, "https://play.google.com/store/apps/details?id=io.demo") {
+		t.Fatal("missing Play Store listing link")
 	}
 }
 
