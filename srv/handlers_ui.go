@@ -282,6 +282,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		Releases               []relRow
 		ManifestURL, UploadURL string
 		Shares                 []shareRow
+		BetaTesters            string // hub-wide tester groups (display; the invite replaces the track list)
 		HasSigningKey          bool
 		SignSha256             string // keystore fingerprint (not secret)
 		SignAlias              string // key alias (not secret)
@@ -290,6 +291,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		PlayEmail              string // service-account email (identifier, not secret)
 	}
 	sections := make([]platSection, 0, len(plats))
+	betaTesters := strings.Join(s.playTesters(r.Context()), ", ")
 	for _, p := range plats {
 		releases, err := q.ListReleases(r.Context(), p.ID)
 		if err != nil {
@@ -336,6 +338,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			ManifestURL:   s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
 			UploadURL:     s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
 			Shares:        shares,
+			BetaTesters:   betaTesters,
 			HasSigningKey: p.SignSha256 != "",
 			SignSha256:    p.SignSha256,
 			SignAlias:     alias,
