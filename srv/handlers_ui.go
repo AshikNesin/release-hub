@@ -680,21 +680,21 @@ func (s *Server) settlePlayStatus(r *http.Request, plat dbgen.AppPlatform, relea
 		// recorded after failed pushes — match on either the name form or any
 		// release on the track containing the versionName.
 		if set := onPlay[track]; set != nil {
-			found := set[wantName]
+			found, matched := set[wantName], wantName
 			if !found {
 				for name := range set {
 					if strings.HasPrefix(name, rel.VersionName+" (") {
-						found = true
+						found, matched = true, name
 						break
 					}
 				}
 			}
 			if found {
 				if err := q.SetPlayStatus(r.Context(), dbgen.SetPlayStatusParams{
-					PlayStatus: "ok", PlayError: "", PlayRelease: wantName,
+					PlayStatus: "ok", PlayError: "", PlayRelease: matched,
 					AppPlatformID: plat.ID, VersionCode: rel.VersionCode,
 				}); err == nil {
-					rel.PlayStatus, rel.PlayRelease = "ok", wantName
+					rel.PlayStatus, rel.PlayRelease = "ok", matched
 				}
 			}
 		}
