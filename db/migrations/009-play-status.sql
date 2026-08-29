@@ -9,10 +9,9 @@ ALTER TABLE releases ADD COLUMN play_status TEXT NOT NULL DEFAULT 'pending';
 ALTER TABLE releases ADD COLUMN play_error TEXT NOT NULL DEFAULT '';
 ALTER TABLE releases ADD COLUMN play_release TEXT NOT NULL DEFAULT '';
 
--- Backfill from what we know: 'internal'/'public'/'alpha'/'beta' channels
--- were Play-intended; nothing else was.
-UPDATE releases SET play_status = 'error'
-WHERE channel IN ('internal','public','alpha','beta','open','closed');
+-- No backfill guess: historical Play outcomes are unknown, so pre-existing
+-- rows stay 'pending'. The app page reconciles lazily against the live
+-- Play track state when Play is enabled (see settlePlayStatus).
 
 INSERT OR IGNORE INTO migrations (migration_number, migration_name)
 VALUES (009, '009-play-status');

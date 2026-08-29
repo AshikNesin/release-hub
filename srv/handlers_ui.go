@@ -313,6 +313,13 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "db error", 500)
 			return
 		}
+		// Reconcile unknown ('pending') Play-channel rows against the live
+		// Play track state — resolves pre-migration history once, and
+		// cross-checks after manual Console fixes. Cached per view; failures
+		// are non-fatal (rows just stay pending).
+		if p.PlayEnabled == 1 {
+			s.settlePlayStatus(r, p, releases)
+		}
 		rows := make([]relRow, 0, len(releases))
 		for _, rel := range releases {
 			rows = append(rows, relRow{
@@ -617,6 +624,81 @@ func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
 	slog.Info("play testers updated (UI)", "app", r.PathValue("slug"), "track", track, "groups", len(groups))
 	setFlash(fmt.Sprintf("Invited %d tester group(s) to the alpha (closed testing) track.", len(groups)))
 	http.Redirect(w, r, back, http.StatusSeeOther)
+}
+
+// settlePlayStatus reconciles 'pending' Play-channel releases against the
+// app's live Play tracks: if the release's versionName appears on the track
+// it targeted, mark ok; leave it pending otherwise (never guess error).
+// In-memory only for rows still pending in DB; persists the outcome.
+func (s *Server) settlePlayStatus(r *http.Request, plat dbgen.AppPlatform, releases []dbgen.Release) {
+	need := false
+	for _, rel := range releases {
+		if rel.PlayStatus == "pending" {
+			if _, ok := trackFor(rel.Channel); ok {
+				need = true
+				break
+			}
+		}
+	}
+	if !need || plat.PlayAccountID == nil {
+		return
+	}
+	creds, err := s.playAccountCreds(*plat.PlayAccountID)
+	if err != nil {
+		return
+	}
+	pub, err := NewPlayPublisherFromJSON(r.Context(), plat.PackageName, creds)
+	if err != nil {
+		return
+	}
+	tracks, err := pub.ListTracks(r.Context())
+	if err != nil {
+		slog.Debug("settle: list tracks failed", "error", err)
+		return
+	}
+	// trackName → set of release names on it
+	onPlay := map[string]map[string]bool{}
+	for _, tr := range tracks {
+		set := map[string]bool{}
+		for _, rel := range tr.Releases {
+			set[rel.Name] = true
+		}
+		onPlay[tr.Track] = set
+	}
+	q := dbgen.New(s.DB)
+	for _, rel := range releases {
+		if rel.PlayStatus != "pending" {
+			continue
+		}
+		track, ok := trackFor(rel.Channel)
+		if !ok {
+			continue
+		}
+		// Play release names are "versionName (bundleVersionCode)".
+		wantName := fmt.Sprintf("%s (%d)", rel.VersionName, rel.VersionCode)
+		// Hub versionCode can trail the Play bundle code by the hub-only rows
+		// recorded after failed pushes — match on either the name form or any
+		// release on the track containing the versionName.
+		if set := onPlay[track]; set != nil {
+			found := set[wantName]
+			if !found {
+				for name := range set {
+					if strings.HasPrefix(name, rel.VersionName+" (") {
+						found = true
+						break
+					}
+				}
+			}
+			if found {
+				if err := q.SetPlayStatus(r.Context(), dbgen.SetPlayStatusParams{
+					PlayStatus: "ok", PlayError: "", PlayRelease: wantName,
+					AppPlatformID: plat.ID, VersionCode: rel.VersionCode,
+				}); err == nil {
+					rel.PlayStatus, rel.PlayRelease = "ok", wantName
+				}
+			}
+		}
+	}
 }
 
 // handleDeleteReleaseUI POST /apps/{slug}/platforms/{platform}/releases/{versionCode}/delete

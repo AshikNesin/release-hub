@@ -647,12 +647,20 @@ func (s *Server) handleApiReleases(w http.ResponseWriter, r *http.Request) {
 	out := make([]map[string]any, 0, len(releases))
 	for _, rel := range releases {
 		u, _ := s.storage.PublicURL(r.Context(), slug+"/"+plat.Platform+"/"+rel.FileName)
-		out = append(out, map[string]any{
+		row := map[string]any{
 			"versionCode": rel.VersionCode, "versionName": rel.VersionName,
 			"channel": rel.Channel, "sha256": rel.Sha256, "size": rel.SizeBytes,
-			"url":       u,
-			"createdAt": rel.CreatedAt.Format(time.RFC3339),
-		})
+			"url":        u,
+			"createdAt":  rel.CreatedAt.Format(time.RFC3339),
+			"playStatus": rel.PlayStatus,
+		}
+		if rel.PlayError != "" {
+			row["playError"] = rel.PlayError
+		}
+		if rel.PlayRelease != "" {
+			row["playRelease"] = rel.PlayRelease
+		}
+		out = append(out, row)
 	}
 	writeJSON(w, 200, out)
 }
