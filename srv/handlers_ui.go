@@ -284,6 +284,9 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		VersionCode                      int64
 		SizeMB                           float64
 		CreatedAt                        time.Time
+		PlayStatus                       string // pending | ok | error (direct/.apk = pending)
+		PlayError                        string // actionable reason + remedy when error
+		PlayRelease                      string // Play release name when ok
 	}
 	type platSection struct {
 		Platform, PackageName, LatestVersion string
@@ -318,6 +321,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 				VersionCode: rel.VersionCode,
 				SizeMB:      float64(rel.SizeBytes) / (1 << 20),
 				CreatedAt:   rel.CreatedAt,
+				PlayStatus:  rel.PlayStatus, PlayError: rel.PlayError, PlayRelease: rel.PlayRelease,
 			})
 		}
 		// Latest across channels (highest versionCode) for the platform header.

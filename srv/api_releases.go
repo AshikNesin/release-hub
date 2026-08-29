@@ -135,14 +135,30 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Play push outcome is persisted per release so the UI can flag MANUAL
+	// ACTION NEEDED until superseded. Start as pending (direct / .apk never
+	// attempt Play), flip to ok/error right after the push.
+	playStatus, playErrText, playRelName := "pending", "", ""
+	if _, isPlay := trackFor(channel); isPlay {
+		playStatus = "error" // pessimistic until proven ok
+	}
 	if _, err := q.CreateRelease(r.Context(), dbgen.CreateReleaseParams{
 		AppPlatformID: plat.ID, VersionCode: versionCode, VersionName: versionName,
 		Channel: channel, Notes: r.FormValue("notes"),
 		Sha256: sha, SizeBytes: size, FileName: fileName,
+		PlayStatus: playStatus, PlayError: playErrText, PlayRelease: playRelName,
 	}); err != nil {
 		_ = s.storage.Delete(r.Context(), key)
 		writeErr(w, 500, "record release: "+err.Error())
 		return
+	}
+	setPlay := func(status, eText, rel string) {
+		if err := q.SetPlayStatus(r.Context(), dbgen.SetPlayStatusParams{
+			PlayStatus: status, PlayError: eText, PlayRelease: rel,
+			AppPlatformID: plat.ID, VersionCode: versionCode,
+		}); err != nil {
+			slog.Warn("play status update failed", "error", err)
+		}
 	}
 	dlURL, err := s.storage.PublicURL(r.Context(), key)
 	if err != nil {
@@ -160,8 +176,16 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	if playRelease, err := s.publishToPlay(r, plat, key, channel, versionName, r.FormValue("notes")); err != nil {
 		slog.Warn("play publish failed", "app", slug, "error", err)
 		resp["playError"] = err.Error() // stored + served; release itself succeeded
+		if _, isPlay := trackFor(channel); isPlay {
+			setPlay("error", err.Error(), "")
+		}
 	} else if playRelease != "" {
 		resp["playRelease"] = playRelease
+		setPlay("ok", "", playRelease)
+	} else if _, isPlay := trackFor(channel); isPlay {
+		// Play-intended channel but publishToPlay returned ("", nil): Play
+		// not enabled for the platform — a manual step remains.
+		setPlay("error", "Play publishing is not enabled for this platform (app page → Enable Play publishing)", "")
 	}
 	// Retention: keep only the newest N direct releases (Settings, or the
 	// platform's override). Runs after the upload is fully committed.

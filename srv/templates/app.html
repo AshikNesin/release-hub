@@ -32,7 +32,11 @@
     {{range .Releases}}
     <tr>
       <td><span class="num">{{.VersionName}}</span> <span style="color:var(--fg2)">({{.VersionCode}})</span></td>
-      <td><span class="chip">{{.Channel}}</span></td>
+      <td><span class="chip">{{.Channel}}</span>
+        {{if eq .PlayStatus "ok"}}<span class="chip ok" title="On Play as {{.PlayRelease}}">✓ on Play</span>
+        {{else if eq .PlayStatus "error"}}<span class="chip err" title="{{.PlayError}}">⚠ Play: manual action needed</span>
+        {{end}}
+      </td>
       <td class="num" style="color:var(--fg2)">{{printf "%.1f" .SizeMB}} MB</td>
       <td style="color:var(--fg2)">{{.Notes}}</td>
       <td class="num" style="color:var(--fg2)">{{.CreatedAt.Format "Jan 2 15:04"}}</td>
@@ -45,6 +49,17 @@
         {{end}}
       </td>
     </tr>
+    {{if eq .PlayStatus "error"}}
+    <tr class="playerr-row">
+      <td colspan="6">
+        <div class="playerr">
+          <b>⚠ Play push failed — manual action needed.</b> The upload is stored on the hub, but it is NOT on Google Play:<br>
+          {{.PlayError}}<br>
+          <span style="color:#991b1b">Fix the above (usually in Play Console), then re-upload with a higher versionCode to retry.</span>
+        </div>
+      </td>
+    </tr>
+    {{end}}
     {{else}}
     <tr><td colspan="6" style="color:var(--fg2)">No releases yet. Upload one:</td></tr>
     <tr><td colspan="6"><div class="uploadcmd">

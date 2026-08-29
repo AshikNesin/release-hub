@@ -65,6 +65,9 @@ type Release struct {
 	SizeBytes     int64     `json:"size_bytes"`
 	FileName      string    `json:"file_name"`
 	CreatedAt     time.Time `json:"created_at"`
+	PlayStatus    string    `json:"play_status"`
+	PlayError     string    `json:"play_error"`
+	PlayRelease   string    `json:"play_release"`
 }
 
 type Session struct {

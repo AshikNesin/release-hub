@@ -36,8 +36,12 @@ DELETE FROM app_platforms WHERE id = ?;
 -- releases (per platform)
 
 -- name: CreateRelease :execresult
-INSERT INTO releases (app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO releases (app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, play_status, play_error, play_release)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: SetPlayStatus :exec
+UPDATE releases SET play_status = ?, play_error = ?, play_release = ?
+WHERE app_platform_id = ? AND version_code = ?;
 
 -- name: ListReleases :many
 SELECT * FROM releases WHERE app_platform_id = ? ORDER BY version_code DESC;

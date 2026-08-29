@@ -121,8 +121,8 @@ func (q *Queries) CreateAppPlatform(ctx context.Context, arg CreateAppPlatformPa
 
 const createRelease = `-- name: CreateRelease :execresult
 
-INSERT INTO releases (app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO releases (app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, play_status, play_error, play_release)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateReleaseParams struct {
@@ -134,6 +134,9 @@ type CreateReleaseParams struct {
 	Sha256        string `json:"sha256"`
 	SizeBytes     int64  `json:"size_bytes"`
 	FileName      string `json:"file_name"`
+	PlayStatus    string `json:"play_status"`
+	PlayError     string `json:"play_error"`
+	PlayRelease   string `json:"play_release"`
 }
 
 // releases (per platform)
@@ -147,6 +150,9 @@ func (q *Queries) CreateRelease(ctx context.Context, arg CreateReleaseParams) (s
 		arg.Sha256,
 		arg.SizeBytes,
 		arg.FileName,
+		arg.PlayStatus,
+		arg.PlayError,
+		arg.PlayRelease,
 	)
 }
 
@@ -240,7 +246,7 @@ func (q *Queries) GetConfig(ctx context.Context, key string) (string, error) {
 }
 
 const latestReleaseForChannel = `-- name: LatestReleaseForChannel :many
-SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases
+SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at, play_status, play_error, play_release FROM releases
 WHERE app_platform_id = ? AND channel = ?
 ORDER BY version_code DESC LIMIT 1
 `
@@ -270,6 +276,9 @@ func (q *Queries) LatestReleaseForChannel(ctx context.Context, arg LatestRelease
 			&i.SizeBytes,
 			&i.FileName,
 			&i.CreatedAt,
+			&i.PlayStatus,
+			&i.PlayError,
+			&i.PlayRelease,
 		); err != nil {
 			return nil, err
 		}
@@ -384,7 +393,7 @@ func (q *Queries) ListPlatformsByApp(ctx context.Context, appID int64) ([]AppPla
 }
 
 const listReleases = `-- name: ListReleases :many
-SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases WHERE app_platform_id = ? ORDER BY version_code DESC
+SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at, play_status, play_error, play_release FROM releases WHERE app_platform_id = ? ORDER BY version_code DESC
 `
 
 func (q *Queries) ListReleases(ctx context.Context, appPlatformID int64) ([]Release, error) {
@@ -407,6 +416,9 @@ func (q *Queries) ListReleases(ctx context.Context, appPlatformID int64) ([]Rele
 			&i.SizeBytes,
 			&i.FileName,
 			&i.CreatedAt,
+			&i.PlayStatus,
+			&i.PlayError,
+			&i.PlayRelease,
 		); err != nil {
 			return nil, err
 		}
@@ -423,7 +435,7 @@ func (q *Queries) ListReleases(ctx context.Context, appPlatformID int64) ([]Rele
 
 const listReleasesByChannel = `-- name: ListReleasesByChannel :many
 
-SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases WHERE app_platform_id = ? AND channel = ? ORDER BY version_code DESC
+SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at, play_status, play_error, play_release FROM releases WHERE app_platform_id = ? AND channel = ? ORDER BY version_code DESC
 `
 
 type ListReleasesByChannelParams struct {
@@ -452,6 +464,9 @@ func (q *Queries) ListReleasesByChannel(ctx context.Context, arg ListReleasesByC
 			&i.SizeBytes,
 			&i.FileName,
 			&i.CreatedAt,
+			&i.PlayStatus,
+			&i.PlayError,
+			&i.PlayRelease,
 		); err != nil {
 			return nil, err
 		}
@@ -546,7 +561,7 @@ func (q *Queries) PlatformsForPrune(ctx context.Context) ([]AppPlatform, error) 
 }
 
 const releaseByAppAndCode = `-- name: ReleaseByAppAndCode :one
-SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at FROM releases WHERE app_platform_id = ? AND version_code = ?
+SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at, play_status, play_error, play_release FROM releases WHERE app_platform_id = ? AND version_code = ?
 `
 
 type ReleaseByAppAndCodeParams struct {
@@ -568,6 +583,9 @@ func (q *Queries) ReleaseByAppAndCode(ctx context.Context, arg ReleaseByAppAndCo
 		&i.SizeBytes,
 		&i.FileName,
 		&i.CreatedAt,
+		&i.PlayStatus,
+		&i.PlayError,
+		&i.PlayRelease,
 	)
 	return i, err
 }
@@ -594,6 +612,30 @@ type SetConfigParams struct {
 
 func (q *Queries) SetConfig(ctx context.Context, arg SetConfigParams) error {
 	_, err := q.db.ExecContext(ctx, setConfig, arg.Key, arg.Value)
+	return err
+}
+
+const setPlayStatus = `-- name: SetPlayStatus :exec
+UPDATE releases SET play_status = ?, play_error = ?, play_release = ?
+WHERE app_platform_id = ? AND version_code = ?
+`
+
+type SetPlayStatusParams struct {
+	PlayStatus    string `json:"play_status"`
+	PlayError     string `json:"play_error"`
+	PlayRelease   string `json:"play_release"`
+	AppPlatformID int64  `json:"app_platform_id"`
+	VersionCode   int64  `json:"version_code"`
+}
+
+func (q *Queries) SetPlayStatus(ctx context.Context, arg SetPlayStatusParams) error {
+	_, err := q.db.ExecContext(ctx, setPlayStatus,
+		arg.PlayStatus,
+		arg.PlayError,
+		arg.PlayRelease,
+		arg.AppPlatformID,
+		arg.VersionCode,
+	)
 	return err
 }
 
