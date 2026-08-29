@@ -167,7 +167,7 @@ picks the `versionCode` from the bundle itself (must strictly increase per
 app; the hub enforces monotonic version codes on its side too).
 
 Promote later by re-uploading the same bundle with a higher versionCode to
-`channel=open` or `channel=public` (a separate release, after the app's
+`channel=beta` or `channel=public` (a separate release, after the app's
 Console declarations — privacy policy, content forms — are complete).
 Play's API has no promote call; each track gets its own upload.
 
