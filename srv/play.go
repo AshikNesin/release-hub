@@ -277,7 +277,10 @@ func (p *PlayPublisher) ensureClosedTrack(ctx context.Context, channel string) (
 	if _, err := p.svc.Edits.Tracks.
 		Create(p.pkgName, appEdit.Id, &androidpublisher.TrackConfig{
 			Track: track,
-			Type:  "closedTesting",
+			// Enum value per the generated client's Possible values list —
+			// the REST docs' prose says "closedTesting" but the wire enum is
+			// CLOSED_TESTING (the prose is a typo; camelCase gets a 400).
+			Type: "CLOSED_TESTING",
 		}).
 		Context(ctx).
 		Do(); err != nil {
