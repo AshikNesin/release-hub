@@ -182,13 +182,14 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 	if err != nil {
 		return "", fmt.Errorf("play: set track %s: %w", track, err)
 	}
-	// Internal track: set the tester list (Google Groups) in the same edit.
-	// Without this the track's tester list stays empty and the opt-in link
-	// (play.google.com/apps/testing/<pkg>) shows "app not available" for
-	// everyone — the API cannot invite individual emails, only groups.
+	// Tester groups (Google Group addresses) are only pushed on CLOSED tracks
+	// (alpha/beta), where the API accepts them. Google rejects group updates
+	// on the internal track ("Cannot set tester group on an internal track")
+	// and that rejection aborts the whole release edit at commit — internal
+	// testers are managed in Play Console (email lists) instead.
 	// Guarded on len>0: Testers.Update REPLACES the whole list, so pushing an
 	// empty one would wipe testers added directly in Play Console.
-	if track == "internal" && len(testers) > 0 {
+	if track != "internal" && len(testers) > 0 {
 		if _, err := p.svc.Edits.Testers.
 			Update(p.pkgName, appEdit.Id, track, &androidpublisher.Testers{GoogleGroups: testers}).
 			Context(ctx).
