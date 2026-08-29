@@ -153,8 +153,11 @@ bytes, base64- or hex-encoded):
 
 - `channel=public`          → Play **production** track
 - `channel=open`            → Play **open testing** track (`beta`)
-- `channel=closed:<name>`   → Play **closed testing** track by exact name
-  (create the track in Play Console first, e.g. `closed:alpha`)
+- `channel=closed`          → Play **closed testing**; the hub's track
+  (`beta-testers`) is **created automatically on first use** via
+  `edits.tracks.create` — no Play Console visit needed
+- `channel=closed:<name>`   → a specific closed track by exact name
+  (for extra tracks you created in Play Console, e.g. `closed:alpha`)
 - `channel=internal`        → Play **internal testing** track
 - `channel=direct` (or any `.apk`) → hub only, Play untouched
 
@@ -209,9 +212,9 @@ curl -H "Authorization: Bearer $HUB_TOKEN" \
      https://hub.example.com/api/apps/tinyfirewall/releases
 # → {"apkUrl":…, "playRelease":"1.15 (115)"}
 
-# closed testing (track must exist in Play Console):
+# closed testing (track auto-created on first use):
 curl -H "Authorization: Bearer $HUB_TOKEN" \
-     -F file=app-release.aab -F channel=closed:alpha \
+     -F file=app-release.aab -F channel=closed \
      https://hub.example.com/api/apps/tinyfirewall/releases
 
 # open testing / production:

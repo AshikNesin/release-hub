@@ -60,9 +60,10 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 // multipart form:
 //
 //	file        artifact (.apk/.aab/.ipa)
-//	channel     direct | internal | open | closed:<name> | public
-//	            (default direct; closed:<name> targets a Play closed
-//	            testing track by its exact name, e.g. closed:alpha)
+//	channel     direct | internal | open | closed | closed:<name> | public
+//	            (default direct; "closed" is the hub's closed testing
+//	            track, auto-created on Play on first use; closed:<name>
+//	            targets a specific closed track by exact name)
 //	versionName human version (default derived from versionCode)
 //	versionCode integer; required for android APKs on direct (the
 //	           on-device BuildConfig.VERSION_CODE, i.e. ABI-adjusted);
@@ -84,11 +85,11 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 		channel = "direct"
 	}
 	switch channel {
-	case "public", "open", "internal", "direct":
+	case "public", "open", "internal", "direct", "closed":
 	default:
-		// closed:<name> — a Play closed testing track by exact name.
+		// closed:<name> — a specific Play closed testing track by exact name.
 		if _, ok := trackFor(channel); !ok {
-			writeErr(w, 400, "channel must be direct, internal, open, closed:<name> or public")
+			writeErr(w, 400, "channel must be direct, internal, open, closed or public")
 			return
 		}
 	}
@@ -289,11 +290,10 @@ func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) 
 	// and production/open manage testers in Play Console instead.
 	channel := r.FormValue("channel")
 	if channel == "" {
-		channel = "closed:alpha"
+		channel = "closed"
 	}
-	track, ok := trackFor(channel)
-	if !ok || !trackIsClosed(channel) {
-		writeErr(w, 400, "testers can only be set on closed tracks (channel=closed:<name>, e.g. closed:alpha)")
+	if !trackIsClosed(channel) {
+		writeErr(w, 400, "testers can only be set on closed tracks (channel=closed or closed:<name>)")
 		return
 	}
 	groups := s.playTesters(r.Context())
@@ -309,6 +309,11 @@ func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) 
 	pub, err := NewPlayPublisherFromJSON(r.Context(), plat.PackageName, creds)
 	if err != nil {
 		writeErr(w, 500, err.Error())
+		return
+	}
+	track, err := pub.ensureClosedTrack(r.Context(), channel)
+	if err != nil {
+		writeErr(w, 502, err.Error())
 		return
 	}
 	if err := pub.SetTesters(r.Context(), track, groups); err != nil {
@@ -379,6 +384,9 @@ func (s *Server) handleApiListTracks(w http.ResponseWriter, r *http.Request) {
 			info.Channel, info.IsClosed = "open", false
 		case "internal", "qa":
 			info.Channel, info.IsClosed = "internal", false
+		case closedDefaultTrack:
+			// The hub's own closed track — the plain "closed" channel.
+			info.Channel, info.IsClosed = "closed", true
 		default:
 			info.IsClosed = true // free-form name = closed testing track
 		}

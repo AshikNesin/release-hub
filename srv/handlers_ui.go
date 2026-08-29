@@ -580,11 +580,10 @@ func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
 	// track"; open/production manage testers in Play Console).
 	channel := r.FormValue("channel")
 	if channel == "" {
-		channel = "closed:alpha"
+		channel = "closed"
 	}
-	track, ok := trackFor(channel)
-	if !ok || !trackIsClosed(channel) {
-		setFlash("Testers can only be invited to closed testing tracks (channel=closed:<name>).")
+	if !trackIsClosed(channel) {
+		setFlash("Testers can only be invited to closed testing tracks (channel=closed or closed:<name>).")
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}
@@ -597,6 +596,12 @@ func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
 	pub, err := NewPlayPublisherFromJSON(r.Context(), plat.PackageName, creds)
 	if err != nil {
 		setFlash("Play setup failed: " + err.Error())
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
+	track, err := pub.ensureClosedTrack(r.Context(), channel)
+	if err != nil {
+		setFlash("Closed track failed: " + err.Error())
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}

@@ -77,8 +77,8 @@
       {{end}}
       <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/testers?back={{$.Tab}}" class="inline" style="margin:6px 0 0">
         <select name="channel" class="trackpick">
+          <option value="closed">closed</option>
           <option value="closed:alpha">closed:alpha</option>
-          <option value="closed:beta">closed:beta</option>
         </select>
         <button type="submit" class="btn ghost xs">invite testers</button>
       </form>
@@ -131,7 +131,7 @@
           <button type="submit" class="btn ghost xs">disable</button>
         </form>
       </div>
-      <p class="hint" style="margin:6px 0 0">channels: <code>internal</code> → internal testing · <code>open</code> → open testing · <code>closed:&lt;name&gt;</code> → closed testing track by name · <code>public</code> → production</p>
+      <p class="hint" style="margin:6px 0 0">channels: <code>internal</code> → internal testing · <code>open</code> → open testing · <code>closed</code> → closed testing (track auto-created) · <code>closed:&lt;name&gt;</code> → specific closed track · <code>public</code> → production</p>
       {{else if eq .Platform "android"}}
       <div class="playsetup">
         <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play?back={{$.Tab}}" enctype="multipart/form-data" class="inline">

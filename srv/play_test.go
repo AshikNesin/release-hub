@@ -13,14 +13,15 @@ func TestTrackFor(t *testing.T) {
 		"direct":             {"", false},
 		"api-share (legacy)": {"", false}, // rejected at upload layer; trackFor returns no track anyway
 		"weird":              {"", false},
+		// closed — the hub's simple one-track channel (auto-created)
+		"closed": {"beta-testers", true},
 		// closed:<name> — closed testing tracks by free-form name
 		"closed:alpha":     {"alpha", true},
 		"closed:team":      {"team", true},
 		"closed:qa-2026":   {"qa-2026", true},
-		"closed:a":         {"", false},    // too short (min 2)
-		"closed:has space": {"", false},    // spaces not allowed
-		"closed:":          {"", false},    // empty name
-		"closed:beta":      {"beta", true}, // allowed: explicit closed use of the classic beta track
+		"closed:a":         {"", false}, // too short (min 2)
+		"closed:has space": {"", false}, // spaces not allowed
+		"closed:":          {"", false}, // empty name
 	}
 	for ch, want := range cases {
 		track, ok := trackFor(ch)
@@ -33,8 +34,8 @@ func TestTrackFor(t *testing.T) {
 func TestTrackIsClosed(t *testing.T) {
 	for ch, want := range map[string]bool{
 		"internal": false, "open": false, "public": false, "direct": false,
-		"closed:alpha": true, "closed:team": true, "closed:": false,
-		"alpha": false,
+		"closed": true, "closed:alpha": true, "closed:team": true,
+		"closed:": false, "alpha": false,
 	} {
 		if got := trackIsClosed(ch); got != want {
 			t.Errorf("trackIsClosed(%q) = %v want %v", ch, got, want)

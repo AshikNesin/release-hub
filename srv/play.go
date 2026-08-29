@@ -113,11 +113,13 @@ func classifyPlayError(err error) error {
 
 // trackFor maps hub channels to Play track identifiers.
 //
-// Fixed tracks: production, open testing ("beta") and internal testing
-// ("internal"; the docs also list the alias "qa"). Closed testing tracks
-// are created manually in Play Console and their names are free-form —
-// the hub addresses them as channel "closed:<name>" (e.g. closed:alpha
-// for the classic default closed track).
+// Fixed tracks: production, open testing ("beta" — note: Google's reserved
+// id for the OPEN track) and internal testing ("internal"; alias "qa").
+// Closed testing tracks are created on demand (Play's edits.tracks.create,
+// type closedTesting) or reused when they already exist — the hub's simple
+// model is ONE closed track named "beta-testers", addressed as channel
+// "closed". The explicit form "closed:<name>" remains for power users who
+// created additional closed tracks in Play Console.
 func trackFor(channel string) (string, bool) {
 	switch channel {
 	case "public":
@@ -129,10 +131,14 @@ func trackFor(channel string) (string, bool) {
 	case "direct":
 		return "", false // direct distribution; no Play involvement
 	}
-	// Closed testing track names are free-form (min 2 chars,
-	// letters/digits/hyphen; no spaces — form-factor names use ':' and
-	// Play's own defaults are "alpha"/"beta", so letters+hyphen+digit is the
-	// safe charset).
+	// "closed" — the hub's default closed testing track.
+	if channel == "closed" {
+		return closedDefaultTrack, true
+	}
+	// "closed:<name>" — a specific closed testing track by exact name
+	// (min 2 chars, letters/digits/hyphen; no spaces — form-factor names use
+	// ':' and Play's own defaults are "alpha"/"beta", so
+	// letters+hyphen+digit is the safe charset).
 	name, ok := strings.CutPrefix(channel, "closed:")
 	if ok && closedTrackNameRx.MatchString(name) {
 		return name, true
@@ -140,19 +146,25 @@ func trackFor(channel string) (string, bool) {
 	return "", false
 }
 
+// closedDefaultTrack is the closed testing track the hub creates and uses
+// for channel "closed". Named "beta-testers" to stay distinct from Google's
+// reserved "beta" (the open-testing track id).
+const closedDefaultTrack = "beta-testers"
+
 var closedTrackNameRx = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]{1,28}$`)
 
 // trackIsClosed reports whether a hub channel targets a closed testing
-// track (closed:<name>) — the only tracks where pushing tester groups via
-// the API is accepted. The name must be non-empty and valid.
+// track ("closed" or "closed:<name>") — the only tracks where pushing
+// tester groups via the API is accepted.
 func trackIsClosed(channel string) bool {
-	name, ok := strings.CutPrefix(channel, "closed:")
-	return ok && closedTrackNameRx.MatchString(name)
+	_, ok := trackFor(channel)
+	return ok && (channel == "closed" || strings.HasPrefix(channel, "closed:"))
 }
 
 // Publish uploads an AAB and assigns it to the Play track for the channel.
-// Tester groups (Google Group addresses) can be attached in the same edit for
-// closed testing tracks. Returns the Play release name.
+// Closed channels auto-create their track when missing (ensureClosedTrack).
+// Tester groups (Google Group addresses) can be attached in the same edit
+// for closed testing tracks. Returns the Play release name.
 func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionName, notes string, testers []string) (string, error) {
 	track, ok := trackFor(channel)
 	if !ok {
@@ -160,6 +172,12 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 	}
 	if !strings.HasSuffix(strings.ToLower(aabPath), ".aab") {
 		return "", fmt.Errorf("play: artifact must be an .aab (got %s)", aabPath)
+	}
+	if trackIsClosed(channel) {
+		var err error
+		if track, err = p.ensureClosedTrack(ctx, channel); err != nil {
+			return "", err
+		}
 	}
 
 	appEdit, err := p.svc.Edits.Insert(p.pkgName, &androidpublisher.AppEdit{}).Context(ctx).Do()
@@ -228,6 +246,57 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 		return "", fmt.Errorf("play: commit: %w", err)
 	}
 	return releaseName, nil
+}
+
+// ensureClosedTrack returns the Play track identifier for a hub closed
+// channel, creating the track first when it doesn't exist yet. Play's
+// edits.tracks.create supports exactly one type — closedTesting — which is
+// precisely what we need. Harmless no-op when the track already exists
+// (the create call is skipped).
+func (p *PlayPublisher) ensureClosedTrack(ctx context.Context, channel string) (string, error) {
+	track, ok := trackFor(channel)
+	if !ok {
+		return "", fmt.Errorf("play: channel %q is not a closed testing channel", channel)
+	}
+	existing, err := p.ListTracks(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, t := range existing {
+		if t.Track == track {
+			return track, nil
+		}
+	}
+	appEdit, err := p.svc.Edits.Insert(p.pkgName, &androidpublisher.AppEdit{}).Context(ctx).Do()
+	if err != nil {
+		return "", fmt.Errorf("play: open edit: %w", classifyPlayError(err))
+	}
+	defer func() {
+		_ = p.svc.Edits.Delete(p.pkgName, appEdit.Id).Context(ctx).Do()
+	}()
+	if _, err := p.svc.Edits.Tracks.
+		Create(p.pkgName, appEdit.Id, &androidpublisher.TrackConfig{
+			Track: track,
+			Type:  "closedTesting",
+		}).
+		Context(ctx).
+		Do(); err != nil {
+		// Lost a race with a concurrent create? Re-list; if it's there now,
+		// fine.
+		if existing2, err2 := p.ListTracks(ctx); err2 == nil {
+			for _, t := range existing2 {
+				if t.Track == track {
+					return track, nil
+				}
+			}
+		}
+		return "", fmt.Errorf("play: create track %s: %w", track, classifyPlayError(err))
+	}
+	if _, err := p.svc.Edits.Commit(p.pkgName, appEdit.Id).Context(ctx).Do(); err != nil {
+		return "", fmt.Errorf("play: commit track create: %w", err)
+	}
+	slog.Info("play: created closed testing track", "pkg", p.pkgName, "track", track)
+	return track, nil
 }
 
 // ListTracks returns the app's existing tracks (name + releases) so the
