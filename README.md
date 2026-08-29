@@ -151,21 +151,23 @@ account** covers all apps; its JSON key is stored in the DB, encrypted at
 rest (AES-256-GCM, key from the `RELEASE_HUB_SECRET_KEY` env var — 32
 bytes, base64- or hex-encoded):
 
-- `channel=public`          → Play **production** track
-- `channel=open`            → Play **open testing** track (`beta`)
-- `channel=closed`          → Play **closed testing**; the hub's track
-  (`beta-testers`) is **created automatically on first use** via
-  `edits.tracks.create` — no Play Console visit needed
-- `channel=closed:<name>`   → a specific closed track by exact name
-  (for extra tracks you created in Play Console, e.g. `closed:alpha`)
-- `channel=internal`        → Play **internal testing** track
+- `channel=public`   → Play **production** track
+- `channel=beta`     → Play **open testing** (Google's track id `beta`)
+- `channel=alpha`    → Play **closed testing** — the hub's `alpha` track,
+  **created automatically on first use** via `edits.tracks.create`,
+  no Console visit needed
+- `channel=internal` → Play **internal testing** track
 - `channel=direct` (or any `.apk`) → hub only, Play untouched
+
+Five channels, Android-convention names. Legacy spellings (`open`,
+`closed`, `closed:<name>`) still map correctly on input.
 
 Play's API track ids: `production`, `beta` (open testing), `internal`
 (internal testing) plus any manually created closed tracks by name.
 `GET /api/apps/{slug}/{platform}/tracks` lists what exists for an app.
-Tester groups (Settings → Beta testers) attach on `closed:<name>` tracks
-only — internal uses Console email lists, open testing is open to all.
+Tester groups (Settings → Beta testers) attach on the `alpha` (closed
+testing) track only — internal uses Console email lists, open testing is
+open to all.
 
 **Full walkthrough** — Play Console setup, service account + JSON key,
 granting release access, enabling per app (UI **or** API), testers, and
@@ -214,11 +216,11 @@ curl -H "Authorization: Bearer $HUB_TOKEN" \
 
 # closed testing (track auto-created on first use):
 curl -H "Authorization: Bearer $HUB_TOKEN" \
-     -F file=app-release.aab -F channel=closed \
+     -F file=app-release.aab -F channel=alpha \
      https://hub.example.com/api/apps/tinyfirewall/releases
 
 # open testing / production:
-#   -F channel=open      /   -F channel=public
+#   -F channel=beta      /   -F channel=public
 
 # which closed track names exist?
 curl -H "Authorization: Bearer $HUB_TOKEN" \

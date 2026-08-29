@@ -76,13 +76,10 @@
       no beta tester groups configured (Settings → Beta testers)
       {{end}}
       <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/testers?back={{$.Tab}}" class="inline" style="margin:6px 0 0">
-        <select name="channel" class="trackpick">
-          <option value="closed">closed</option>
-          <option value="closed:alpha">closed:alpha</option>
-        </select>
-        <button type="submit" class="btn ghost xs">invite testers</button>
+        <input type="hidden" name="channel" value="alpha">
+        <button type="submit" class="btn ghost xs">invite testers to alpha</button>
       </form>
-      <p class="hint" style="margin:4px 0 0">Groups can only be attached to <b>closed testing</b> tracks — Google rejects them on internal (<code>email lists</code> in Play Console instead) and open/production have no tester list. List your app's real track names via <code>GET /api/apps/{{$.App.Slug}}/{{.Platform}}/tracks</code>.</p>
+      <p class="hint" style="margin:4px 0 0">Groups can only be attached to the <b>alpha</b> (closed testing) track — Google rejects them on internal (Console email lists instead) and beta/public have no tester list. Track inventory: <code>GET /api/apps/{{$.App.Slug}}/{{.Platform}}/tracks</code>.</p>
       {{if .TesterEmails}}
       <div style="margin-top:10px">
         tester emails: <code class="dl">{{.TesterEmails}}</code>
@@ -131,7 +128,7 @@
           <button type="submit" class="btn ghost xs">disable</button>
         </form>
       </div>
-      <p class="hint" style="margin:6px 0 0">channels: <code>internal</code> → internal testing · <code>open</code> → open testing · <code>closed</code> → closed testing (track auto-created) · <code>closed:&lt;name&gt;</code> → specific closed track · <code>public</code> → production</p>
+      <p class="hint" style="margin:6px 0 0">channels: <code>internal</code> → internal testing · <code>alpha</code> → closed testing (track auto-created) · <code>beta</code> → open testing · <code>public</code> → production</p>
       {{else if eq .Platform "android"}}
       <div class="playsetup">
         <form method="post" action="/apps/{{$.App.Slug}}/platforms/{{.Platform}}/play?back={{$.Tab}}" enctype="multipart/form-data" class="inline">
@@ -144,7 +141,7 @@
           <div><label>{{if $.PlayAccounts}}Or upload a new key{{else}}Service-account JSON key{{end}}</label><input type="file" name="file" accept=".json,application/json"{{if not $.PlayAccounts}} required{{end}}></div>
           <button type="submit" class="btn primary">Enable Play publishing</button>
         </form>
-        <p class="hint" style="margin:6px 0 0">One shared service account covers every app (Play Console → Setup → API access; guide in <code>docs/play-internal-testing.md</code>). <code>channel=internal</code> .aab uploads go to internal testing, <code>open</code> to open testing, <code>closed:&lt;name&gt;</code> to that closed track (create it in Play Console first), <code>public</code> to production.</p>
+        <p class="hint" style="margin:6px 0 0">One shared service account covers every app (Play Console → Setup → API access; guide in <code>docs/play-internal-testing.md</code>). <code>channel=internal</code> .aab uploads go to internal testing, <code>alpha</code> to closed testing (auto-created), <code>beta</code> to open testing, <code>public</code> to production.</p>
         <p class="hint" style="margin:6px 0 0">App not in Play yet? The API can't create apps — <a href="https://play.google.com/console/u/0/developers" target="_blank" rel="noopener">create it in Play Console</a> with package <code>{{.PackageName}}</code>, then enable publishing above.</p>
       </div>
       {{else}}

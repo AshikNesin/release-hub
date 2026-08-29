@@ -352,7 +352,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		if p.PlayEnabled == 1 {
 			shares = append(shares,
 				shareRow{Label: "internal", URL: dl + "internal"},
-				shareRow{Label: "open", URL: dl + "open"},
+				shareRow{Label: "beta", URL: dl + "beta"},
 				shareRow{Label: "public", URL: dl + "public"})
 		}
 		sections = append(sections, platSection{
@@ -575,15 +575,15 @@ func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}
-	// Groups only land on closed testing tracks; internal/open/production
-	// reject the call (internal: "Cannot set tester group on an internal
-	// track"; open/production manage testers in Play Console).
+	// Groups only land on the closed testing (alpha) track; internal/beta/
+	// public reject the call (internal: "Cannot set tester group on an
+	// internal track"; beta/public have no tester list).
 	channel := r.FormValue("channel")
 	if channel == "" {
-		channel = "closed"
+		channel = "alpha"
 	}
 	if !trackIsClosed(channel) {
-		setFlash("Testers can only be invited to closed testing tracks (channel=closed or closed:<name>).")
+		setFlash("Testers can only be invited to the alpha (closed testing) track.")
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}
@@ -611,7 +611,7 @@ func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slog.Info("play testers updated (UI)", "app", r.PathValue("slug"), "track", track, "groups", len(groups))
-	setFlash(fmt.Sprintf("Invited %d tester group(s) to closed track %q.", len(groups), track))
+	setFlash(fmt.Sprintf("Invited %d tester group(s) to the alpha (closed testing) track.", len(groups)))
 	http.Redirect(w, r, back, http.StatusSeeOther)
 }
 

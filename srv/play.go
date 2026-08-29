@@ -123,52 +123,51 @@ func classifyPlayError(err error) error {
 
 // trackFor maps hub channels to Play track identifiers.
 //
-// Fixed tracks: production, open testing ("beta" — note: Google's reserved
-// id for the OPEN track) and internal testing ("internal"; alias "qa").
-// Closed testing tracks are created on demand (Play's edits.tracks.create,
-// type closedTesting) or reused when they already exist — the hub's simple
-// model is ONE closed track named "beta-testers", addressed as channel
-// "closed". The explicit form "closed:<name>" remains for power users who
-// created additional closed tracks in Play Console.
+// The simple Android-convention model:
+//
+//	public    → production
+//	beta      → beta       (Google's OPEN testing track id)
+//	alpha     → alpha      (the hub's CLOSED testing track, auto-created)
+//	internal  → internal   (internal testing)
+//	direct    → —          (no Play involvement)
+//
+// No closed:<name> addressing, no track-name knowledge required. Legacy
+// channels (open, closed, closed:<name>) are accepted on input and mapped
+// to their new names so existing scripts keep working.
 func trackFor(channel string) (string, bool) {
 	switch channel {
 	case "public":
 		return "production", true
-	case "open":
+	case "beta", "open":
 		return "beta", true
+	case "alpha":
+		return alphaTrack, true
 	case "internal":
 		return "internal", true
 	case "direct":
 		return "", false // direct distribution; no Play involvement
+	case "closed":
+		return alphaTrack, true // legacy alias
 	}
-	// "closed" — the hub's default closed testing track.
-	if channel == "closed" {
-		return closedDefaultTrack, true
-	}
-	// "closed:<name>" — a specific closed testing track by exact name
-	// (min 2 chars, letters/digits/hyphen; no spaces — form-factor names use
-	// ':' and Play's own defaults are "alpha"/"beta", so
-	// letters+hyphen+digit is the safe charset).
 	name, ok := strings.CutPrefix(channel, "closed:")
 	if ok && closedTrackNameRx.MatchString(name) {
-		return name, true
+		return name, true // legacy explicit form
 	}
 	return "", false
 }
 
-// closedDefaultTrack is the closed testing track the hub creates and uses
-// for channel "closed". Named "beta-testers" to stay distinct from Google's
-// reserved "beta" (the open-testing track id).
-const closedDefaultTrack = "beta-testers"
+// alphaTrack is the closed testing track the hub uses for the alpha
+// channel — created automatically via edits.tracks.create on first use.
+const alphaTrack = "alpha"
 
 var closedTrackNameRx = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]{1,28}$`)
 
-// trackIsClosed reports whether a hub channel targets a closed testing
-// track ("closed" or "closed:<name>") — the only tracks where pushing
-// tester groups via the API is accepted.
+// trackIsClosed reports whether a hub channel targets the hub's closed
+// testing track (alpha — or its legacy spellings closed/closed:<name>) —
+// the only tracks where pushing tester groups via the API is accepted.
 func trackIsClosed(channel string) bool {
 	_, ok := trackFor(channel)
-	return ok && (channel == "closed" || strings.HasPrefix(channel, "closed:"))
+	return ok && (channel == "alpha" || channel == "closed" || strings.HasPrefix(channel, "closed:"))
 }
 
 // Publish uploads an AAB and assigns it to the Play track for the channel.

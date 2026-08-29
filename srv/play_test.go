@@ -7,21 +7,23 @@ func TestTrackFor(t *testing.T) {
 		track string
 		ok    bool
 	}{
-		"public":             {"production", true},
-		"open":               {"beta", true},
-		"internal":           {"internal", true},
-		"direct":             {"", false},
-		"api-share (legacy)": {"", false}, // rejected at upload layer; trackFor returns no track anyway
-		"weird":              {"", false},
-		// closed — the hub's simple one-track channel (auto-created)
-		"closed": {"beta-testers", true},
-		// closed:<name> — closed testing tracks by free-form name
-		"closed:alpha":     {"alpha", true},
-		"closed:team":      {"team", true},
-		"closed:qa-2026":   {"qa-2026", true},
-		"closed:a":         {"", false}, // too short (min 2)
-		"closed:has space": {"", false}, // spaces not allowed
-		"closed:":          {"", false}, // empty name
+		// The five simple channels.
+		"public":   {"production", true},
+		"beta":     {"beta", true}, // Google's OPEN testing track id
+		"alpha":    {"alpha", true},
+		"internal": {"internal", true},
+		"direct":   {"", false},
+		// Legacy spellings still accepted.
+		"open":         {"beta", true},
+		"closed":       {"alpha", true},
+		"closed:alpha": {"alpha", true},
+		"closed:team":  {"team", true},
+		"closed:a":     {"", false}, // too short (min 2)
+		"closed:":      {"", false}, // empty name
+		"api-share":    {"", false}, // legacy channel name, never Play
+		"weird":        {"", false},
+		"production":   {"", false}, // Play track id is not a channel name
+		"closed:beta":  {"beta", true},
 	}
 	for ch, want := range cases {
 		track, ok := trackFor(ch)
@@ -33,9 +35,9 @@ func TestTrackFor(t *testing.T) {
 
 func TestTrackIsClosed(t *testing.T) {
 	for ch, want := range map[string]bool{
-		"internal": false, "open": false, "public": false, "direct": false,
-		"closed": true, "closed:alpha": true, "closed:team": true,
-		"closed:": false, "alpha": false,
+		"internal": false, "beta": false, "public": false, "direct": false,
+		"alpha": true, "closed": true, "closed:alpha": true, "closed:team": true,
+		"closed:": false, "open": false,
 	} {
 		if got := trackIsClosed(ch); got != want {
 			t.Errorf("trackIsClosed(%q) = %v want %v", ch, got, want)

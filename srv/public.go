@@ -66,12 +66,12 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetRelease GET /apps/{slug}/download and /apps/{slug}/download/{platform}
-// Stable, shareable download link: ?channel=direct|internal|open|public
+// Stable, shareable download link: ?channel=direct|internal|beta|public
 // (default direct).
 //   - direct:         302 → newest direct-channel artifact on this hub
 //   - internal:       302 → Play internal-testing opt-in page (join as
 //     tester, then install from Play)
-//   - open:           302 → Play open-testing opt-in page
+//   - beta:           302 → Play open-testing opt-in page
 //   - public:         302 → Play Store listing
 //
 // This is the URL the app page's share row copies — it stays valid across
@@ -90,7 +90,7 @@ func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) {
 	case "internal":
 		http.Redirect(w, r, playInternalTestingURL(plat.PackageName), http.StatusFound)
 		return
-	case "open":
+	case "beta", "open": // legacy "open" alias
 		http.Redirect(w, r, playOpenTestingURL(plat.PackageName), http.StatusFound)
 		return
 	case "public":
@@ -98,7 +98,7 @@ func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	case "direct":
 	default:
-		writeErr(w, 400, "channel must be direct, internal, open or public")
+		writeErr(w, 400, "channel must be direct, internal, beta or public")
 		return
 	}
 	releases, err := dbgen.New(s.DB).LatestReleaseForChannel(r.Context(), dbgen.LatestReleaseForChannelParams{

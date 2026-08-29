@@ -60,10 +60,10 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 // multipart form:
 //
 //	file        artifact (.apk/.aab/.ipa)
-//	channel     direct | internal | open | closed | closed:<name> | public
-//	            (default direct; "closed" is the hub's closed testing
-//	            track, auto-created on Play on first use; closed:<name>
-//	            targets a specific closed track by exact name)
+//	channel     direct | internal | alpha | beta | public   (default direct)
+//	            internal → internal testing · alpha → closed testing
+//	            (auto-created track) · beta → open testing · public →
+//	            production
 //	versionName human version (default derived from versionCode)
 //	versionCode integer; required for android APKs on direct (the
 //	           on-device BuildConfig.VERSION_CODE, i.e. ABI-adjusted);
@@ -85,11 +85,11 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 		channel = "direct"
 	}
 	switch channel {
-	case "public", "open", "internal", "direct", "closed":
+	case "public", "beta", "alpha", "internal", "direct":
 	default:
-		// closed:<name> — a specific Play closed testing track by exact name.
+		// Legacy spellings (open, closed, closed:<name>) still resolve.
 		if _, ok := trackFor(channel); !ok {
-			writeErr(w, 400, "channel must be direct, internal, open, closed or public")
+			writeErr(w, 400, "channel must be direct, internal, alpha, beta or public")
 			return
 		}
 	}
@@ -274,7 +274,7 @@ func (s *Server) testerEmails(ctx context.Context) []string {
 
 // handleApiInviteTesters POST /api/apps/{slug}/{platform}/testers
 // Push the hub-wide beta-tester groups to a Play closed testing track
-// (?channel=closed:<name>, default closed:alpha). Requires Play publishing
+// (?channel=alpha, the hub's closed testing track). Requires Play publishing
 // enabled (needs the service account).
 func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) {
 	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
@@ -290,10 +290,10 @@ func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) 
 	// and production/open manage testers in Play Console instead.
 	channel := r.FormValue("channel")
 	if channel == "" {
-		channel = "closed"
+		channel = "alpha"
 	}
 	if !trackIsClosed(channel) {
-		writeErr(w, 400, "testers can only be set on closed tracks (channel=closed or closed:<name>)")
+		writeErr(w, 400, "testers can only be set on the alpha (closed testing) track")
 		return
 	}
 	groups := s.playTesters(r.Context())
@@ -336,13 +336,13 @@ func (s *Server) handleApiGetTesters(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"groups": s.playTesters(r.Context()),
 		"emails": s.testerEmails(r.Context()),
-		"hint":   "groups: pushable to closed tracks (POST channel=closed:<name>); emails: paste into Play Console email lists — the API cannot accept individual addresses",
+		"hint":   "groups: pushable to the alpha (closed testing) track (POST channel=alpha); emails: paste into Play Console email lists — the API cannot accept individual addresses",
 	})
 }
 
 // handleApiListTracks GET /api/apps/{slug}/{platform}/tracks
 // Read-only Play track inventory (name + current releases) — answers
-// "which closed testing track names can I use with channel=closed:<name>?"
+// "what's on each of my Play tracks?"
 // without opening Play Console.
 func (s *Server) handleApiListTracks(w http.ResponseWriter, r *http.Request) {
 	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
@@ -381,12 +381,12 @@ func (s *Server) handleApiListTracks(w http.ResponseWriter, r *http.Request) {
 		case "production":
 			info.Channel, info.IsClosed = "public", false
 		case "beta":
-			info.Channel, info.IsClosed = "open", false
+			info.Channel, info.IsClosed = "beta", false
 		case "internal", "qa":
 			info.Channel, info.IsClosed = "internal", false
-		case closedDefaultTrack:
-			// The hub's own closed track — the plain "closed" channel.
-			info.Channel, info.IsClosed = "closed", true
+		case alphaTrack:
+			// The hub's closed testing track — the "alpha" channel.
+			info.Channel, info.IsClosed = "alpha", true
 		default:
 			info.IsClosed = true // free-form name = closed testing track
 		}

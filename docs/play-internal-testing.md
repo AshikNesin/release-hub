@@ -1,4 +1,4 @@
-# Publishing to Google Play (internal → closed → open → production)
+# Publishing to Google Play (internal → alpha → beta → public)
 
 End-to-end guide for pushing releases from the hub to Google Play:
 one-time Play Console + service-account setup, enabling it per app in the
@@ -8,13 +8,11 @@ compressed form — this is the walkthrough version.
 ## How the hub talks to Play
 
 - Uploads with `channel=internal` and an `.aab` go to the Play **internal
-  testing** track; `channel=open` goes to **open testing** (Play track id
-  `beta`); `channel=closed` goes to the hub's **closed testing** track
-  (`beta-testers` — created automatically on first use via
-  `edits.tracks.create`, no Console visit needed); `channel=closed:<name>`
-  targets a specific extra closed track by exact name;
-  `channel=public` goes to **production**; `channel=direct` (or any `.apk`)
-  never touches Play.
+  testing** track; `channel=alpha` goes to the hub's **closed testing**
+  track (`alpha` — created automatically on first use via
+  `edits.tracks.create`, no Console visit needed); `channel=beta` goes to
+  **open testing** (Google's track id `beta`); `channel=public` goes to
+  **production**; `channel=direct` (or any `.apk`) never touches Play.
 - Play track ids per the Publishing API docs: `production`, `beta` (open
   testing), `internal` (internal testing; alias `qa`), plus closed tracks
   with free-form names you chose at creation. `GET
@@ -143,13 +141,12 @@ account and enables the app on it.
   ("Cannot set tester group on an internal track"), so the hub never
   touches internal testers. (The API <i>can</i> read the number of joined
   testers via `tracks` list, but not the list itself.)
-- **Closed testing** — the hub's `closed` channel uses its own track
-  (`beta-testers`), created via API on first publish or first invite —
-  nothing to set up. Attach testers as the hub's Google Group (invite-testers
+- **Closed testing (alpha)** — the hub's `alpha` channel uses its own
+  closed track, created via API on first publish or first invite — nothing
+  to set up. Attach testers as the hub's Google Group (invite-testers
   button, or `POST /api/apps/{slug}/{platform}/testers` with
-  `channel=closed`). Extra tracks created manually in Play Console remain
-  addressable as `closed:<exact-name>`.
-- **Open testing** — no tester list; anyone with the opt-in link can join.
+  `channel=alpha`).
+- **Open testing (beta)** — no tester list; anyone with the opt-in link can join.
 
 ## Day 2: cut a release
 
