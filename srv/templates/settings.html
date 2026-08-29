@@ -21,8 +21,18 @@
       <input name="play_testers" value="{{.BetaTesters}}" placeholder="beta-testers@googlegroups.com" style="width:100%"></div>
     <button type="submit" class="btn primary">Save</button>
   </form>
-  <p class="hint">The hub pushes these to a <b>closed testing</b> track of each Play-published app (invite-testers button on the app's page; <code>channel=closed:&lt;name&gt;</code> for releases). The Play API can only invite Google Groups — <b>not email lists and not individual emails</b> (create a group free at groups.google.com and add your testers' emails as members). Internal testing has no group support at all: manage its testers as an email list in Play Console.</p>
+  <p class="hint">The hub pushes these to a <b>closed testing</b> track of each Play-published app (invite-testers button on the app's page; <code>channel=closed:&lt;name&gt;</code> for releases). The Play API can only invite Google Groups — <b>not email lists and not individual emails</b>.</p>
   <p class="hint" style="color:#b45309">Re-syncing <b>replaces</b> the track's tester list: whatever is saved here becomes the entire list. Testers you invite by email directly in Play Console are not visible to the hub — clear this field and re-invite, and the Console-added testers are removed. Prefer managing testers only here (or only in Console), never both.</p>
+</section>
+
+<section>
+  <div class="sect">Individual tester emails</div>
+  <form method="post" action="/settings" class="inline">
+    <div style="flex:1;min-width:280px"><label>Personal emails (comma or newline separated) — Console-side testers</label>
+      <textarea name="play_tester_emails" rows="3" placeholder="alice@gmail.com, bob@gmail.com" style="width:100%">{{.TesterEmails}}</textarea></div>
+    <button type="submit" class="btn primary">Save</button>
+  </form>
+  <p class="hint">Google exposes <b>no API</b> for these — the Play Publishing API cannot push individual emails or email lists (groups only, closed tracks only). The hub keeps this list as the single source of truth: it shows on every Play-enabled app page with a copy button, and is served by <code>GET /api/apps/{slug}/{platform}/testers</code> — ready to paste into Play Console's tester email lists (internal testing → Testers → create email list, or a closed track's email list).</p>
 </section>
 
 <section>

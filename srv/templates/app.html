@@ -83,6 +83,13 @@
         <button type="submit" class="btn ghost xs">invite testers</button>
       </form>
       <p class="hint" style="margin:4px 0 0">Groups can only be attached to <b>closed testing</b> tracks — Google rejects them on internal (<code>email lists</code> in Play Console instead) and open/production have no tester list. List your app's real track names via <code>GET /api/apps/{{$.App.Slug}}/{{.Platform}}/tracks</code>.</p>
+      {{if .TesterEmails}}
+      <div style="margin-top:10px">
+        tester emails: <code class="dl">{{.TesterEmails}}</code>
+        <button class="btn ghost xs" data-copy="{{.TesterEmails}}">copy emails</button>
+        <span class="hint">— paste into Play Console email lists (the API can't push personal addresses)</span>
+      </div>
+      {{end}}
     </td></tr>
     {{end}}
     </tbody>

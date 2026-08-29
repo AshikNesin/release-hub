@@ -259,6 +259,18 @@ func (s *Server) playTesters(ctx context.Context) []string {
 	return normalizeTesterGroups(v)
 }
 
+// testerEmails reads the hub-wide individual tester emails (comma/newline
+// separated) from config. Empty when unset. These are NOT pushable to Play
+// (the API takes Google Groups only) — they're the copy-paste source for
+// the Console's tester email lists.
+func (s *Server) testerEmails(ctx context.Context) []string {
+	v, err := dbgen.New(s.DB).GetConfig(ctx, "play_tester_emails")
+	if err != nil {
+		return nil
+	}
+	return normalizeTesterGroups(v)
+}
+
 // handleApiInviteTesters POST /api/apps/{slug}/{platform}/testers
 // Push the hub-wide beta-tester groups to a Play closed testing track
 // (?channel=closed:<name>, default closed:alpha). Requires Play publishing
@@ -305,6 +317,22 @@ func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) 
 	}
 	slog.Info("play testers updated", "app", r.PathValue("slug"), "track", track, "groups", len(groups))
 	writeJSON(w, 200, map[string]any{"ok": true, "track": track, "groups": groups})
+}
+
+// handleApiGetTesters GET /api/apps/{slug}/{platform}/testers
+// The hub's tester inventory: groups (pushable to Play closed tracks) and
+// individual emails (Console-only; the Play API cannot accept personal
+// addresses). Lets a helper script or CI paste the email list into Play
+// Console's tester email lists.
+func (s *Server) handleApiGetTesters(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.platformFromRequest(w, r, r.PathValue("slug")); !ok {
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"groups": s.playTesters(r.Context()),
+		"emails": s.testerEmails(r.Context()),
+		"hint":   "groups: pushable to closed tracks (POST channel=closed:<name>); emails: paste into Play Console email lists — the API cannot accept individual addresses",
+	})
 }
 
 // handleApiListTracks GET /api/apps/{slug}/{platform}/tracks

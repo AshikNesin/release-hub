@@ -291,6 +291,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 		ManifestURL, UploadURL               string
 		Shares                               []shareRow
 		BetaTesters                          string // hub-wide tester groups (display; the invite replaces the track list)
+		TesterEmails                         string // hub-wide individual tester emails (Console-side; not API-pushable)
 		PruneKeepOverride                    string // platform retention override ("" = inherit)
 		PruneKeepEffective                   string // what actually applies, for display
 		HasSigningKey                        bool
@@ -302,6 +303,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	sections := make([]platSection, 0, len(plats))
 	betaTesters := strings.Join(s.playTesters(r.Context()), ", ")
+	testerEmails := strings.Join(s.testerEmails(r.Context()), ", ")
 	for _, p := range plats {
 		releases, err := q.ListReleases(r.Context(), p.ID)
 		if err != nil {
@@ -359,6 +361,7 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			UploadURL:         s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
 			Shares:            shares,
 			BetaTesters:       betaTesters,
+			TesterEmails:      testerEmails,
 			PruneKeepOverride: override,
 			PruneKeepEffective: inheritLabel(func() *int64 {
 				if p.PruneKeep != nil {
@@ -763,12 +766,22 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		// Beta testers: Google Group addresses pushed to the Play internal
-		// track on every internal publish (and via the app page's invite
-		// button). Normalized to comma-separated on save.
+		// Beta testers: Google Group addresses pushed to Play closed testing
+		// tracks on publish/invite. Normalized comma-separated on save.
 		if posted.Has("play_testers") {
 			groups := normalizeTesterGroups(r.FormValue("play_testers"))
 			if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: "play_testers", Value: strings.Join(groups, ", ")}); err != nil {
+				http.Error(w, "save failed: "+err.Error(), 500)
+				return
+			}
+		}
+		// Individual tester emails: NOT pushable via the Play API (it only
+		// accepts Google Groups, and only on closed tracks). The hub stores
+		// them as the source of truth for Console-managed email lists —
+		// copy-paste from the app page / fetch from the API.
+		if posted.Has("play_tester_emails") {
+			emails := normalizeTesterGroups(r.FormValue("play_tester_emails"))
+			if err := q.SetConfig(r.Context(), dbgen.SetConfigParams{Key: "play_tester_emails", Value: strings.Join(emails, ", ")}); err != nil {
 				http.Error(w, "save failed: "+err.Error(), 500)
 				return
 			}
@@ -804,6 +817,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	tokens, _ := q.ListApiTokens(r.Context())
 	betaTesters, _ := q.GetConfig(r.Context(), "play_testers")
+	testerEmails, _ := q.GetConfig(r.Context(), "play_tester_emails")
 	pruneKeep, _ := q.GetConfig(r.Context(), "prune_keep")
 	type playAcctRow struct {
 		ID, Email string
@@ -827,12 +841,13 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		Fields       []field
 		BundlePrefix string
 		BetaTesters  string
+		TesterEmails string
 		PruneKeep    string
 		Tokens       []dbgen.ApiToken
 		NewToken     string
 		PlayAccounts []playAcctRow
 	}{uiData{Title: "Settings", Authenticated: true, AssetVersion: assetVersion},
-		fields, s.bundlePrefix(r.Context()), betaTesters, pruneKeep, tokens, flashFrom(r), playRows})
+		fields, s.bundlePrefix(r.Context()), betaTesters, testerEmails, pruneKeep, tokens, flashFrom(r), playRows})
 }
 
 // normalizeTesterGroups splits a comma/newline/space-separated tester list

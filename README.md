@@ -44,8 +44,15 @@ GET  /api/apps/{slug}/releases              (also /{platform}/… everywhere)
 POST /api/tokens                            form: name → token shown once
 GET  /api/apps/{slug}/manifest?channel=direct    (public)
 GET  /api/apps/{slug}/{platform}/tracks          (Play track inventory)
+GET  /api/apps/{slug}/{platform}/testers         (hub tester inventory)
 GET  /artifacts/{slug}/{platform}/{file}         (public)
 ```
+
+Testers: `GET …/testers` returns `{groups, emails}` — the hub-wide Google
+Groups (pushable to closed tracks) and individual tester emails
+(Settings → Individual tester emails). Google's API cannot push personal
+addresses or email lists at all, so the emails list is the copy-paste
+source for Play Console's tester email lists.
 
 Platform defaults to `android` when omitted from the path, so
 `/api/apps/{slug}/manifest` keeps working for android-only apps.
