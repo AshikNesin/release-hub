@@ -639,10 +639,16 @@ func (s *Server) handleApiReleases(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	releases, err := dbgen.New(s.DB).ListReleases(r.Context(), plat.ID)
+	q := dbgen.New(s.DB)
+	releases, err := q.ListReleases(r.Context(), plat.ID)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
+	}
+	// Same lazy reconciliation the app page runs — keeps the API and UI in
+	// agreement about unknown ('pending') Play outcomes.
+	if plat.PlayEnabled == 1 {
+		s.settlePlayStatus(r, plat, releases)
 	}
 	out := make([]map[string]any, 0, len(releases))
 	for _, rel := range releases {
