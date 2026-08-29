@@ -107,6 +107,16 @@ func classifyPlayError(err error) error {
 	case 404:
 		return fmt.Errorf("%s — no app with this package exists in Play yet; create it in Play Console first (the API cannot create apps)", gerr.Message)
 	default:
+		// Draft-app gate: closed/open/production releases are rejected until
+		// the app has left draft state. An internal-track release alone does
+		// NOT lift the draft status — the app must be sent for review on some
+		// track. Remedy: in Play Console, send any release for review (e.g.
+		// the existing internal one via Publishing overview, or roll a closed
+		// release as DRAFT in Console and send it) — once the app status
+		// changes from Draft, API 'completed' releases work on all tracks.
+		if strings.Contains(gerr.Message, "Only releases with status draft may be created on draft app") {
+			return fmt.Errorf("%s — the app is still in DRAFT state on Play: non-internal 'completed' releases are blocked until the app has been sent for review at least once. In Play Console: Publishing overview → send the pending internal release for review (or create the closed release as a draft there and send it). After the app leaves draft, retry this upload (bump versionCode).", gerr.Message)
+		}
 		return err
 	}
 }
