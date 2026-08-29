@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 
 	"google.golang.org/api/androidpublisher/v3"
@@ -110,23 +111,48 @@ func classifyPlayError(err error) error {
 	}
 }
 
-// trackFor maps hub channels to Play tracks.
+// trackFor maps hub channels to Play track identifiers.
+//
+// Fixed tracks: production, open testing ("beta") and internal testing
+// ("internal"; the docs also list the alias "qa"). Closed testing tracks
+// are created manually in Play Console and their names are free-form —
+// the hub addresses them as channel "closed:<name>" (e.g. closed:alpha
+// for the classic default closed track).
 func trackFor(channel string) (string, bool) {
 	switch channel {
 	case "public":
 		return "production", true
+	case "open":
+		return "beta", true
 	case "internal":
 		return "internal", true
 	case "direct":
 		return "", false // direct distribution; no Play involvement
 	}
+	// Closed testing track names are free-form (min 2 chars,
+	// letters/digits/hyphen; no spaces — form-factor names use ':' and
+	// Play's own defaults are "alpha"/"beta", so letters+hyphen+digit is the
+	// safe charset).
+	name, ok := strings.CutPrefix(channel, "closed:")
+	if ok && closedTrackNameRx.MatchString(name) {
+		return name, true
+	}
 	return "", false
 }
 
+var closedTrackNameRx = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]{1,28}$`)
+
+// trackIsClosed reports whether a hub channel targets a closed testing
+// track (closed:<name>) — the only tracks where pushing tester groups via
+// the API is accepted. The name must be non-empty and valid.
+func trackIsClosed(channel string) bool {
+	name, ok := strings.CutPrefix(channel, "closed:")
+	return ok && closedTrackNameRx.MatchString(name)
+}
+
 // Publish uploads an AAB and assigns it to the Play track for the channel.
-// For the internal track, testers (Google Group addresses) are set in the
-// same edit so a release and its tester list always land together.
-// Returns the Play release name.
+// Tester groups (Google Group addresses) can be attached in the same edit for
+// closed testing tracks. Returns the Play release name.
 func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionName, notes string, testers []string) (string, error) {
 	track, ok := trackFor(channel)
 	if !ok {
@@ -182,14 +208,15 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 	if err != nil {
 		return "", fmt.Errorf("play: set track %s: %w", track, err)
 	}
-	// Tester groups (Google Group addresses) are only pushed on CLOSED tracks
-	// (alpha/beta), where the API accepts them. Google rejects group updates
-	// on the internal track ("Cannot set tester group on an internal track")
-	// and that rejection aborts the whole release edit at commit — internal
-	// testers are managed in Play Console (email lists) instead.
+	// Tester groups (Google Group addresses) are only pushed on closed testing
+	// tracks (closed:<name>), where the API accepts them. Google rejects group
+	// updates on the internal track ("Cannot set tester group on an internal
+	// track") — and on production/open the tester list is managed in Play
+	// Console (open testing is open to everyone) — pushing groups there aborts
+	// the whole release edit at commit.
 	// Guarded on len>0: Testers.Update REPLACES the whole list, so pushing an
 	// empty one would wipe testers added directly in Play Console.
-	if track != "internal" && len(testers) > 0 {
+	if trackIsClosed(channel) && len(testers) > 0 {
 		if _, err := p.svc.Edits.Testers.
 			Update(p.pkgName, appEdit.Id, track, &androidpublisher.Testers{GoogleGroups: testers}).
 			Context(ctx).
@@ -203,10 +230,29 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 	return releaseName, nil
 }
 
+// ListTracks returns the app's existing tracks (name + releases) so the
+// UI/API can show which closed testing tracks exist. Read-only and cheap —
+// it opens and discards an edit, like Preflight.
+func (p *PlayPublisher) ListTracks(ctx context.Context) ([]*androidpublisher.Track, error) {
+	appEdit, err := p.svc.Edits.Insert(p.pkgName, &androidpublisher.AppEdit{}).Context(ctx).Do()
+	if err != nil {
+		return nil, fmt.Errorf("play: open edit: %w", classifyPlayError(err))
+	}
+	defer func() {
+		_ = p.svc.Edits.Delete(p.pkgName, appEdit.Id).Context(ctx).Do()
+	}()
+	resp, err := p.svc.Edits.Tracks.List(p.pkgName, appEdit.Id).Context(ctx).Do()
+	if err != nil {
+		return nil, fmt.Errorf("play: list tracks: %w", classifyPlayError(err))
+	}
+	return resp.Tracks, nil
+}
+
 // SetTesters replaces the tester list (Google Group addresses) on a Play
 // track without touching releases — the manual "invite testers" action.
 // The API cannot invite individual emails, only Google Groups; groups can
-// be created free at groups.google.com.
+// be created free at groups.google.com. Only closed testing tracks accept
+// group updates; the caller validates the track name.
 func (p *PlayPublisher) SetTesters(ctx context.Context, track string, groups []string) error {
 	appEdit, err := p.svc.Edits.Insert(p.pkgName, &androidpublisher.AppEdit{}).Context(ctx).Do()
 	if err != nil {

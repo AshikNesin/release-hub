@@ -247,10 +247,18 @@ type shareRow struct {
 	Label, URL string
 }
 
-// playInternalTestingURL and playStoreURL are the user-facing links for a
-// package on Google Play. internaltesting/ is the opt-in page testers use to
-// join the internal-testing track; details is the public listing.
+// playInternalTestingURL, playOpenTestingURL and playStoreURL are the
+// user-facing links for a package on Google Play. internaltesting/ is the
+// opt-in page testers use to join the internal-testing track; beta is the
+// open-testing opt-in page (Play's track id for open testing); details is
+// the public listing.
 func playInternalTestingURL(pkg string) string {
+	return "https://play.google.com/apps/testing/" + pkg
+}
+
+func playOpenTestingURL(pkg string) string {
+	// Same opt-in URL as internal — Play resolves the tester's eligible
+	// tracks (internal wins if joined; otherwise open) from the package.
 	return "https://play.google.com/apps/testing/" + pkg
 }
 
@@ -335,13 +343,14 @@ func (s *Server) handleAppDetail(w http.ResponseWriter, r *http.Request) {
 			override = strconv.FormatInt(*p.PruneKeep, 10)
 		}
 		// Share links: one stable /download URL per channel — direct always
-		// (latest APK on this hub); the two Play channels only while Play
+		// (latest APK on this hub); the Play channels only while Play
 		// publishing is enabled for the platform.
 		dl := s.baseURL + "/apps/" + app.Slug + "/download?channel="
 		shares := []shareRow{{Label: "direct", URL: dl + "direct"}}
 		if p.PlayEnabled == 1 {
 			shares = append(shares,
 				shareRow{Label: "internal", URL: dl + "internal"},
+				shareRow{Label: "open", URL: dl + "open"},
 				shareRow{Label: "public", URL: dl + "public"})
 		}
 		sections = append(sections, platSection{
@@ -563,6 +572,19 @@ func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}
+	// Groups only land on closed testing tracks; internal/open/production
+	// reject the call (internal: "Cannot set tester group on an internal
+	// track"; open/production manage testers in Play Console).
+	channel := r.FormValue("channel")
+	if channel == "" {
+		channel = "closed:alpha"
+	}
+	track, ok := trackFor(channel)
+	if !ok || !trackIsClosed(channel) {
+		setFlash("Testers can only be invited to closed testing tracks (channel=closed:<name>).")
+		http.Redirect(w, r, back, http.StatusSeeOther)
+		return
+	}
 	creds, err := s.playAccountCreds(*plat.PlayAccountID)
 	if err != nil {
 		setFlash("Play account failed: " + err.Error())
@@ -575,13 +597,13 @@ func (s *Server) handleInviteTestersUI(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}
-	if err := pub.SetTesters(r.Context(), "internal", groups); err != nil {
+	if err := pub.SetTesters(r.Context(), track, groups); err != nil {
 		setFlash("Inviting testers failed: " + err.Error())
 		http.Redirect(w, r, back, http.StatusSeeOther)
 		return
 	}
-	slog.Info("play testers updated (UI)", "app", r.PathValue("slug"), "groups", len(groups))
-	setFlash(fmt.Sprintf("Invited %d tester group(s) to the internal track.", len(groups)))
+	slog.Info("play testers updated (UI)", "app", r.PathValue("slug"), "track", track, "groups", len(groups))
+	setFlash(fmt.Sprintf("Invited %d tester group(s) to closed track %q.", len(groups), track))
 	http.Redirect(w, r, back, http.StatusSeeOther)
 }
 

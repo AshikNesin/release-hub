@@ -43,6 +43,7 @@ POST /api/apps/{slug}/{platform}/releases   same, explicit platform
 GET  /api/apps/{slug}/releases              (also /{platform}/… everywhere)
 POST /api/tokens                            form: name → token shown once
 GET  /api/apps/{slug}/manifest?channel=direct    (public)
+GET  /api/apps/{slug}/{platform}/tracks          (Play track inventory)
 GET  /artifacts/{slug}/{platform}/{file}         (public)
 ```
 
@@ -143,9 +144,18 @@ account** covers all apps; its JSON key is stored in the DB, encrypted at
 rest (AES-256-GCM, key from the `RELEASE_HUB_SECRET_KEY` env var — 32
 bytes, base64- or hex-encoded):
 
-- `channel=public`   → Play **production** track
-- `channel=internal` → Play **internal testing** track
+- `channel=public`          → Play **production** track
+- `channel=open`            → Play **open testing** track (`beta`)
+- `channel=closed:<name>`   → Play **closed testing** track by exact name
+  (create the track in Play Console first, e.g. `closed:alpha`)
+- `channel=internal`        → Play **internal testing** track
 - `channel=direct` (or any `.apk`) → hub only, Play untouched
+
+Play's API track ids: `production`, `beta` (open testing), `internal`
+(internal testing) plus any manually created closed tracks by name.
+`GET /api/apps/{slug}/{platform}/tracks` lists what exists for an app.
+Tester groups (Settings → Beta testers) attach on `closed:<name>` tracks
+only — internal uses Console email lists, open testing is open to all.
 
 **Full walkthrough** — Play Console setup, service account + JSON key,
 granting release access, enabling per app (UI **or** API), testers, and
@@ -191,6 +201,20 @@ curl -H "Authorization: Bearer $HUB_TOKEN" \
      -F file=app-release.aab -F channel=internal -F versionName=1.15 \
      https://hub.example.com/api/apps/tinyfirewall/releases
 # → {"apkUrl":…, "playRelease":"1.15 (115)"}
+
+# closed testing (track must exist in Play Console):
+curl -H "Authorization: Bearer $HUB_TOKEN" \
+     -F file=app-release.aab -F channel=closed:alpha \
+     https://hub.example.com/api/apps/tinyfirewall/releases
+
+# open testing / production:
+#   -F channel=open      /   -F channel=public
+
+# which closed track names exist?
+curl -H "Authorization: Bearer $HUB_TOKEN" \
+     https://hub.example.com/api/apps/tinyfirewall/android/tracks
+# → [{"track":"production","channel":"public","isClosed":false,…},
+#    {"track":"alpha","channel":"closed:alpha","isClosed":true,…}]
 ```
 
 Note: Play requires versionCodes to strictly increase per app, and the

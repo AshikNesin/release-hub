@@ -1,4 +1,4 @@
-# Publishing to Google Play (internal testing → production)
+# Publishing to Google Play (internal → closed → open → production)
 
 End-to-end guide for pushing releases from the hub to Google Play:
 one-time Play Console + service-account setup, enabling it per app in the
@@ -8,8 +8,16 @@ compressed form — this is the walkthrough version.
 ## How the hub talks to Play
 
 - Uploads with `channel=internal` and an `.aab` go to the Play **internal
-testing** track; `channel=public` goes to **production**; `channel=direct`
-  (or any `.apk`) never touches Play.
+  testing** track; `channel=open` goes to **open testing** (Play track id
+  `beta`); `channel=closed:<name>` goes to that **closed testing** track by
+  exact name (e.g. `closed:alpha` — create the track in Play Console first);
+  `channel=public` goes to **production**; `channel=direct` (or any `.apk`)
+  never touches Play.
+- Play track ids per the Publishing API docs: `production`, `beta` (open
+  testing), `internal` (internal testing; alias `qa`), plus closed tracks
+  with free-form names you chose at creation. `GET
+  /api/apps/{slug}/{platform}/tracks` lists the app's real tracks and the
+  hub channel value for each.
 - Publishing uses the official Publishing API (`androidpublisher` v3) with a
   service-account JSON key stored **encrypted at rest** (AES-256-GCM, key
   from `RELEASE_HUB_SECRET_KEY` — the hub's existing secret).
@@ -121,12 +129,21 @@ The legacy form (`-F file=service-account.json` posted to
 `/api/apps/{slug}/play`) still works — it creates/updates the shared
 account and enables the app on it.
 
-## One-time: testers for the internal track
+## One-time: testers
 
-Play Console → the app → **Testing → Internal testing → Testers**: create
-an email list with the testers' Gmail addresses. The **opt-in link** on
-that page is opened once by each tester; after opting in, the Play Store
-app offers install/updates like any normal app.
+- **Internal testing** — Play Console → the app → **Testing → Internal
+  testing → Testers**: create an email list with the testers' Gmail
+  addresses. The **opt-in link** on that page is opened once by each tester;
+  after opting in, the Play Store app offers install/updates like any normal
+  app. (Google's API rejects group lists here — "Cannot set tester group on
+  an internal track" — so the hub never pushes groups to internal.)
+- **Closed testing** — **Testing → Closed testing**: pick or create the
+  track (remember its exact name, e.g. `alpha`, `team`), then attach either
+  an email list or Google Group(s). Groups from the hub's Settings → Beta
+  testers can be pushed by API on `closed:<name>` tracks (app page → invite
+  testers, or `POST /api/apps/{slug}/{platform}/testers` with
+  `channel=closed:<name>`).
+- **Open testing** — no tester list; anyone with the opt-in link can join.
 
 ## Day 2: cut a release
 
@@ -146,9 +163,10 @@ a Play edit, uploads the bundle, assigns it to the track and commits. Play
 picks the `versionCode` from the bundle itself (must strictly increase per
 app; the hub enforces monotonic version codes on its side too).
 
-Promote later by uploading with `channel=public` (a separate production
-release, after the app's Console declarations — privacy policy, content
-forms — are complete).
+Promote later by re-uploading the same bundle with a higher versionCode to
+`channel=open` or `channel=public` (a separate release, after the app's
+Console declarations — privacy policy, content forms — are complete).
+Play's API has no promote call; each track gets its own upload.
 
 ## FAQ
 

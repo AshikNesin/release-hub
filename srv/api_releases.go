@@ -60,7 +60,9 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 // multipart form:
 //
 //	file        artifact (.apk/.aab/.ipa)
-//	channel     direct | internal | public   (default direct)
+//	channel     direct | internal | open | closed:<name> | public
+//	            (default direct; closed:<name> targets a Play closed
+//	            testing track by its exact name, e.g. closed:alpha)
 //	versionName human version (default derived from versionCode)
 //	versionCode integer; required for android APKs on direct (the
 //	           on-device BuildConfig.VERSION_CODE, i.e. ABI-adjusted);
@@ -82,10 +84,13 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 		channel = "direct"
 	}
 	switch channel {
-	case "public", "internal", "direct":
+	case "public", "open", "internal", "direct":
 	default:
-		writeErr(w, 400, "channel must be direct, internal or public")
-		return
+		// closed:<name> — a Play closed testing track by exact name.
+		if _, ok := trackFor(channel); !ok {
+			writeErr(w, 400, "channel must be direct, internal, open, closed:<name> or public")
+			return
+		}
 	}
 	q := dbgen.New(s.DB)
 	maxCode, err := maxVersionCode(r.Context(), q, plat.ID)
@@ -169,7 +174,7 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 
 // handleApiDeleteRelease DELETE /api/apps/{slug}/{platform}/releases/{versionCode}
 // (and POST …/releases/{versionCode}/delete — the UI form twin).
-// Direct-channel releases only: internal/public mirror what Play published.
+// Direct-channel releases only: Play channels mirror what Play published.
 func (s *Server) handleApiDeleteRelease(w http.ResponseWriter, r *http.Request) {
 	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
 	if !ok {
@@ -188,7 +193,7 @@ func (s *Server) handleApiDeleteRelease(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if rel.Channel != "direct" {
-		writeErr(w, 400, "only direct-channel releases can be deleted (internal/public are managed by Play)")
+		writeErr(w, 400, "only direct-channel releases can be deleted (Play channels are managed by Play)")
 		return
 	}
 	found, err := s.deleteRelease(r.Context(), plat, r.PathValue("slug"), versionCode)
@@ -255,8 +260,9 @@ func (s *Server) playTesters(ctx context.Context) []string {
 }
 
 // handleApiInviteTesters POST /api/apps/{slug}/{platform}/testers
-// Push the hub-wide beta-tester groups to the platform's Play internal
-// track. Requires Play publishing enabled (needs the service account).
+// Push the hub-wide beta-tester groups to a Play closed testing track
+// (?channel=closed:<name>, default closed:alpha). Requires Play publishing
+// enabled (needs the service account).
 func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) {
 	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
 	if !ok {
@@ -264,6 +270,18 @@ func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) 
 	}
 	if plat.PlayEnabled == 0 || plat.PlayAccountID == nil {
 		writeErr(w, 400, "Play publishing is not enabled for this platform")
+		return
+	}
+	// Tester groups only land on closed testing tracks — Google rejects
+	// them on internal ("Cannot set tester group on an internal track")
+	// and production/open manage testers in Play Console instead.
+	channel := r.FormValue("channel")
+	if channel == "" {
+		channel = "closed:alpha"
+	}
+	track, ok := trackFor(channel)
+	if !ok || !trackIsClosed(channel) {
+		writeErr(w, 400, "testers can only be set on closed tracks (channel=closed:<name>, e.g. closed:alpha)")
 		return
 	}
 	groups := s.playTesters(r.Context())
@@ -281,12 +299,67 @@ func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, 500, err.Error())
 		return
 	}
-	if err := pub.SetTesters(r.Context(), "internal", groups); err != nil {
+	if err := pub.SetTesters(r.Context(), track, groups); err != nil {
 		writeErr(w, 502, err.Error())
 		return
 	}
-	slog.Info("play testers updated", "app", r.PathValue("slug"), "groups", len(groups))
-	writeJSON(w, 200, map[string]any{"ok": true, "track": "internal", "groups": groups})
+	slog.Info("play testers updated", "app", r.PathValue("slug"), "track", track, "groups", len(groups))
+	writeJSON(w, 200, map[string]any{"ok": true, "track": track, "groups": groups})
+}
+
+// handleApiListTracks GET /api/apps/{slug}/{platform}/tracks
+// Read-only Play track inventory (name + current releases) — answers
+// "which closed testing track names can I use with channel=closed:<name>?"
+// without opening Play Console.
+func (s *Server) handleApiListTracks(w http.ResponseWriter, r *http.Request) {
+	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
+	if !ok {
+		return
+	}
+	if plat.PlayEnabled == 0 || plat.PlayAccountID == nil {
+		writeErr(w, 400, "Play publishing is not enabled for this platform")
+		return
+	}
+	creds, err := s.playAccountCreds(*plat.PlayAccountID)
+	if err != nil {
+		writeErr(w, 500, "play account: "+err.Error())
+		return
+	}
+	pub, err := NewPlayPublisherFromJSON(r.Context(), plat.PackageName, creds)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	tracks, err := pub.ListTracks(r.Context())
+	if err != nil {
+		writeErr(w, 502, err.Error())
+		return
+	}
+	type trackInfo struct {
+		Track    string   `json:"track"`
+		IsClosed bool     `json:"isClosed"`
+		Channel  string   `json:"channel"`  // the hub channel value to use
+		Releases []string `json:"releases"` // current releases on the track
+	}
+	out := make([]trackInfo, 0, len(tracks))
+	for _, t := range tracks {
+		info := trackInfo{Track: t.Track, Channel: "closed:" + t.Track}
+		switch t.Track {
+		case "production":
+			info.Channel, info.IsClosed = "public", false
+		case "beta":
+			info.Channel, info.IsClosed = "open", false
+		case "internal", "qa":
+			info.Channel, info.IsClosed = "internal", false
+		default:
+			info.IsClosed = true // free-form name = closed testing track
+		}
+		for _, rel := range t.Releases {
+			info.Releases = append(info.Releases, rel.Name)
+		}
+		out = append(out, info)
+	}
+	writeJSON(w, 200, out)
 }
 
 // handleApiSetPlay POST /api/apps/{slug}/play

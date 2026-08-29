@@ -54,6 +54,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/play", s.requireAPI(s.handleApiSetPlay))
 	mux.HandleFunc("POST /api/apps/{slug}/testers", s.requireAPI(s.handleApiInviteTesters))
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/testers", s.requireAPI(s.handleApiInviteTesters))
+	mux.HandleFunc("GET /api/apps/{slug}/tracks", s.requireAPI(s.handleApiListTracks))
+	mux.HandleFunc("GET /api/apps/{slug}/{platform}/tracks", s.requireAPI(s.handleApiListTracks))
 	mux.HandleFunc("GET /api/apps/{slug}/play/preflight", s.requireAPI(s.handleApiPlayPreflight))
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/play/preflight", s.requireAPI(s.handleApiPlayPreflight))
 	mux.HandleFunc("GET /api/play-accounts", s.requireAPI(s.handleApiPlayAccounts))
