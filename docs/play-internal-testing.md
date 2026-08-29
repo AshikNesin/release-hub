@@ -135,8 +135,12 @@ account and enables the app on it.
   testing → Testers**: create an email list with the testers' Gmail
   addresses. The **opt-in link** on that page is opened once by each tester;
   after opting in, the Play Store app offers install/updates like any normal
-  app. (Google's API rejects group lists here — "Cannot set tester group on
-  an internal track" — so the hub never pushes groups to internal.)
+  app. Email lists are Console-only — the API can neither create email
+  lists nor read them (`edits.testers` documents: "email lists are not
+  supported by this resource"), and it rejects group lists here too
+  ("Cannot set tester group on an internal track"), so the hub never
+  touches internal testers. (The API <i>can</i> read the number of joined
+  testers via `tracks` list, but not the list itself.)
 - **Closed testing** — **Testing → Closed testing**: pick or create the
   track (remember its exact name, e.g. `alpha`, `team`), then attach either
   an email list or Google Group(s). Groups from the hub's Settings → Beta

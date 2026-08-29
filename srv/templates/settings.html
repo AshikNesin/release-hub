@@ -21,7 +21,7 @@
       <input name="play_testers" value="{{.BetaTesters}}" placeholder="beta-testers@googlegroups.com" style="width:100%"></div>
     <button type="submit" class="btn primary">Save</button>
   </form>
-  <p class="hint">Invited to the internal-testing track of every Play-published app — automatically on each internal release, or via <i>invite testers</i> on an app's page. The Play API can only invite Google Groups (create one free at groups.google.com and add your testers' emails there); the copied <code>internal</code> link then works for every group member.</p>
+  <p class="hint">The hub pushes these to a <b>closed testing</b> track of each Play-published app (invite-testers button on the app's page; <code>channel=closed:&lt;name&gt;</code> for releases). The Play API can only invite Google Groups — <b>not email lists and not individual emails</b> (create a group free at groups.google.com and add your testers' emails as members). Internal testing has no group support at all: manage its testers as an email list in Play Console.</p>
   <p class="hint" style="color:#b45309">Re-syncing <b>replaces</b> the track's tester list: whatever is saved here becomes the entire list. Testers you invite by email directly in Play Console are not visible to the hub — clear this field and re-invite, and the Console-added testers are removed. Prefer managing testers only here (or only in Console), never both.</p>
 </section>
 
