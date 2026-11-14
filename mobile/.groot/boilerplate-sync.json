@@ -1,0 +1,8 @@
+{
+  "boilerplate": {
+    "name": "groot-mobile-app",
+    "repo": "https://github.com/AshikNesin/groot-mobile-app"
+  },
+  "last_sync": { "commit": "c279931", "date": "2026-11-14T17:27:59Z" },
+  "additional_exclusions": ["ios/**", ".github/actions/setup-ios/**", ".swiftlint.yml", "scripts/size/ios-size.sh", "scripts/release/release-internal-ios.sh", ".github/workflows/**", ".github/dependabot.yml", ".github/pull_request_template.md"]
+}
