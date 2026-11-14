@@ -68,6 +68,9 @@ func (s *Server) pruneDirectReleases(ctx context.Context, plat dbgen.AppPlatform
 		slog.Warn("prune: list releases", "error", err)
 		return 0
 	}
+	if len(rels) <= keep {
+		return 0 // nothing beyond the keep count (slicing past the end would panic)
+	}
 	pruned := 0
 	for _, rel := range rels[keep:] { // oldest first (list is DESC)
 		if _, err := s.deleteRelease(ctx, plat, slug, rel.VersionCode); err != nil {
