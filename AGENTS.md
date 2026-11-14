@@ -17,3 +17,7 @@ the binary. See README.md for structure, the UI section in particular.
   envelope. Change `srv/api_v1_handlers.go` and `web/src/lib/types.ts`
   together. The bearer API under `/api/` is what CI and devices use: keep it
   backwards compatible.
+- `mobile/` is the Android app, a groot-mobile-app child in a subdirectory. Its rules are in
+  `mobile/AGENTS.md`; run its `pnpm` commands from `mobile/`. The app reads the bearer API and the
+  public manifest: when changing those responses, update `mobile/android/app/.../data/hub/HubJson.kt`
+  (additive fields only; installed apps on old versions keep parsing the old shape).

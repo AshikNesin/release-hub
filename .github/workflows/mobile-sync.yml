@@ -1,0 +1,83 @@
+# Pulls groot-mobile-app (the boilerplate) changes into mobile/ and opens a chore/groot-mobile-sync PR,
+# twice a day. Root-level equivalent of the boilerplate's sync.yml, which can't run from mobile/.github.
+# The PR must trigger mobile.yml, which PRs opened with GITHUB_TOKEN never do: configure
+# vars.GROOT_APP_ID + secrets.GROOT_APP_PRIVATE_KEY (a GitHub App installed on this repo).
+name: Groot Mobile Sync
+
+on:
+  schedule:
+    - cron: "30 6 * * *" # 12 PM IST
+    - cron: "30 18 * * *" # 12 AM IST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: App token
+        id: app-token
+        if: ${{ vars.GROOT_APP_ID != '' }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.GROOT_APP_ID }}
+          private-key: ${{ secrets.GROOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: mobile/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: mobile/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check and apply clean changes
+        id: sync
+        run: |
+          pnpm groot:check
+          APPLICABLE=$(jq '((.autoApply // []) | length) + ((.autoMerged // []) | length) + ((.conflicts // []) | length) + ((.deleted // []) | length)' .groot/sync-report.json)
+          if [ "$APPLICABLE" -gt 0 ]; then
+            # Conflicts are recorded for `pnpm groot:resolve`, never written into the tree here.
+            pnpm groot:sync --skip-conflicts
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: PR body from the sync report
+        if: steps.sync.outputs.changes == 'true'
+        run: |
+          jq -r '
+            "## Groot Mobile sync (mobile/)\n",
+            (if (.breakingChanges // []) | length > 0 then "### ⚠ Breaking changes\n" + ((.breakingChanges | map("- " + .)) | join("\n")) + "\n" else empty end),
+            "### Auto-applied (\((.autoApply // []) | length))", ((.autoApply // [])[] | "- `mobile/" + . + "`"), "",
+            "### Merged (\((.autoMerged // []) | length))", ((.autoMerged // [])[] | "- `mobile/" + . + "`"), "",
+            "### Conflicts — run `pnpm groot:resolve` in mobile/ (\((.conflicts // []) | length))", ((.conflicts // [])[] | "- `mobile/" + (if type == "object" then .file else . end) + "`"), "",
+            "### Drift — new upstream paths, not synced (\((.drift // []) | length))", ((.drift // [])[] | "- `" + . + "`")
+          ' .groot/sync-report.json > /tmp/sync-pr-body.md
+
+      - name: Open or update the sync PR
+        if: steps.sync.outputs.changes == 'true'
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          branch: chore/groot-mobile-sync
+          title: "chore(mobile): sync from groot-mobile-app"
+          commit-message: "chore(mobile): sync from groot-mobile-app"
+          body-path: /tmp/sync-pr-body.md
+          add-paths: mobile
+          delete-branch: true
