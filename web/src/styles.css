@@ -1,0 +1,4 @@
+/* The groot shell theme (tokens, base layer), verbatim from the vendored copy.
+   Its own @import "tailwindcss" source(...) scans vendor/; add this app's src. */
+@import "../vendor/groot/shell/src/index.css";
+@source "./";

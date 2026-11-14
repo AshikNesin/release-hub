@@ -2,5 +2,8 @@
 srv/srv
 db.sqlite3*
 artifacts/
+web/node_modules
+web/dist
 *.md
+!web/vendor/**/*.md
 Makefile

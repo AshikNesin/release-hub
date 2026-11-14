@@ -1,0 +1,182 @@
+import { Badge } from "./badge";
+import { cn } from "./lib/utils";
+import {
+  Activity,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+  X,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+
+/**
+ * Red text on the red tint must still reach 4.5:1: plain --destructive measured
+ * 4.0 (light) and 4.2 (dark) at 12px. Mixing in the foreground darkens it on
+ * light surfaces and lightens it on dark ones, from tokens alone.
+ */
+const DESTRUCTIVE_TEXT = "text-[color-mix(in_oklch,var(--destructive)_65%,var(--foreground))]";
+
+/**
+ * Canonical status badge — the single source of truth for rendering a job /
+ * health status. Colors come exclusively from design tokens.
+ *
+ * If you need to show a status, use this instead of hand-rolling color maps.
+ * Built on {@link Badge} so status pills share their shape and typography with
+ * every other badge in the app.
+ */
+
+/**
+ * Every job state from `@groot/jobs/lifecycle` (created, active, completed,
+ * failed, cancelled) is a variant below, but the union is spelled out here
+ * rather than imported: `@groot/jobs` depends on `@groot/ui`, so importing
+ * `JobState` would invert the dependency direction.
+ */
+export type StatusVariant =
+  | "active"
+  | "created"
+  | "pending"
+  | "retry"
+  | "failed"
+  | "error"
+  | "completed"
+  | "success"
+  | "cancelled"
+  | "warning"
+  | "info"
+  | "expired";
+
+interface StatusConfig {
+  /** small colored dot */
+  dot: string;
+  /** label text color */
+  text: string;
+  /** pill background */
+  bg: string;
+  label: string;
+  icon?: LucideIcon;
+}
+
+const STATUS_CONFIG: Record<StatusVariant, StatusConfig> = {
+  active: {
+    dot: "bg-info",
+    text: "text-info",
+    bg: "bg-info/10",
+    label: "Active",
+    icon: Activity,
+  },
+  created: {
+    dot: "bg-muted-foreground",
+    text: "text-muted-foreground",
+    bg: "bg-muted/40",
+    label: "Created",
+    icon: Clock,
+  },
+  pending: {
+    dot: "bg-muted-foreground",
+    text: "text-muted-foreground",
+    bg: "bg-muted/40",
+    label: "Pending",
+    icon: Clock,
+  },
+  retry: {
+    dot: "bg-warning",
+    text: "text-warning",
+    bg: "bg-warning/10",
+    label: "Retry",
+    icon: RefreshCw,
+  },
+  failed: {
+    dot: "bg-destructive",
+    text: DESTRUCTIVE_TEXT,
+    bg: "bg-destructive/10",
+    label: "Failed",
+    icon: XCircle,
+  },
+  error: {
+    dot: "bg-destructive",
+    text: DESTRUCTIVE_TEXT,
+    bg: "bg-destructive/10",
+    label: "Error",
+    icon: AlertCircle,
+  },
+  completed: {
+    dot: "bg-success",
+    text: "text-success",
+    bg: "bg-success/10",
+    label: "Completed",
+    icon: CheckCircle,
+  },
+  success: {
+    dot: "bg-success",
+    text: "text-success",
+    bg: "bg-success/10",
+    label: "Success",
+    icon: CheckCircle,
+  },
+  cancelled: {
+    dot: "bg-muted-foreground",
+    text: "text-muted-foreground",
+    bg: "bg-muted/40",
+    label: "Cancelled",
+    icon: X,
+  },
+  warning: {
+    dot: "bg-warning",
+    text: "text-warning",
+    bg: "bg-warning/10",
+    label: "Warning",
+    icon: AlertCircle,
+  },
+  info: {
+    dot: "bg-info",
+    text: "text-info",
+    bg: "bg-info/10",
+    label: "Info",
+    icon: AlertCircle,
+  },
+  expired: {
+    dot: "bg-destructive",
+    text: DESTRUCTIVE_TEXT,
+    bg: "bg-destructive/10",
+    label: "Expired",
+    icon: AlertCircle,
+  },
+};
+
+interface StatusBadgeProps {
+  status: StatusVariant | string;
+  label?: string;
+  showIcon?: boolean;
+  showDot?: boolean;
+  className?: string;
+}
+
+export function StatusBadge({
+  status,
+  label,
+  showIcon = false,
+  showDot = true,
+  className,
+}: StatusBadgeProps) {
+  const config =
+    STATUS_CONFIG[(status as StatusVariant).toLowerCase() as StatusVariant] ??
+    ({
+      dot: "bg-muted-foreground",
+      text: "text-muted-foreground",
+      bg: "bg-muted/40",
+      label: status.charAt(0).toUpperCase() + status.slice(1),
+    } as StatusConfig);
+
+  const displayLabel = label ?? config.label;
+  const Icon = config.icon;
+
+  return (
+    <Badge variant="secondary" className={cn(config.bg, config.text, className)}>
+      {showDot && <span className={cn("size-1.5 rounded-full", config.dot)} />}
+      {showIcon && Icon && <Icon className="size-3" />}
+      {displayLabel}
+    </Badge>
+  );
+}
