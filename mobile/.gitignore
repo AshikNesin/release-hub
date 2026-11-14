@@ -1,0 +1,35 @@
+# SHARED (3-way merged): add your own entries at the bottom.
+
+# Node
+node_modules/
+
+# Gradle / Android
+.gradle/
+build/
+android/local.properties
+*.keystore
+*.jks
+captures/
+.kotlin/
+
+# Xcode / Swift
+ios/**/xcuserdata/
+ios/**/DerivedData/
+ios/GrootKit/.build/
+*.p12
+*.mobileprovision
+
+# Editors and OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Secrets
+.env
+.env.*
+
+# Sync tooling state written per run
+.groot/sync-report.json
+.groot/needs-review/
+ios/build/

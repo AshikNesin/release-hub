@@ -1,0 +1,68 @@
+# Publishes the Release Hub Android app to your hub's direct channel, so installed copies update
+# themselves like any other app. Bump mobile/android/version.properties first: the hub refuses a
+# versionCode it already has, and devices only update to a higher one.
+#
+# Needs: vars.RELEASE_HUB_URL (e.g. https://hub.example.com), secrets.RELEASE_HUB_TOKEN (an API token),
+# and the app registered on the hub with an android platform for io.nesin.releasehub (the hub generates
+# its signing key; this workflow fetches it).
+name: Mobile Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: App slug on the hub
+        default: release-hub
+      notes:
+        description: Release notes (shown as "What's new")
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HUB_URL: ${{ vars.RELEASE_HUB_URL }}
+      HUB_TOKEN: ${{ secrets.RELEASE_HUB_TOKEN }}
+      SLUG: ${{ inputs.slug }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./mobile/.github/actions/setup-android
+
+      - name: Fetch the signing key from the hub
+        run: |
+          set -euo pipefail
+          curl -fsS -D "$RUNNER_TEMP/h" -H "Authorization: Bearer $HUB_TOKEN" \
+            -o "$RUNNER_TEMP/release.jks" "$HUB_URL/api/apps/$SLUG/android/signing"
+          header() { grep -i "^$1:" "$RUNNER_TEMP/h" | cut -d' ' -f2- | tr -d '\r'; }
+          echo "$(header x-hub-keystore-sha256)  $RUNNER_TEMP/release.jks" | sha256sum -c
+          {
+            echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks"
+            echo "RELEASE_KEY_ALIAS=$(header x-hub-key-alias)"
+          } >> "$GITHUB_ENV"
+          echo "::add-mask::$(header x-hub-store-password)"
+          echo "::add-mask::$(header x-hub-key-password)"
+          echo "RELEASE_STORE_PASSWORD=$(header x-hub-store-password)" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=$(header x-hub-key-password)" >> "$GITHUB_ENV"
+
+      - name: Build the signed release APK
+        working-directory: mobile/android
+        run: ./gradlew :app:assembleRelease --console=plain
+
+      - name: Upload to the hub's direct channel
+        working-directory: mobile/android
+        env:
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          . ./version.properties
+          curl -fsS -H "Authorization: Bearer $HUB_TOKEN" \
+            -F "file=@app/build/outputs/apk/release/app-release.apk" \
+            -F channel=direct -F "versionCode=$VERSION_CODE" -F "versionName=$VERSION_NAME" -F "notes=$NOTES" \
+            "$HUB_URL/api/apps/$SLUG/android/releases"
+          rm -f "$RELEASE_STORE_FILE"

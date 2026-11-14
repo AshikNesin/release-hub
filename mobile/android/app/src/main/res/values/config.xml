@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App identity shown in Settings › About. `pnpm groot:setup` asks for these. -->
+    <string name="config_feedback_email" translatable="false">feedback@example.com</string>
+    <string name="config_maker_name" translatable="false">Nesin Technologies LLP</string>
+    <string name="config_maker_url" translatable="false">https://nesin.io</string>
+</resources>

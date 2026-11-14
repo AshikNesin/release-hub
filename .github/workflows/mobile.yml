@@ -1,0 +1,81 @@
+# CI for the Android app in mobile/ (a groot-mobile-app child in a subdirectory). The boilerplate's
+# own ci.yml can't run from mobile/.github, so this is its root-level equivalent: same checks, same
+# composite action (mobile/.github/actions/setup-android, synced from the boilerplate).
+name: Mobile
+
+on:
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile*.yml"
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile*.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  checks:
+    name: Repo checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: mobile/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: mobile/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:boundaries
+      - run: pnpm check:tokens
+      - run: pnpm check:doc-refs
+      - run: pnpm check:kit-edits
+      - run: pnpm test:groot
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./mobile/.github/actions/setup-android
+      - name: Lint and unit tests (JUnit, Robolectric, Compose UI, kit contract)
+        working-directory: mobile/android
+        run: ./gradlew lintDebug testDebugUnitTest assembleDebug --console=plain
+      - name: Download size budget (release AAB via bundletool)
+        run: bash scripts/size/android-size.sh
+      - name: Upload debug APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-hub-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+      - name: Upload reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-reports
+          path: |
+            mobile/android/*/build/reports/
+            mobile/android/*/build/test-results/
+            mobile/android/build/size/android-size.json
+          if-no-files-found: ignore

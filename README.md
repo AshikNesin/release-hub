@@ -4,6 +4,28 @@ Self-hosted release distribution hub for personal Android (later iOS) apps.
 Single Go binary (React UI embedded) + SQLite. Owns versioning, artifact storage, channels and the
 update-manifest API so coding environments only talk to one endpoint.
 
+## Android app
+
+`mobile/` holds **Release Hub for Android**: your own app store for this hub. Point it at the hub with an
+API token and it lists every android app, installs direct-channel APKs (checked against the manifest's
+SHA-256), and keeps installed apps (and itself) up to date in the background. Details:
+[`mobile/docs/app/README.md`](mobile/docs/app/README.md).
+
+It is a [groot-mobile-app](https://github.com/AshikNesin/groot-mobile-app) child app living in a
+subdirectory, so the kit, build logic and tooling keep syncing from the boilerplate:
+
+```bash
+cd mobile
+pnpm install
+pnpm groot:check      # what would sync from groot-mobile-app
+pnpm groot:sync       # apply it
+pnpm check            # repo checks + Android lint and unit tests
+```
+
+CI lives at the root: `.github/workflows/mobile.yml` (checks, lint, tests, size budget, debug APK),
+`mobile-sync.yml` (boilerplate sync PR twice a day) and `mobile-release.yml` (publishes the app to this
+hub's direct channel, signed with the hub's key).
+
 ## Channels
 
 - `public` — production releases (Play production track)

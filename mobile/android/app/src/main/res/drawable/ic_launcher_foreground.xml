@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release Hub's mark: an arrow into a tray, on the adaptive-icon safe zone (108dp canvas, 66dp safe area). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M50,30h8v22h-8z" />
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M38,46L70,46L54,63Z" />
+    <path
+        android:fillColor="@color/launcher_foreground"
+        android:pathData="M34,62h6v10h28v-10h6v16h-40z" />
+</vector>

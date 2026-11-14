@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"srv.exe.dev/db/dbgen"
 )
@@ -23,6 +24,10 @@ type releaseManifest struct {
 	ApkURL      string `json:"apkUrl"`
 	Sha256      string `json:"sha256"`
 	Size        int64  `json:"size"`
+	// Additive fields (older updaters ignore them): release notes for the
+	// Release Hub app's "What's new", and when the release was uploaded.
+	Notes     string `json:"notes"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // handleManifest GET /api/apps/{slug}/manifest?channel=direct
@@ -62,6 +67,8 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 		ApkURL:      dlURL,
 		Sha256:      rel.Sha256,
 		Size:        rel.SizeBytes,
+		Notes:       rel.Notes,
+		CreatedAt:   rel.CreatedAt.Format(time.RFC3339),
 	})
 }
 

@@ -1,0 +1,47 @@
+{
+  "name": "release-hub-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Release Hub for Android: install and auto-update apps from your release-hub server.",
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "tsx scripts/checks/all.ts",
+    "check:boundaries": "tsx scripts/checks/boundaries.ts",
+    "check:tokens": "tsx scripts/checks/tokens.ts",
+    "check:doc-refs": "tsx scripts/checks/doc-refs.ts",
+    "check:kit-edits": "tsx scripts/checks/kit-edits.ts",
+    "test:groot": "tsx --test .groot/tests/*.test.ts",
+    "android:test": "cd android && ./gradlew testDebugUnitTest",
+    "android:lint": "cd android && ./gradlew lintDebug",
+    "android:build": "cd android && ./gradlew assembleDebug",
+    "size:android": "bash scripts/size/android-size.sh",
+    "ios:test": "xcodebuild test -project ios/GrootMobile.xcodeproj -scheme GrootMobile -testPlan Unit -destination 'platform=iOS Simulator,name=iPhone 17' CODE_SIGNING_ALLOWED=NO && cd ios/GrootKit && xcodebuild test -scheme GrootKit -destination 'platform=iOS Simulator,name=iPhone 17'",
+    "ios:lint": "swiftlint lint --strict",
+    "size:ios": "bash scripts/size/ios-size.sh",
+    "screenshots": "cd android && ./gradlew :app:recordRoborazziDebug",
+    "groot:setup": "bash .groot/setup-boilerplate.sh",
+    "groot:check": "tsx .groot/sync.ts check",
+    "groot:sync": "tsx .groot/sync.ts apply",
+    "groot:resolve": "tsx .groot/resolve.ts",
+    "groot:upstream": "tsx .groot/upstream.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "@types/micromatch": "4.0.10",
+    "@types/node": "^24.0.0",
+    "micromatch": "^4.0.8",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

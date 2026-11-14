@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Release Hub</string>
+    <string name="navigate_up">Navigate up</string>
+    <string name="settings_title">Settings</string>
+    <string name="refresh">Refresh</string>
+
+    <!-- Apps -->
+    <string name="apps_connect_title">Your own app store</string>
+    <string name="apps_connect_body">Connect to your release-hub server to install your apps and keep them up to date.</string>
+    <string name="apps_connect_action">Connect to a hub</string>
+    <string name="apps_empty">No Android apps on this hub yet. Register one in the hub, upload an APK to the direct channel, and it shows up here.</string>
+    <string name="apps_section_updates">Updates</string>
+    <string name="apps_section_not_installed">Not installed</string>
+    <string name="apps_section_installed">Installed</string>
+    <string name="apps_section_no_release">No direct release yet</string>
+    <string name="apps_update_all">Update all</string>
+    <string name="apps_permission_title">Allow installs</string>
+    <string name="apps_permission_body">Android needs your OK before Release Hub can install apps.</string>
+    <string name="apps_permission_action">Allow</string>
+    <string name="apps_retry">Retry</string>
+    <string name="apps_this_app">This app</string>
+
+    <string name="action_install">Install</string>
+    <string name="action_update">Update</string>
+    <string name="action_open">Open</string>
+    <string name="action_uninstall">Uninstall</string>
+    <string name="action_dismiss">Dismiss</string>
+
+    <string name="status_queued">Waiting…</string>
+    <string name="status_downloading">Downloading…</string>
+    <string name="status_downloading_percent">Downloading %1$d%%</string>
+    <string name="status_installing">Installing…</string>
+    <string name="status_waiting_for_user">Confirm to install</string>
+    <string name="status_update_line">%1$s → %2$s</string>
+    <string name="status_ahead">%1$s · newer than the hub (%2$s)</string>
+    <string name="status_no_release">Nothing on the direct channel</string>
+
+    <!-- App detail -->
+    <string name="detail_section_versions">Versions</string>
+    <string name="detail_installed">Installed</string>
+    <string name="detail_not_installed">Not installed</string>
+    <string name="detail_latest">Latest on hub</string>
+    <string name="detail_none">None</string>
+    <string name="detail_size">Download size</string>
+    <string name="detail_published">Published</string>
+    <string name="detail_installed_by">Installed by</string>
+    <string name="detail_installed_by_self">Release Hub</string>
+    <string name="detail_installed_by_unknown">Unknown (adb or a file)</string>
+    <string name="detail_whats_new">What’s new</string>
+    <string name="detail_section_updates">Updates</string>
+    <string name="detail_auto_update">Auto-update this app</string>
+    <string name="detail_auto_update_summary">Install new releases in the background</string>
+    <string name="detail_auto_update_off_globally">Auto-update is off in Settings</string>
+    <string name="detail_section_history">Release history</string>
+    <string name="detail_history_empty">No direct-channel releases.</string>
+    <string name="detail_history_error">Couldn’t load the history: %1$s</string>
+    <string name="detail_history_current">Installed</string>
+    <string name="detail_history_latest">Latest</string>
+    <string name="detail_install_version">Install %1$s?</string>
+    <string name="detail_install_version_body">Android won’t install an older version over a newer one; uninstall first to go back.</string>
+    <string name="detail_missing">This app isn’t on the hub any more.</string>
+    <string name="detail_signer_hint">Updates only install when the APK is signed with the same key as the installed app. Apps installed from Play are signed by Play.</string>
+
+    <!-- Connect -->
+    <string name="connect_title">Hub</string>
+    <string name="connect_intro">Release Hub reads your apps from your release-hub server with an API token. Create one in the hub under Settings › API tokens.</string>
+    <string name="connect_url">Hub URL</string>
+    <string name="connect_url_hint">hub.example.com</string>
+    <string name="connect_token">API token</string>
+    <string name="connect_token_hint">rh_…</string>
+    <string name="connect_token_keep">Leave empty to keep the saved token</string>
+    <string name="connect_action">Connect</string>
+    <string name="connect_checking">Checking…</string>
+    <string name="connect_invalid_url">Enter the hub’s address, e.g. https://hub.example.com</string>
+    <string name="connect_missing_token">Enter an API token</string>
+    <string name="connect_cleartext">Plain http is allowed only in debug builds. Use https so the token stays private.</string>
+    <string name="connect_security_note">The token is encrypted on this device with a key that never leaves it. It can also read signing keys on the hub, so create one just for this phone and revoke it if the phone is lost.</string>
+
+    <!-- Settings -->
+    <string name="settings_section_hub">Hub</string>
+    <string name="settings_hub">Server</string>
+    <string name="settings_hub_none">Not connected</string>
+    <string name="settings_disconnect">Disconnect</string>
+    <string name="settings_disconnect_summary">Forget the token. Installed apps stay installed.</string>
+    <string name="settings_section_updates">Updates</string>
+    <string name="settings_auto_update">Auto-update apps</string>
+    <string name="settings_auto_update_summary">Download and install new releases in the background</string>
+    <string name="settings_unmetered">Wi-Fi only</string>
+    <string name="settings_unmetered_summary">Check and download only on unmetered networks</string>
+    <string name="settings_interval">Check for updates</string>
+    <plurals name="settings_interval_hours">
+        <item quantity="one">Every %1$d hour</item>
+        <item quantity="other">Every %1$d hours</item>
+    </plurals>
+    <string name="settings_interval_hour">Every hour</string>
+    <string name="settings_interval_day">Once a day</string>
+    <string name="settings_last_checked">Last checked</string>
+    <string name="settings_never">Never</string>
+    <string name="settings_section_permissions">Permissions</string>
+    <string name="settings_install_permission">Install apps</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_allowed">Allowed</string>
+    <string name="settings_not_allowed">Not allowed</string>
+    <string name="settings_silent_note">Updates install without asking only for apps Release Hub installed itself (Android 12+). Everything else asks once per update.</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_updates">Updates</string>
+    <string name="notif_channel_installs">Installs needing you</string>
+    <plurals name="notif_updates_title">
+        <item quantity="one">%1$d update available</item>
+        <item quantity="other">%1$d updates available</item>
+    </plurals>
+    <string name="notif_confirm_title">Update %1$s</string>
+    <string name="notif_confirm_text">Tap to confirm the install</string>
+    <string name="notif_installed_title">%1$s updated</string>
+    <string name="notif_installed_text">Now on %1$s</string>
+    <string name="notif_failed_title">Couldn’t update %1$s</string>
+    <string name="notif_permission_title">Release Hub can’t install updates</string>
+    <string name="notif_permission_text">Tap to allow installing apps</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_version">Version</string>
+    <string name="about_build">Build</string>
+    <string name="about_commit">Commit</string>
+    <string name="about_build_type">Build type</string>
+    <string name="about_build_type_debug">Debug</string>
+    <string name="about_build_type_release">Release</string>
+    <string name="about_footer">Built by %1$s</string>
+    <string name="about_tagline">Your own app store for your release-hub apps</string>
+    <string name="about_section_build">Build</string>
+</resources>
