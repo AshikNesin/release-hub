@@ -7,37 +7,12 @@ import "net/http"
 func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// UI (session auth; setup/login always reachable)
-	mux.HandleFunc("GET /setup", s.handleFirstRun)
-	mux.HandleFunc("POST /setup", s.handleFirstRun)
-	mux.HandleFunc("GET /login", s.handleLogin)
-	mux.HandleFunc("POST /login", s.handleLogin)
-	mux.HandleFunc("GET /logout", s.handleLogout)
-	mux.HandleFunc("GET /{$}", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/apps", http.StatusSeeOther)
-	}))
-	mux.HandleFunc("GET /apps", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
-		r = r.WithContext(withFlash(r, flash(r)))
-		s.handleAppsPage(w, r)
-	}))
-	mux.HandleFunc("POST /apps", s.requireUI(s.handleCreateAppUI))
-	mux.HandleFunc("POST /apps/{slug}/platforms", s.requireUI(s.handleAddPlatformUI))
-	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/play", s.requireUI(s.handlePlayConfigUI))
-	mux.HandleFunc("GET /apps/{slug}/platforms/{platform}/play/check", s.requireUI(s.handlePlayPreflightUI))
-	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/testers", s.requireUI(s.handleInviteTestersUI))
-	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/releases/{versionCode}/delete", s.requireUI(s.handleDeleteReleaseUI))
-	mux.HandleFunc("POST /apps/{slug}/platforms/{platform}/retention", s.requireUI(s.handleRetentionUI))
-	mux.HandleFunc("GET /settings", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
-		r = r.WithContext(withFlash(r, flash(r)))
-		s.handleSettings(w, r)
-	}))
-	mux.HandleFunc("POST /settings", s.requireUI(s.handleSettings))
-	mux.HandleFunc("POST /settings/play", s.requireUI(s.handlePlayAccountsUI))
-	mux.HandleFunc("POST /tokens", s.requireUI(s.handleCreateTokenUI))
-	mux.HandleFunc("GET /apps/{slug}", s.requireUI(func(w http.ResponseWriter, r *http.Request) {
-		r = r.WithContext(withFlash(r, flash(r)))
-		s.handleAppDetail(w, r)
-	}))
+	// UI: the React app (web/, embedded) and its JSON API (/api/v1, session
+	// auth). Every path the table does not claim falls through to the SPA.
+	s.v1Routes(mux)
+	mux.Handle("/", spaHandler(s.uiFS))
+	// Old server-rendered pages lived at /login, /setup, /apps/{slug}, /settings;
+	// those URLs are now client routes, served by the SPA fallback above.
 
 	// API (bearer auth)
 	mux.HandleFunc("GET /api/apps", s.requireAPI(s.handleApiListApps))
@@ -79,8 +54,6 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /apps/{slug}/get/{platform}", s.handleGetRelease) // legacy alias
 	mux.HandleFunc("GET /artifacts/{slug}/{platform}/{file}", s.handleArtifact)
 	mux.HandleFunc("GET /artifacts/{slug}/{file}", s.handleArtifact) // legacy path shape
-
-	mux.Handle("GET /static/", staticHandler())
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))

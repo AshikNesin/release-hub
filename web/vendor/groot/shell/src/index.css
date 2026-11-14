@@ -1,0 +1,536 @@
+/* Scan from the repo root: @tailwindcss/vite otherwise scans only Vite's root
+   (apps/web) and misses classes used in packages/*. */
+@import "tailwindcss" source("../../..");
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Warm monochrome palette: off-white and near-black surfaces with a faint warm
+ * cast, hairline borders drawn from the foreground, and an achromatic primary.
+ * Raw colour values live only in this file (pnpm check:tokens).
+ */
+:root {
+  /* Native controls (scrollbars, form widgets) follow the theme. */
+  color-scheme: light;
+
+  /* Base colors */
+  --background: oklch(0.98 0.0017 67.8);
+  --foreground: oklch(0.115 0 0);
+
+  /* Card */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.115 0 0);
+
+  /* Popover */
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.115 0 0);
+
+  /* Primary */
+  --primary: oklch(0.115 0 0);
+  --primary-foreground: oklch(0.991 0 0);
+
+  /* Secondary */
+  --secondary: oklch(0.952 0.0029 84.6);
+  --secondary-foreground: oklch(0.115 0 0);
+
+  /* Muted */
+  --muted: oklch(0.952 0.0029 84.6);
+  --muted-foreground: oklch(0.5 0 0);
+
+  /* Accent */
+  --accent: oklch(0.952 0.0029 84.6);
+  --accent-foreground: oklch(0.115 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: hsl(0 0% 98%);
+
+  /* Semantic colors (project-specific, kept for status-badge / loading-spinner) */
+  --success: hsl(142 76% 36%);
+  --success-foreground: hsl(0 0% 98%);
+
+  --warning: hsl(45 93% 47%);
+  --warning-foreground: hsl(0 0% 98%);
+
+  --info: hsl(217 91% 60%);
+  --info-foreground: hsl(0 0% 98%);
+
+  /* Border & Input */
+  --border: oklch(0.16 0.007 78.1 / 8%);
+  --input: oklch(0.922 0.0029 84.6);
+  --ring: oklch(0.115 0 0 / 30%);
+
+  /* Radius */
+  --radius: 0.75rem;
+
+  /* Charts */
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+
+  /* Sidebar */
+  --sidebar: oklch(0.965 0.0025 48.7);
+  --sidebar-foreground: oklch(0.115 0 0);
+  --sidebar-primary: oklch(0.115 0 0);
+  --sidebar-primary-foreground: oklch(0.991 0 0);
+  --sidebar-accent: oklch(0.115 0 0 / 4%);
+  --sidebar-accent-foreground: oklch(0.115 0 0);
+  --sidebar-border: oklch(0.16 0.007 78.1 / 8%);
+  --sidebar-ring: oklch(0.115 0 0 / 30%);
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Inter Variable", sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  color-scheme: dark;
+  /* Muted and secondary sit one step above the card so hover and selected
+     fills stay visible on cards, not only on the page background. */
+  --background: oklch(0.183 0.0026 67.7);
+  --foreground: oklch(0.991 0 0);
+  --card: oklch(0.24 0.004 84.6);
+  --card-foreground: oklch(0.991 0 0);
+  --popover: oklch(0.24 0.004 84.6);
+  --popover-foreground: oklch(0.991 0 0);
+  --primary: oklch(0.991 0 0);
+  --primary-foreground: oklch(0.115 0 0);
+  --secondary: oklch(0.281 0.0039 84.6);
+  --secondary-foreground: oklch(0.991 0 0);
+  --muted: oklch(0.281 0.0039 84.6);
+  --muted-foreground: oklch(0.699 0 0);
+  --accent: oklch(0.281 0.0039 84.6);
+  --accent-foreground: oklch(0.991 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(0.991 0 0 / 8%);
+  --input: oklch(0.991 0 0 / 10%);
+  --ring: oklch(0.991 0 0 / 30%);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0.0025 67.7);
+  --sidebar-foreground: oklch(0.991 0 0);
+  --sidebar-primary: oklch(0.991 0 0);
+  --sidebar-primary-foreground: oklch(0.115 0 0);
+  --sidebar-accent: oklch(0.991 0 0 / 8%);
+  --sidebar-accent-foreground: oklch(0.991 0 0);
+  --sidebar-border: oklch(0.991 0 0 / 8%);
+  --sidebar-ring: oklch(0.991 0 0 / 30%);
+}
+
+/*
+ * Fluid Functionalism tokens — read by the command menu (@groot/ui/command-menu)
+ * and its vendored helpers in packages/ui/src/fluid/. Surfaces, fills and the
+ * focus ring derive from the groot palette above so the menu stays warm
+ * monochrome; only the layered shadows carry raw values.
+ */
+:root {
+  --surface-1: var(--background);
+  --surface-2: var(--popover);
+  --surface-3: var(--popover);
+  --surface-4: var(--popover);
+  --surface-5: var(--popover);
+  --surface-6: var(--popover);
+  --surface-7: var(--popover);
+  --surface-8: var(--popover);
+  --hover: color-mix(in oklab, var(--foreground) 4%, transparent);
+  --active: color-mix(in oklab, var(--foreground) 7%, transparent);
+  --selected: var(--muted);
+  --destructive-light: color-mix(in oklab, var(--destructive) 10%, transparent);
+  --overlay: 0 0 0;
+  --tint: color-mix(in oklab, var(--foreground) 8%, transparent);
+  --tint-hover: color-mix(in oklab, var(--foreground) 6.5%, transparent);
+  --fluid-accent: var(--foreground);
+  --focus-ring: var(--ring);
+  --shadow-color: rgb(0 0 0 / 0.06);
+  --shadow-1: 0 0 0 1px var(--shadow-color);
+  --shadow-2: 0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color);
+  --shadow-3:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color);
+  --shadow-4:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color);
+  --shadow-5:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color),
+    0 12px 12px -6px var(--shadow-color);
+  --shadow-6:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color),
+    0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color);
+  --shadow-7:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color),
+    0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color),
+    0 48px 48px -24px var(--shadow-color);
+  --shadow-8:
+    0 0 0 1px var(--shadow-color), 0 1px 1px -0.5px var(--shadow-color),
+    0 3px 3px -1.5px var(--shadow-color), 0 6px 6px -3px var(--shadow-color),
+    0 12px 12px -6px var(--shadow-color), 0 24px 24px -12px var(--shadow-color),
+    0 48px 48px -24px var(--shadow-color), 0 96px 96px -48px var(--shadow-color);
+}
+
+.dark {
+  --surface-1: var(--background);
+  --surface-2: color-mix(in oklab, var(--background), var(--foreground) 3%);
+  --surface-3: var(--popover);
+  --surface-4: color-mix(in oklab, var(--popover), var(--foreground) 3%);
+  --surface-5: color-mix(in oklab, var(--popover), var(--foreground) 5%);
+  --surface-6: color-mix(in oklab, var(--popover), var(--foreground) 7%);
+  --surface-7: color-mix(in oklab, var(--popover), var(--foreground) 9%);
+  --surface-8: color-mix(in oklab, var(--popover), var(--foreground) 11%);
+  --hover: color-mix(in oklab, var(--foreground) 6%, transparent);
+  --active: color-mix(in oklab, var(--foreground) 10%, transparent);
+  --overlay: 255 255 255;
+  --tint: color-mix(in oklab, var(--foreground) 25%, transparent);
+  --tint-hover: color-mix(in oklab, var(--foreground) 20%, transparent);
+  --dm-hi-base: rgba(255, 255, 255, 0.01);
+  --dm-hi-mid: rgba(255, 255, 255, 0.02);
+  --dm-hi-high: rgba(255, 255, 255, 0.04);
+  --dm-hi-peak: rgba(255, 255, 255, 0.06);
+  --dm-ring-base: rgba(255, 255, 255, 0.02);
+  --dm-ring-mid: rgba(255, 255, 255, 0.04);
+  --dm-ring-high: rgba(255, 255, 255, 0.06);
+  --dm-drop: rgba(0, 0, 0, 0.18);
+  --shadow-1: inset 0 0 0 1px var(--dm-ring-base);
+  --shadow-2:
+    inset 0 1px 0 0 var(--dm-hi-base), inset 0 0 0 1px var(--dm-ring-base),
+    0 1px 1px -0.5px var(--dm-drop);
+  --shadow-3:
+    inset 0 1px 0 0 var(--dm-hi-mid), inset 0 0 0 1px var(--dm-ring-base),
+    0 0 0 1px rgba(0, 0, 0, 0.12), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop);
+  --shadow-4:
+    inset 0 1px 0 0 var(--dm-hi-mid), inset 0 0 0 1px var(--dm-ring-mid),
+    0 0 0 1px rgba(0, 0, 0, 0.14), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop),
+    0 6px 6px -3px var(--dm-drop);
+  --shadow-5:
+    inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-mid),
+    0 0 0 1px rgba(0, 0, 0, 0.16), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop),
+    0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop);
+  --shadow-6:
+    inset 0 1px 0 0 var(--dm-hi-high), inset 0 0 0 1px var(--dm-ring-high),
+    0 0 0 1px rgba(0, 0, 0, 0.18), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop),
+    0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop), 0 24px 24px -12px var(--dm-drop);
+  --shadow-7:
+    inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high),
+    0 0 0 1px rgba(0, 0, 0, 0.2), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop),
+    0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop),
+    0 24px 24px -12px var(--dm-drop), 0 48px 48px -24px var(--dm-drop);
+  --shadow-8:
+    inset 0 1px 0 0 var(--dm-hi-peak), inset 0 0 0 1px var(--dm-ring-high),
+    0 0 0 1px rgba(0, 0, 0, 0.22), 0 1px 1px -0.5px var(--dm-drop), 0 3px 3px -1.5px var(--dm-drop),
+    0 6px 6px -3px var(--dm-drop), 0 12px 12px -6px var(--dm-drop),
+    0 24px 24px -12px var(--dm-drop), 0 48px 48px -24px var(--dm-drop),
+    0 96px 96px -48px var(--dm-drop);
+}
+
+@theme inline {
+  --color-hover: var(--hover);
+  --color-active: var(--active);
+  --color-selected: var(--selected);
+  --color-destructive-light: var(--destructive-light);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-surface-5: var(--surface-5);
+  --color-surface-6: var(--surface-6);
+  --color-surface-7: var(--surface-7);
+  --color-surface-8: var(--surface-8);
+  --shadow-surface-1: var(--shadow-1);
+  --shadow-surface-2: var(--shadow-2);
+  --shadow-surface-3: var(--shadow-3);
+  --shadow-surface-4: var(--shadow-4);
+  --shadow-surface-5: var(--shadow-5);
+  --shadow-surface-6: var(--shadow-6);
+  --shadow-surface-7: var(--shadow-7);
+  --shadow-surface-8: var(--shadow-8);
+}
+
+/* Fluid scroll-area */
+@property --sf-start {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+@property --sf-end {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+@keyframes sf-reveal-start {
+  from {
+    --sf-start: 1;
+  }
+  to {
+    --sf-start: 0;
+  }
+}
+@keyframes sf-reveal-end {
+  from {
+    --sf-end: 0;
+  }
+  to {
+    --sf-end: 1;
+  }
+}
+.scroll-fade,
+.scroll-fade-x {
+  --scroll-fade-size: 48px;
+}
+@keyframes sf-divider-start {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sf-divider-end {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@supports (timeline-scope: --sf) {
+  .scroll-divider {
+    position: relative;
+    timeline-scope: --sf-scroller;
+    --scroll-divider-size: 48px;
+  }
+  .scroll-divider .scroll-fade {
+    scroll-timeline-name: --sf-scroller;
+  }
+  .scroll-divider::before,
+  .scroll-divider::after {
+    content: "";
+    position: absolute;
+    left: var(--scroll-divider-inset, 0px);
+    right: var(--scroll-divider-inset, 0px);
+    height: 1px;
+    background-color: var(--border);
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+  }
+  .scroll-divider::before {
+    top: 0;
+    animation: sf-divider-start both linear;
+    animation-timeline: --sf-scroller;
+    animation-range: 0 var(--scroll-divider-size);
+  }
+  .scroll-divider:first-child::before {
+    content: none;
+  }
+  .scroll-divider::after {
+    bottom: 0;
+    animation: sf-divider-end both linear;
+    animation-timeline: --sf-scroller;
+    animation-range: calc(100% - var(--scroll-divider-size)) 100%;
+  }
+  .scroll-divider:last-child::after {
+    content: none;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .scroll-fade {
+    mask-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, var(--sf-start)) 0,
+      #000 var(--scroll-fade-size),
+      #000 calc(100% - var(--scroll-fade-size)),
+      rgba(0, 0, 0, var(--sf-end)) 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, var(--sf-start)) 0,
+      #000 var(--scroll-fade-size),
+      #000 calc(100% - var(--scroll-fade-size)),
+      rgba(0, 0, 0, var(--sf-end)) 100%
+    );
+    animation:
+      sf-reveal-start both linear,
+      sf-reveal-end both linear;
+    animation-timeline: scroll(self), scroll(self);
+    animation-range-start: 0, calc(100% - var(--scroll-fade-size));
+    animation-range-end: var(--scroll-fade-size), 100%;
+  }
+  .scroll-fade-x {
+    mask-image: linear-gradient(
+      to right,
+      rgba(0, 0, 0, var(--sf-start)) 0,
+      #000 var(--scroll-fade-size),
+      #000 calc(100% - var(--scroll-fade-size)),
+      rgba(0, 0, 0, var(--sf-end)) 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      rgba(0, 0, 0, var(--sf-start)) 0,
+      #000 var(--scroll-fade-size),
+      #000 calc(100% - var(--scroll-fade-size)),
+      rgba(0, 0, 0, var(--sf-end)) 100%
+    );
+    animation:
+      sf-reveal-start both linear,
+      sf-reveal-end both linear;
+    animation-timeline: scroll(self inline), scroll(self inline);
+    animation-range-start: 0, calc(100% - var(--scroll-fade-size));
+    animation-range-end: var(--scroll-fade-size), 100%;
+  }
+}
+@media (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--overlay) / 0.08) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--overlay) / 0.08);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:vertical {
+    border-left-width: 1px;
+    border-right-width: 5px;
+  }
+  ::-webkit-scrollbar-thumb:horizontal {
+    border-top-width: 1px;
+    border-bottom-width: 5px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(var(--overlay) / 0.12);
+  }
+  ::-webkit-scrollbar-thumb:active {
+    background-color: rgb(var(--overlay) / 0.16);
+  }
+}
+/* Fluid tabs */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+/* Fluid button */
+@keyframes spinner-move {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes spinner-dash {
+  0%,
+  100% {
+    stroke-dasharray: 15 85;
+  }
+  50% {
+    stroke-dasharray: 40 60;
+  }
+}
+
+/* CodeMirror chrome follows the theme tokens; syntax colours stay
+   CodeMirror's. The wrapper class (from @uiw/react-codemirror) adds the
+   specificity needed to beat its injected light / One Dark theme. */
+:is(.cm-theme-light, .cm-theme-dark) .cm-editor {
+  background-color: transparent;
+  color: var(--foreground);
+}
+:is(.cm-theme-light, .cm-theme-dark) .cm-editor .cm-gutters {
+  background-color: transparent;
+  color: var(--muted-foreground);
+  border-right: 1px solid var(--border);
+}
+:is(.cm-theme-light, .cm-theme-dark) .cm-editor .cm-activeLine,
+:is(.cm-theme-light, .cm-theme-dark) .cm-editor .cm-activeLineGutter {
+  background-color: color-mix(in oklch, var(--foreground) 4%, transparent);
+}
+
+.cm-json-link {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* dvh, not vh: on mobile the URL bar eats into 100vh. */
+    min-height: 100dvh;
+    /* A quiet thumb on no track; inherited by every scroll container. */
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 45%, transparent) transparent;
+  }
+  html {
+    @apply font-sans;
+    /* The page's own scrollbar takes its color from the root element, not body. */
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 45%, transparent) transparent;
+  }
+}

@@ -4,3 +4,9 @@ srv/srv
 # runtime data
 db.sqlite3*
 artifacts/
+
+# web UI: dependencies and build output (dist/.gitkeep stays so go:embed
+# always has a match, even before the UI is built)
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep

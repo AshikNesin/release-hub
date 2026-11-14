@@ -98,3 +98,6 @@ require (
 )
 
 tool github.com/sqlc-dev/sqlc/cmd/sqlc
+
+// The UI's npm dependencies are not Go packages.
+ignore ./web/node_modules

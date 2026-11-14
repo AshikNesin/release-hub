@@ -1,9 +1,20 @@
+# ---- ui ----
+FROM node:22-alpine AS ui
+WORKDIR /src/web
+RUN corepack enable
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY web/ ./
+RUN pnpm build
+
 # ---- build ----
 FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+# The built UI replaces the placeholder dist/ and is embedded into the binary.
+COPY --from=ui /src/web/dist ./web/dist
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/release-hub ./cmd/srv
 
 # ---- run ----

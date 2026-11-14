@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@groot/ui": ["./vendor/groot/ui/src/index.ts"],
+      "@groot/ui/*": ["./vendor/groot/ui/src/*"],
+      "@groot/shell/*": ["./vendor/groot/shell/src/*"]
+    }
+  },
+  "include": ["src", "vendor/groot/shell/src", "vendor/groot/ui/src", "vendor/groot/ui/vendor"]
+}

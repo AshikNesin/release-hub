@@ -1,0 +1,8 @@
+# Same supply-chain hardening as groot: refuse versions published <24h ago,
+# and packages whose provenance weakens between resolutions.
+minimumReleaseAge: 1440
+trustPolicy: no-downgrade
+confirmModulesPurge: false
+
+packages:
+  - "."

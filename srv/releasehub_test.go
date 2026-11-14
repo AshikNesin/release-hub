@@ -241,46 +241,48 @@ func TestAppPageShareLinks(t *testing.T) {
 		}
 	}
 
-	// UI session cookie (page needs session auth).
-	sess := "sess_sharetest"
-	if _, err := s.DB.Exec(
-		"INSERT INTO sessions (token_hash, created_at, expires_at) VALUES (?, datetime('now'), datetime('now', '+1 day'))",
-		hashToken(sess)); err != nil {
-		t.Fatalf("seed session: %v", err)
+	// UI session cookie (the v1 API needs session auth).
+	sess := seedSession(t, s)
+	type detail struct {
+		Platforms []struct {
+			ManifestURL string `json:"manifestUrl"`
+			Shares      []struct{ Label, URL string }
+			Play        struct{ Enabled bool }
+			Signing     struct{ HasKey bool }
+		}
 	}
-	get := func(tab string) string {
-		u := ts.URL + "/apps/demo"
-		if tab != "" {
-			u += "?tab=" + tab
+	get := func() detail {
+		var d detail
+		v1Do(t, ts, sess, "GET", "/api/v1/apps/demo", nil, 200, &d)
+		if len(d.Platforms) != 1 {
+			t.Fatalf("expected 1 platform, got %d", len(d.Platforms))
 		}
-		req, _ := http.NewRequest("GET", u, nil)
-		req.AddCookie(&http.Cookie{Name: "rh_session", Value: sess})
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Fatal(err)
+		return d
+	}
+	shareURLs := func(d detail) []string {
+		var out []string
+		for _, sh := range d.Platforms[0].Shares {
+			out = append(out, sh.URL)
 		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			t.Fatalf("app page: %d", resp.StatusCode)
-		}
-		b, _ := io.ReadAll(resp.Body)
-		return string(b)
+		return out
 	}
 
-	// Play disabled: only the direct share link — visible on the
-	// distribution tab (default tab is releases, where no links render).
-	page := get("distribution")
-	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/download?channel=direct\"") {
-		t.Fatal("missing direct share link")
+	// Play disabled: only the direct share link.
+	d := get()
+	if got := shareURLs(d); len(got) != 1 || got[0] != "http://hub.test/apps/demo/download?channel=direct" {
+		t.Fatalf("share links with Play disabled = %v, want only the direct link", got)
 	}
-	if strings.Contains(page, "download?channel=\"internal\"") || strings.Contains(page, "download?channel=\"public\"") {
-		t.Fatal("Play share links must be hidden while Play publishing is disabled")
+	if d.Platforms[0].Play.Enabled {
+		t.Fatal("play must be disabled")
 	}
-	if strings.Contains(page, "invite testers") {
-		t.Fatal("invite-testers button must be hidden while Play publishing is disabled")
+	if !d.Platforms[0].Signing.HasKey {
+		t.Fatal("android platform must carry its generated signing key")
+	}
+	if d.Platforms[0].ManifestURL != "http://hub.test/api/apps/demo/android/manifest" {
+		t.Fatalf("manifest URL = %q", d.Platforms[0].ManifestURL)
 	}
 
-	// Enable Play → internal + public links appear, derived from the package.
+	// Enable Play → internal, beta and public links appear.
 	creds := []byte(`{"client_email": "sa@test.iam.gserviceaccount.com", "private_key": "x"}`)
 	body := &bytes.Buffer{}
 	mw := multipart.NewWriter(body)
@@ -299,25 +301,18 @@ func TestAppPageShareLinks(t *testing.T) {
 		t.Fatalf("set play: %d", resp.StatusCode)
 	}
 
-	page = get("distribution")
-	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/download?channel=internal\"") {
-		t.Fatal("missing internal share link")
+	d = get()
+	want := []string{
+		"http://hub.test/apps/demo/download?channel=direct",
+		"http://hub.test/apps/demo/download?channel=internal",
+		"http://hub.test/apps/demo/download?channel=beta",
+		"http://hub.test/apps/demo/download?channel=public",
 	}
-	if !strings.Contains(page, "data-copy=\"http://hub.test/apps/demo/download?channel=public\"") {
-		t.Fatal("missing public share link")
+	if got := shareURLs(d); strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("share links with Play enabled = %v, want %v", got, want)
 	}
-	if !strings.Contains(page, "invite testers") {
-		t.Fatal("missing invite-testers button with Play enabled")
-	}
-	// Configuration tab carries the manifest URL and signing-key fingerprint.
-	page = get("configuration")
-	if !strings.Contains(page, "hub.test/api/apps/demo/android/manifest") {
-		t.Fatal("missing manifest URL on configuration tab")
-	}
-	// Default tab is releases: no share links or Play rows leak onto it.
-	page = get("")
-	if strings.Contains(page, "download?channel=") || strings.Contains(page, "Enable Play publishing") {
-		t.Fatal("distribution/configuration content leaked onto the releases tab")
+	if !d.Platforms[0].Play.Enabled {
+		t.Fatal("play must be enabled")
 	}
 }
 
