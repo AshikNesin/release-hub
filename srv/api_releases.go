@@ -657,6 +657,8 @@ func (s *Server) handleApiReleases(w http.ResponseWriter, r *http.Request) {
 			"versionCode": rel.VersionCode, "versionName": rel.VersionName,
 			"channel": rel.Channel, "sha256": rel.Sha256, "size": rel.SizeBytes,
 			"url":        u,
+			"fileName":   rel.FileName,
+			"notes":      rel.Notes,
 			"createdAt":  rel.CreatedAt.Format(time.RFC3339),
 			"playStatus": rel.PlayStatus,
 		}

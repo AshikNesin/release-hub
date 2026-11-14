@@ -89,6 +89,7 @@ func TestUploadAndManifestFlow(t *testing.T) {
 	mw.WriteField("channel", "direct")
 	mw.WriteField("versionCode", "10")
 	mw.WriteField("versionName", "1.0")
+	mw.WriteField("notes", "First direct build")
 	mw.Close()
 	req, _ = http.NewRequest("POST", ts.URL+"/api/apps/demo/releases", body)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
@@ -115,12 +116,31 @@ func TestUploadAndManifestFlow(t *testing.T) {
 	if err := json.NewDecoder(resp2.Body).Decode(&m); err != nil {
 		t.Fatal(err)
 	}
-	if m.VersionCode != 10 || m.VersionName != "1.0" {
+	if m.VersionCode != 10 || m.VersionName != "1.0" || m.Notes != "First direct build" || m.CreatedAt == "" {
 		t.Fatalf("manifest content: %+v", m)
 	}
 	sum := sha256.Sum256([]byte("fake-apk-bytes"))
 	if m.Sha256 != hex.EncodeToString(sum[:]) {
 		t.Fatalf("sha mismatch in manifest: %s", m.Sha256)
+	}
+
+	// The releases list carries the file name and notes the Android app shows.
+	req, _ = http.NewRequest("GET", ts.URL+"/api/apps/demo/releases", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	respR, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rels []struct {
+		FileName string `json:"fileName"`
+		Notes    string `json:"notes"`
+	}
+	if err := json.NewDecoder(respR.Body).Decode(&rels); err != nil {
+		t.Fatal(err)
+	}
+	respR.Body.Close()
+	if len(rels) != 1 || !strings.HasSuffix(rels[0].FileName, ".apk") || rels[0].Notes != "First direct build" {
+		t.Fatalf("releases list: %+v", rels)
 	}
 
 	// unknown channel on manifest: 404, no panic
