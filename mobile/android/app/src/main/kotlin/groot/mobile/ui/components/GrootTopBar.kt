@@ -1,5 +1,6 @@
 package groot.mobile.ui.components
 
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -15,13 +16,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import groot.mobile.R
 
-/** Large collapsing title, matching the kit's settings screen. Pass [onNavigateUp] for a back button. */
+/** Large collapsing title, matching the kit's settings screen. Pass [onNavigateUp] for a back button, [actions] for icons on the right. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GrootTopBar(
     title: String,
     scrollBehavior: TopAppBarScrollBehavior,
     onNavigateUp: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     LargeTopAppBar(
         title = { Text(title, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp) },
@@ -39,6 +41,7 @@ fun GrootTopBar(
             containerColor = MaterialTheme.colorScheme.background,
             scrolledContainerColor = MaterialTheme.colorScheme.background,
         ),
+        actions = actions,
         scrollBehavior = scrollBehavior,
     )
 }

@@ -32,11 +32,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by store.themeMode.collectAsStateWithLifecycle(initialValue = initialMode)
             GrootTheme(mode = themeMode, palette = BrandPalette) {
-                AppNavHost(
-                    themeModeStore = store,
-                    appPreferences = container.appPreferences,
-                    buildInfo = { container.buildInfo },
-                )
+                AppNavHost(graph = container.graph)
             }
         }
     }

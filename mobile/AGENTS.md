@@ -58,3 +58,17 @@ Setup and prerequisites: `docs/quick-start.md`.
 ## This app
 
 <!-- Child apps: your own agent notes go below this line. Sync never conflicts with this section. -->
+
+Release Hub for Android: installs and auto-updates apps from a release-hub server. This app lives in
+`mobile/` of the release-hub repo (a groot-mobile-app child in a subdirectory): run every `pnpm` command
+from this folder, and CI from the repo root (`.github/workflows/mobile*.yml`). Product notes:
+`docs/app/README.md`.
+
+- Kit, build-logic, `.groot/`, `scripts/` and `docs/` (outside `docs/app/`) are synced from the
+  boilerplate; never edit them here. Kit fixes go upstream with `pnpm groot:upstream`.
+- The hub API is the contract: keep `data/hub/HubJson.kt` in step with the server's `srv/public.go`,
+  `srv/api_apps.go` and `srv/api_releases.go`. Only the bearer API (`/api/...`) and public endpoints
+  are for devices; never call `/api/v1` (browser session only).
+- Never send the hub token anywhere but the hub (artifact URLs may be S3/CDN) and never log it.
+- Installs go through `InstallController` only, so the queue, progress and notifications stay consistent.
+

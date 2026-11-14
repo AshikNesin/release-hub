@@ -12,8 +12,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import groot.kit.theme.GrootTheme
 import groot.kit.theme.ThemeMode
 import groot.kit.tokens.GrootSpacing
-import groot.mobile.feature.home.HOME_CONTENT_TAG
-import groot.mobile.feature.home.HomeScreen
+import groot.mobile.feature.apps.AppsScreen
+import groot.mobile.feature.apps.AppsUiState
+import groot.mobile.feature.apps.CONNECT_PROMPT_TAG
+import groot.mobile.ui.AppIconLoader
 import groot.mobile.ui.brand.BrandPalette
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -43,7 +45,7 @@ class KitContractTest {
         compose.setContent {
             GrootTheme(mode = ThemeMode.Light, palette = BrandPalette, spacing = GrootSpacing(xl = 28.dp)) { Home() }
         }
-        compose.onNodeWithTag(HOME_CONTENT_TAG).assertLeftPositionInRootIsEqualTo(28.dp)
+        compose.onNodeWithTag(CONNECT_PROMPT_TAG).assertLeftPositionInRootIsEqualTo(28.dp)
     }
 
     private fun assertBackground(mode: ThemeMode, expected: Color) {
@@ -53,5 +55,17 @@ class KitContractTest {
     }
 
     @androidx.compose.runtime.Composable
-    private fun Home() = HomeScreen(showHomeIntro = true, onOpenComponents = {}, onOpenSettings = {})
+    private fun Home() = AppsScreen(
+        state = AppsUiState(connected = false),
+        canInstall = true,
+        icons = AppIconLoader.None,
+        canOpen = { false },
+        onRefresh = {},
+        onOpenApp = {},
+        onAction = { _, _ -> },
+        onUpdateAll = {},
+        onAllowInstalls = {},
+        onConnect = {},
+        onOpenSettings = {},
+    )
 }

@@ -29,6 +29,21 @@ android {
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
     }
 
+    // Release signing comes from the environment (CI fetches the key from the hub, see
+    // .github/workflows/mobile-release.yml at the repo root). Without it, release builds stay unsigned.
+    val releaseStore = System.getenv("RELEASE_STORE_FILE")
+    if (releaseStore != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseStore)
+                storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            }
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("release")
+    }
+
     buildFeatures {
         buildConfig = true
     }
@@ -45,6 +60,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.compose.material3)
+    // Background update checks (docs/guides/android.md: WorkManager with constraints).
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.core)
 
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)

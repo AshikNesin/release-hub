@@ -10,10 +10,22 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import groot.kit.theme.GrootTheme
 import groot.kit.theme.ThemeMode
+import groot.mobile.data.InstalledApp
+import groot.mobile.data.UpdatePrefs
+import groot.mobile.data.catalog.CatalogEntry
+import groot.mobile.data.catalog.CatalogState
+import groot.mobile.data.hub.HubApp
 import groot.mobile.feature.about.AboutScreen
-import groot.mobile.feature.components.ComponentsScreen
-import groot.mobile.feature.home.HomeScreen
+import groot.mobile.feature.apps.AppsScreen
+import groot.mobile.feature.apps.AppsUiState
+import groot.mobile.feature.connect.ConnectScreen
+import groot.mobile.feature.connect.ConnectUiState
+import groot.mobile.feature.detail.AppDetailScreen
+import groot.mobile.feature.detail.AppDetailUiState
+import groot.mobile.feature.detail.HistoryState
 import groot.mobile.feature.settings.SettingsScreen
+import groot.mobile.install.InstallState
+import groot.mobile.ui.AppIconLoader
 import groot.mobile.ui.brand.BrandPalette
 import org.junit.Rule
 import org.junit.Test
@@ -22,10 +34,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Renders the reference screens to PNGs for review: `pnpm screenshots`
+ * Renders the screens to PNGs for review: `pnpm screenshots`
  * (`./gradlew :app:recordRoborazziDebug`) writes them to app/build/outputs/roborazzi.
  * Not a golden-image gate (RFC 0001 Q9); a normal test run only checks they render.
- * Settings uses a taller window so the whole screen fits in one image.
+ * Long screens use a taller window so they fit in one image.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -34,41 +46,37 @@ class ScreenshotTest {
     @get:Rule
     val compose = createComposeRule()
 
-    @Test fun homeLight() = capture("home_light", ThemeMode.Light) { Home(ThemeMode.Light) }
+    @Test fun appsLight() = capture("apps_light", ThemeMode.Light) { Apps() }
 
-    @Test fun homeDark() = capture("home_dark", ThemeMode.Dark) { Home(ThemeMode.Dark) }
+    @Test fun appsDark() = capture("apps_dark", ThemeMode.Dark) { Apps() }
+
+    @Test fun connectPromptLight() = capture("connect_prompt_light", ThemeMode.Light) { Apps(AppsUiState(connected = false)) }
 
     @Test
     @Config(qualifiers = "w412dp-h1240dp-xxhdpi")
+    fun detailLight() = capture("detail_light", ThemeMode.Light) { Detail() }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1240dp-xxhdpi")
+    fun detailDark() = capture("detail_dark", ThemeMode.Dark) { Detail() }
+
+    @Test fun connectDark() = capture("connect_dark", ThemeMode.Dark) { Connect() }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
     fun settingsLight() = capture("settings_light", ThemeMode.Light) { Settings(ThemeMode.Light) }
 
     @Test
-    @Config(qualifiers = "w412dp-h1240dp-xxhdpi")
+    @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
     fun settingsDark() = capture("settings_dark", ThemeMode.Dark) { Settings(ThemeMode.Dark) }
 
     @Test
-    fun settingsThemePickerLight() =
-        captureScreen("settings_theme_picker_light", ThemeMode.Light, before = { compose.onNodeWithText("Theme").performClick() }) {
+    fun settingsIntervalPickerLight() =
+        captureScreen("settings_interval_picker_light", ThemeMode.Light, before = { compose.onNodeWithText("Check for updates").performClick() }) {
             Settings(ThemeMode.Light)
         }
 
-    @Test
-    @Config(qualifiers = "w412dp-h1240dp-xxhdpi")
-    fun componentsLight() = capture("components_light", ThemeMode.Light) { Components() }
-
-    @Test
-    @Config(qualifiers = "w412dp-h1240dp-xxhdpi")
-    fun componentsDark() = capture("components_dark", ThemeMode.Dark) { Components() }
-
-    @Test
-    fun componentsPickerDark() =
-        captureScreen("components_picker_dark", ThemeMode.Dark, before = { compose.onNodeWithText("Route through").performClick() }) {
-            Components()
-        }
-
     @Test fun aboutLight() = capture("about_light", ThemeMode.Light) { About() }
-
-    @Test fun aboutDark() = capture("about_dark", ThemeMode.Dark) { About() }
 
     private fun capture(name: String, mode: ThemeMode, before: () -> Unit = {}, content: @Composable () -> Unit) {
         compose.setContent { GrootTheme(mode = mode, palette = BrandPalette, content = content) }
@@ -88,21 +96,64 @@ class ScreenshotTest {
     }
 
     @Composable
-    private fun Home(@Suppress("UNUSED_PARAMETER") mode: ThemeMode) = HomeScreen(
-        showHomeIntro = true,
-        onOpenComponents = {},
+    private fun Apps(state: AppsUiState = sampleApps) = AppsScreen(
+        state = state,
+        canInstall = false,
+        icons = AppIconLoader.None,
+        canOpen = { true },
+        onRefresh = {},
+        onOpenApp = {},
+        onAction = { _, _ -> },
+        onUpdateAll = {},
+        onAllowInstalls = {},
+        onConnect = {},
         onOpenSettings = {},
     )
 
     @Composable
-    private fun Components() = ComponentsScreen(onNavigateUp = {}, onOpenSettings = {})
+    private fun Detail() = AppDetailScreen(
+        state = AppDetailUiState(
+            entry = sampleEntries.first { it.slug == "tinyfirewall" },
+            prefs = UpdatePrefs(),
+            history = HistoryState(loading = false, releases = listOf(release(143), release(142), release(140))),
+        ),
+        icons = AppIconLoader.None,
+        selfPackage = SELF_PACKAGE,
+        canOpen = true,
+        onNavigateUp = {},
+        onInstall = {},
+        onInstallRelease = {},
+        onOpen = {},
+        onUninstall = {},
+        onAutoUpdateChange = {},
+        onDismissError = {},
+        onRetryHistory = {},
+    )
+
+    @Composable
+    private fun Connect() = ConnectScreen(
+        state = ConnectUiState(url = HUB_URL, hubError = "The hub rejected the API token"),
+        onUrlChange = {},
+        onTokenChange = {},
+        onConnect = {},
+        onNavigateUp = {},
+    )
 
     @Composable
     private fun Settings(mode: ThemeMode) = SettingsScreen(
         themeMode = mode,
         onThemeModeChange = {},
-        showHomeIntro = true,
-        onShowHomeIntroChange = {},
+        hubUrl = HUB_URL,
+        onOpenHub = {},
+        onDisconnect = {},
+        prefs = UpdatePrefs(lastCheckedAt = 1_794_650_000_000),
+        onAutoUpdateChange = {},
+        onUnmeteredChange = {},
+        onIntervalChange = {},
+        installAllowed = true,
+        notificationsAllowed = false,
+        onOpenInstallPermission = {},
+        onOpenNotifications = {},
         onResetData = {},
         buildInfo = fakeBuildInfo,
         onNavigateUp = {},
@@ -112,5 +163,22 @@ class ScreenshotTest {
     @Composable
     private fun About() = AboutScreen(buildInfo = fakeBuildInfo, onNavigateUp = {})
 }
+
+private fun installed(pkg: String, label: String, code: Long) = InstalledApp(pkg, label, code, "1.$code", SELF_PACKAGE)
+
+private val sampleEntries = listOf(
+    CatalogEntry(HubApp("tinyfirewall", "io.nesin.tinyfirewall"), installed("io.nesin.tinyfirewall", "Tiny Firewall", 142), manifest(143, notes = "Faster rule sync.\nFixes a crash on Android 16.")),
+    CatalogEntry(HubApp("budget", "io.nesin.budget"), installed("io.nesin.budget", "Budget", 20), manifest(21)),
+    CatalogEntry(HubApp("notes", "io.nesin.notes"), null, manifest(3)),
+    CatalogEntry(HubApp("hub", SELF_PACKAGE), installed(SELF_PACKAGE, "Release Hub", 1), manifest(1), isSelf = true),
+    CatalogEntry(HubApp("groot-demo", "io.nesin.groot"), installed("io.nesin.groot", "Groot Demo", 9), manifest(7)),
+    CatalogEntry(HubApp("prototype", "io.nesin.prototype"), null, null),
+).sortedWith(CatalogEntry.ORDER)
+
+private val sampleApps = AppsUiState(
+    connected = true,
+    catalog = CatalogState(entries = sampleEntries, loaded = true),
+    installs = mapOf("io.nesin.budget" to InstallState.Downloading(0.4f)),
+)
 
 private const val SHEET_SETTLE_MS = 1_000L

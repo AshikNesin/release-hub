@@ -15,28 +15,32 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import groot.kit.theme.S
-import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import groot.kit.buildinfo.BuildInfo
-import groot.kit.theme.ThemeModeStore
-import groot.mobile.data.AppPreferences
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import groot.mobile.feature.apps.AppsRoute
+import groot.mobile.feature.apps.AppsViewModel
+import groot.mobile.feature.connect.ConnectRoute
+import groot.mobile.feature.connect.ConnectViewModel
+import groot.mobile.feature.detail.AppDetailRoute
+import groot.mobile.feature.detail.AppDetailViewModel
 import groot.mobile.feature.about.AboutScreen
-import groot.mobile.feature.components.ComponentsScreen
-import groot.mobile.feature.home.HomeScreen
 import groot.mobile.feature.settings.SettingsRoute
 import groot.mobile.feature.settings.SettingsViewModel
 
 object Routes {
-    const val HOME = "home"
+    const val APPS = "apps"
+    const val APP = "app/{slug}"
+    const val CONNECT = "connect"
     const val SETTINGS = "settings"
     const val ABOUT = "about"
-    const val COMPONENTS = "components"
+
+    fun app(slug: String) = "app/${android.net.Uri.encode(slug)}"
 }
 
 /*
@@ -61,14 +65,12 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.popExit(): ExitTra
 
 @Composable
 fun AppNavHost(
-    themeModeStore: ThemeModeStore,
-    appPreferences: AppPreferences,
-    buildInfo: () -> BuildInfo,
+    graph: AppGraph,
     navController: NavHostController = rememberNavController(),
 ) {
     NavHost(
         navController = navController,
-        startDestination = Routes.HOME,
+        startDestination = Routes.APPS,
         enterTransition = { enter() },
         exitTransition = { exit() },
         popEnterTransition = { popEnter() },
@@ -79,37 +81,67 @@ fun AppNavHost(
         predictivePopEnterTransition = { popEnter() },
         predictivePopExitTransition = { popExit() },
     ) {
-        composable(Routes.HOME) {
+        composable(Routes.APPS) {
             ScreenContainer {
-            val showHomeIntro by appPreferences.showHomeIntro.collectAsStateWithLifecycle(initialValue = true)
-            HomeScreen(
-                showHomeIntro = showHomeIntro,
-                onOpenComponents = { navController.navigate(Routes.COMPONENTS) },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-            )
-            }
-        }
-        composable(Routes.SETTINGS) {
-            ScreenContainer {
-            val viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(themeModeStore, appPreferences))
-            SettingsRoute(
-                viewModel = viewModel,
-                buildInfo = buildInfo(),
-                onNavigateUp = navController::navigateUp,
-                onOpenAbout = { navController.navigate(Routes.ABOUT) },
-            )
-            }
-        }
-        composable(Routes.COMPONENTS) {
-            ScreenContainer {
-                ComponentsScreen(
-                    onNavigateUp = navController::navigateUp,
+                val viewModel: AppsViewModel = viewModel(
+                    factory = AppsViewModel.factory(graph.hubSettings, graph.catalog, graph.installController, graph.installTracker, graph.appScope),
+                )
+                AppsRoute(
+                    viewModel = viewModel,
+                    installedApps = graph.installedApps,
+                    icons = graph.icons,
+                    onOpenApp = { navController.navigate(Routes.app(it)) },
+                    onConnect = { navController.navigate(Routes.CONNECT) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 )
             }
         }
+        composable(Routes.APP, arguments = listOf(navArgument("slug") { type = NavType.StringType })) { entry ->
+            val slug = entry.arguments?.getString("slug").orEmpty()
+            ScreenContainer {
+                val viewModel: AppDetailViewModel = viewModel(
+                    factory = AppDetailViewModel.factory(
+                        slug, graph.hubSettings, graph.catalog, graph.installController, graph.installTracker, graph.appScope,
+                    ),
+                )
+                AppDetailRoute(
+                    viewModel = viewModel,
+                    installedApps = graph.installedApps,
+                    icons = graph.icons,
+                    selfPackage = graph.selfPackage,
+                    onNavigateUp = navController::navigateUp,
+                )
+            }
+        }
+        composable(Routes.CONNECT) {
+            ScreenContainer {
+                val viewModel: ConnectViewModel = viewModel(
+                    factory = ConnectViewModel.factory(graph.hubApi, graph.hubSettings, graph.allowCleartext),
+                )
+                ConnectRoute(
+                    viewModel = viewModel,
+                    onConnected = { navController.popBackStack(Routes.APPS, inclusive = false) },
+                    onNavigateUp = navController::navigateUp,
+                )
+            }
+        }
+        composable(Routes.SETTINGS) {
+            ScreenContainer {
+                val viewModel: SettingsViewModel = viewModel(
+                    factory = SettingsViewModel.factory(graph.themeModeStore, graph.hubSettings, graph.catalog),
+                )
+                SettingsRoute(
+                    viewModel = viewModel,
+                    buildInfo = graph.buildInfo(),
+                    canInstall = graph.installController::canInstall,
+                    onNavigateUp = navController::navigateUp,
+                    onOpenAbout = { navController.navigate(Routes.ABOUT) },
+                    onOpenHub = { navController.navigate(Routes.CONNECT) },
+                )
+            }
+        }
         composable(Routes.ABOUT) {
-            ScreenContainer { AboutScreen(buildInfo = buildInfo(), onNavigateUp = navController::navigateUp) }
+            ScreenContainer { AboutScreen(buildInfo = graph.buildInfo(), onNavigateUp = navController::navigateUp) }
         }
     }
 }
