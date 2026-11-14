@@ -721,3 +721,43 @@ func TestAppPlatforms(t *testing.T) {
 	}
 	resp.Body.Close()
 }
+
+// Regression: a keep count larger than the number of direct releases used to
+// slice past the end in pruneDirectReleases and crash the upload request
+// after the release was already stored.
+func TestRetentionKeepAboveReleaseCount(t *testing.T) {
+	s, ts := newTestServer(t)
+	tok := "rh_keeptest"
+	if _, err := s.DB.Exec("INSERT INTO api_tokens (name, token_hash) VALUES ('t', ?)", hashToken(tok)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec("INSERT INTO config (key, value) VALUES ('prune_keep', '10')"); err != nil {
+		t.Fatal(err)
+	}
+	post := func(path string, body io.Reader, ct string) *http.Response {
+		req, _ := http.NewRequest("POST", ts.URL+path, body)
+		req.Header.Set("Content-Type", ct)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+		resp.Body.Close()
+		return resp
+	}
+	form := "application/x-www-form-urlencoded"
+	post("/api/apps", strings.NewReader("slug=keep"), form)
+	post("/api/apps/keep/platforms", strings.NewReader("platform=ios&packageName=io.keep"), form)
+	for code := 1; code <= 2; code++ {
+		body := &bytes.Buffer{}
+		mw := multipart.NewWriter(body)
+		fw, _ := mw.CreateFormFile("file", "app.ipa")
+		fw.Write([]byte("ipa"))
+		mw.WriteField("channel", "direct")
+		mw.WriteField("versionCode", fmt.Sprint(code))
+		mw.Close()
+		if resp := post("/api/apps/keep/ios/releases", body, mw.FormDataContentType()); resp.StatusCode != 201 {
+			t.Fatalf("upload %d with keep=10: status %d", code, resp.StatusCode)
+		}
+	}
+}
