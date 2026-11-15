@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"srv.exe.dev/db"
 )
@@ -13,9 +14,11 @@ import (
 type Server struct {
 	DB       *sql.DB
 	Hostname string
-	baseURL  string  // public base URL for links
-	storage  Storage // local FS or S3 (see storage.go)
-	uiFS     fs.FS   // built React UI; nil = the copy embedded from web/dist
+	baseURL  string    // public base URL for links
+	storage  Storage   // local FS or S3 (see storage.go)
+	uiFS     fs.FS     // built React UI; nil = the copy embedded from web/dist
+	oidcHTTP *http.Client // outbound client for OIDC discovery/JWKS
+	oidcJWKS *jwksCache
 }
 
 // Options configures a Server at construction time (listmonk-style config
@@ -34,6 +37,8 @@ func New(opt Options) (*Server, error) {
 		baseURL:  opt.BaseURL,
 		storage:  opt.Storage,
 		uiFS:     opt.UI,
+		oidcHTTP: &http.Client{Timeout: 15 * time.Second},
+		oidcJWKS: &jwksCache{},
 	}
 	if s.storage == nil {
 		s.storage = &LocalStorage{Dir: "artifacts", BaseURL: opt.BaseURL}

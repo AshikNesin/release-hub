@@ -104,6 +104,16 @@ export interface ApiToken {
   lastUsedAt: string | null;
 }
 
+/** Keyless publishing: one OIDC identity (a GitHub repo) → one app. */
+export interface OidcGrant {
+  id: number;
+  issuer: string;
+  subject: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export interface PlayAccount {
   id: number;
   email: string;

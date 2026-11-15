@@ -2,9 +2,10 @@
 # themselves like any other app. Bump mobile/android/version.properties first: the hub refuses a
 # versionCode it already has, and devices only update to a higher one.
 #
-# Needs: vars.RELEASE_HUB_URL (e.g. https://hub.example.com), secrets.RELEASE_HUB_TOKEN (an API token),
-# and the app registered on the hub with an android platform for io.nesin.releasehub (the hub generates
-# its signing key; this workflow fetches it).
+# Keyless: the repo's GitHub Actions OIDC identity is exchanged for a 1-hour hub token scoped to
+# this app, so no HUB_TOKEN secret is stored. Needs vars.RELEASE_HUB_URL and an OIDC grant on the
+# hub (App → Configuration → Keyless publishing) for this repo's subject
+# repo:ashiknesin/release-hub:ref:refs/heads/main (workflow_dispatch runs use the default branch).
 name: Mobile Release
 
 on:
@@ -19,6 +20,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # request the repo's OIDC token for the hub exchange
 
 jobs:
   release:
@@ -26,13 +28,23 @@ jobs:
     timeout-minutes: 30
     env:
       HUB_URL: ${{ vars.RELEASE_HUB_URL }}
-      HUB_TOKEN: ${{ secrets.RELEASE_HUB_TOKEN }}
       SLUG: ${{ inputs.slug }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./mobile/.github/actions/setup-android
+
+      - name: Exchange the job's OIDC token for a hub token
+        run: |
+          set -euo pipefail
+          oidc=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            -H "Accept: application/json; api-version=2.0" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=release-hub" | jq -r .value)
+          HUB_TOKEN=$(curl -fsS -X POST "$HUB_URL/api/oidc/exchange" \
+            --data-urlencode "token=$oidc" | jq -r .token)
+          echo "::add-mask::$HUB_TOKEN"
+          echo "HUB_TOKEN=$HUB_TOKEN" >> "$GITHUB_ENV"
 
       - name: Fetch the signing key from the hub
         run: |

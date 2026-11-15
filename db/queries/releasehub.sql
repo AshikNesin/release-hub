@@ -109,3 +109,34 @@ UPDATE app_platforms SET prune_keep = ? WHERE id = ?;
 
 -- name: PlatformsForPrune :many
 SELECT ap.* FROM app_platforms ap;
+
+-- oidc grants (keyless publishing)
+
+-- name: CreateOidcGrant :execresult
+INSERT INTO oidc_grants (app_id, issuer, subject, name) VALUES (?, ?, ?, ?);
+
+-- name: ListOidcGrantsByApp :many
+SELECT og.*, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id WHERE og.app_id = ? ORDER BY og.created_at;
+
+-- name: OidcGrantByIssuerSubject :one
+SELECT og.*, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id WHERE og.issuer = ? AND og.subject = ?;
+
+-- name: TouchOidcGrant :exec
+UPDATE oidc_grants SET last_used_at = ? WHERE id = ?;
+
+-- name: DeleteOidcGrant :exec
+DELETE FROM oidc_grants WHERE id = ?;
+
+-- name: DeleteApiTokensByGrant :exec
+DELETE FROM api_tokens WHERE oidc_grant_id = ?;
+
+-- scoped api tokens (keyless publishing)
+
+-- name: CreateScopedApiToken :execresult
+INSERT INTO api_tokens (name, token_hash, scope_slug, expires_at, oidc_grant_id) VALUES (?, ?, ?, ?, ?);
+
+-- name: ApiTokenByHashWithGrant :one
+SELECT t.*, g.app_id AS grant_app_id FROM api_tokens t
+LEFT JOIN oidc_grants g ON g.id = t.oidc_grant_id
+WHERE t.token_hash = ?;
+

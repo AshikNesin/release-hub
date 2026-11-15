@@ -17,6 +17,7 @@ import { AddPlatformDialog } from "./AddPlatformDialog";
 import { ConfigurationPanel } from "./ConfigurationPanel";
 import { DeleteAppDialog } from "./DeleteAppDialog";
 import { DistributionPanel } from "./DistributionPanel";
+import { KeylessCard } from "./KeylessCard";
 import { ReleasesPanel } from "./ReleasesPanel";
 
 const TABS = [
@@ -139,6 +140,7 @@ export function AppDetailPage() {
             />
           </TabsContent>
           <TabsContent value="configuration" className="space-y-8">
+            <KeylessCard app={app} />
             <PerPlatform app={app} render={(p) => <ConfigurationPanel app={app} platform={p} />} />
           </TabsContent>
         </Tabs>

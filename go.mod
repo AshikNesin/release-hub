@@ -8,9 +8,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.36
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.43
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.107.2
+	github.com/go-jose/go-jose/v4 v4.1.4
 	golang.org/x/crypto v0.54.0
 	google.golang.org/api v0.293.0
 	modernc.org/sqlite v1.48.0
+	software.sslmate.com/src/go-pkcs12 v0.7.3
 )
 
 require (
@@ -70,7 +72,6 @@ require (
 	github.com/tetratelabs/wazero v1.9.0 // indirect
 	github.com/wasilibs/go-pgquery v0.0.0-20250409022910-10ac41983c07 // indirect
 	github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52 // indirect
-	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.67.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
@@ -94,7 +95,6 @@ require (
 	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	software.sslmate.com/src/go-pkcs12 v0.7.3 // indirect
 )
 
 tool github.com/sqlc-dev/sqlc/cmd/sqlc

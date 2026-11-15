@@ -40,6 +40,10 @@ hub's direct channel, signed with the hub's key).
   not accepted there, and cross-site writes are refused (Fetch Metadata/Origin).
 - **API**: `Authorization: Bearer rh_...` tokens, created in the UI (shown once)
   or via `POST /api/tokens`. Stored as SHA-256 hashes.
+- **Keyless (OIDC)**: GitHub Actions (or any OIDC issuer) can publish without
+  a stored secret — see [Keyless publishing](#keyless-publishing-oidc) below.
+  The minted hub token is scoped to one app's publish endpoints and lives
+  1 hour.
 - **Public, no auth** (devices need them): `GET /api/apps/{slug}/manifest`,
   `GET /artifacts/...`, `GET /health`.
 - When self-hosting outside exe.dev, run behind TLS (e.g. Caddy/nginx) — the
@@ -69,6 +73,10 @@ POST /api/apps/{slug}/releases              multipart: file, channel, versionCod
 POST /api/apps/{slug}/{platform}/releases   same, explicit platform
 GET  /api/apps/{slug}/releases              (also /{platform}/… everywhere)
 POST /api/tokens                            form: name → token shown once
+POST /api/oidc/exchange                    form: token (a CI job's OIDC identity
+                                            token, audience "release-hub")
+                                            → {token, expiresIn, app}: a hub
+                                            token scoped to one app, 1h TTL
 GET  /api/apps/{slug}/manifest?channel=direct    (public)
 GET  /api/apps/{slug}/{platform}/tracks          (Play track inventory)
 GET  /api/apps/{slug}/{platform}/testers         (hub tester inventory)
@@ -92,6 +100,50 @@ curl -H "Authorization: Bearer $HUB_TOKEN" \
      -F versionCode=142 -F versionName=1.15 \
      https://hub.example.com/api/apps/tinyfirewall/releases
 ```
+
+## Keyless publishing (OIDC)
+
+CI can publish with **no stored hub secret**. The hub trusts a GitHub repo's
+Actions identity: register a grant binding that repo to **one app** (one repo
+→ one app), and the workflow exchanges its short-lived job token for a hub
+token on every run.
+
+**Hub side** (App → Configuration → Keyless publishing): paste the repo's OIDC
+subject, e.g.
+
+```
+repo:ashiknesin/release-hub:ref:refs/heads/main
+```
+
+The subject differs per ref/event — grab it from a failed exchange's 401
+message or the workflow's OIDC debug output. The issuer is fixed to GitHub's
+(`https://token.actions.githubusercontent.com`); any other OIDC issuer works
+too if it's registered in the grant.
+
+**CI side**: request the job token with audience `release-hub` and exchange
+it:
+
+```bash
+# inside a GitHub Actions job with `permissions: id-token: write`
+oidc=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+  -H "Accept: application/json; api-version=2.0" \
+  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=release-hub" | jq -r .value)
+HUB_TOKEN=$(curl -fsS -X POST "$HUB_URL/api/oidc/exchange" \
+  --data-urlencode "token=$oidc" | jq -r .token)
+# use $HUB_TOKEN like any bearer — for one hour, on this app's publish
+# endpoints only (upload/list/delete releases, manifest, signing-key fetch)
+```
+
+What the minted token can and cannot do:
+
+- ✅ upload/list/delete releases **of the granted app**, read its manifest,
+  fetch its signing key (CI signs the build with it)
+- ❌ anything else: other apps, token creation, Play config, testers,
+  hub-wide listings — 403
+- Revoking the grant kills its outstanding minted tokens immediately; expired
+  tokens are deleted on sight.
+
+`.github/workflows/mobile-release.yml` in this repo is already wired this way.
 
 ## Storage backends
 

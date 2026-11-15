@@ -69,6 +69,11 @@ func (s *Server) v1Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/tokens", s.v1(s.handleV1ListTokens))
 	mux.HandleFunc("POST /api/v1/tokens", s.v1(s.handleApiCreateToken))
 	mux.HandleFunc("DELETE /api/v1/tokens/{id}", s.v1(s.handleV1DeleteToken))
+
+	// Keyless publishing: OIDC grants per app.
+	mux.HandleFunc("GET /api/v1/apps/{slug}/oidc/grants", s.v1(s.handleV1ListOidcGrants))
+	mux.HandleFunc("POST /api/v1/apps/{slug}/oidc/grants", s.v1(s.handleV1CreateOidcGrant))
+	mux.HandleFunc("DELETE /api/v1/oidc/grants/{id}", s.v1(s.handleV1DeleteOidcGrant))
 	mux.HandleFunc("GET /api/v1/play-accounts", s.v1(s.handleV1ListPlayAccounts))
 	mux.HandleFunc("POST /api/v1/play-accounts", s.v1(s.handleApiPlayAccounts))
 	mux.HandleFunc("DELETE /api/v1/play-accounts/{id}", s.v1(s.handleV1DeletePlayAccount))

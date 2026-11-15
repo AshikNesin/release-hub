@@ -15,6 +15,7 @@ func (s *Server) routes() *http.ServeMux {
 	// those URLs are now client routes, served by the SPA fallback above.
 
 	// API (bearer auth)
+	mux.HandleFunc("POST /api/oidc/exchange", s.handleApiOidcExchange)
 	mux.HandleFunc("GET /api/apps", s.requireAPI(s.handleApiListApps))
 	mux.HandleFunc("POST /api/apps", s.requireAPI(s.handleApiCreateApp))
 	mux.HandleFunc("DELETE /api/apps/{slug}", s.requireAPI(s.handleApiDeleteApp))

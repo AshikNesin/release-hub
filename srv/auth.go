@@ -57,6 +57,9 @@ func (s *Server) requireUI(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // requireAPI is middleware for programmatic endpoints: Bearer token → 401.
+// Handmade tokens (no scope) work everywhere as before. Tokens minted by
+// /api/oidc/exchange carry a scope slug and are only accepted on the publish
+// endpoints of that app: upload, release list/delete, signing-key fetch.
 func (s *Server) requireAPI(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
@@ -68,14 +71,57 @@ func (s *Server) requireAPI(next http.HandlerFunc) http.HandlerFunc {
 		}
 		token := strings.TrimPrefix(auth, prefix)
 		q := dbgen.New(s.DB)
-		if _, err := q.ApiTokenByHash(r.Context(), hashToken(token)); err != nil {
+		row, err := q.ApiTokenByHashWithGrant(r.Context(), hashToken(token))
+		if err != nil {
 			http.Error(w, "invalid token", http.StatusUnauthorized)
 			return
+		}
+		if row.ExpiresAt != nil && row.ExpiresAt.Before(time.Now()) {
+			_ = q.DeleteApiToken(r.Context(), row.ID)
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+		if row.OidcGrantID != nil && row.GrantAppID == nil {
+			// Grant deleted → its minted tokens die with it.
+			_ = q.DeleteApiToken(r.Context(), row.ID)
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+		if row.ScopeSlug != "" {
+			// Scoped (OIDC-minted) token: only the granted app's publish
+			// endpoints. Anything else — including other apps — is refused.
+			if !oidcScopeAllows(r, row.ScopeSlug) {
+				http.Error(w, "this token is scoped to app "+row.ScopeSlug, http.StatusForbidden)
+				return
+			}
 		}
 		now := time.Now()
 		_ = q.TouchApiToken(r.Context(), dbgen.TouchApiTokenParams{LastUsedAt: &now, TokenHash: hashToken(token)})
 		next(w, r)
 	}
+}
+
+// oidcScopeAllows reports whether request targets a publish endpoint of slug:
+// that app's releases (upload/list/delete), manifest, or signing-key fetch.
+func oidcScopeAllows(r *http.Request, slug string) bool {
+	segs := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(segs) < 3 || segs[0] != "api" || segs[1] != "apps" || segs[2] != slug {
+		return false
+	}
+	rest := segs[3:]
+	switch {
+	case len(rest) == 0:
+		return false // no publish endpoint at the bare app path
+	case rest[0] == "releases", rest[0] == "manifest":
+		return true
+	case rest[0] == "signing" && r.Method == http.MethodGet:
+		return true // CI fetches the keystore to sign the build
+	case len(rest) >= 2 && (rest[1] == "releases" || rest[1] == "manifest"):
+		return true // /{platform}/releases, /{platform}/manifest
+	case len(rest) >= 2 && rest[1] == "signing" && r.Method == http.MethodGet:
+		return true // /{platform}/signing
+	}
+	return false
 }
 
 func (s *Server) validSession(r *http.Request) bool {

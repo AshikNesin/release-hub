@@ -5,6 +5,7 @@ import type {
   AppDetail,
   AppSummary,
   HubSettings,
+  OidcGrant,
   Platform,
   PlayAccount,
   PlayTrack,
@@ -19,6 +20,7 @@ export const keys = {
   settings: ["settings"] as const,
   tokens: ["tokens"] as const,
   playAccounts: ["play-accounts"] as const,
+  oidcGrants: (slug: string) => ["apps", slug, "oidc-grants"] as const,
   tracks: (slug: string, platform: Platform) => ["apps", slug, platform, "tracks"] as const,
 };
 
@@ -72,6 +74,17 @@ export const hub = {
   createToken: (name: string) =>
     apiClient.post<{ name: string; token: string }>("/tokens", { name }),
   deleteToken: (id: number) => apiClient.delete(`/tokens/${id}`),
+  listOidcGrants: (slug: string) =>
+    apiClient.get<OidcGrant[]>(`/apps/${encodeURIComponent(slug)}/oidc/grants`),
+  createOidcGrant: (
+    slug: string,
+    v: { issuer: string; subject: string; name?: string },
+  ) =>
+    apiClient.post<OidcGrant[]>(
+      `/apps/${encodeURIComponent(slug)}/oidc/grants`,
+      v,
+    ),
+  deleteOidcGrant: (id: number) => apiClient.delete(`/oidc/grants/${id}`),
   listPlayAccounts: () => apiClient.get<PlayAccount[]>("/play-accounts"),
   addPlayAccount: (file: File) => {
     const form = new FormData();
@@ -86,5 +99,7 @@ export const useApp = (slug: string) =>
   useQuery({ queryKey: keys.app(slug), queryFn: () => hub.getApp(slug) });
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: hub.getSettings });
 export const useTokens = () => useQuery({ queryKey: keys.tokens, queryFn: hub.listTokens });
+export const useOidcGrants = (slug: string) =>
+  useQuery({ queryKey: keys.oidcGrants(slug), queryFn: () => hub.listOidcGrants(slug) });
 export const usePlayAccounts = () =>
   useQuery({ queryKey: keys.playAccounts, queryFn: hub.listPlayAccounts });
