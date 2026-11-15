@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 30
     env:
       RELEASE_HUB_URL: ${{ vars.RELEASE_HUB_URL }}
-      SLUG: ${{ inputs.slug }}
+      RELEASE_HUB_SLUG: ${{ inputs.slug }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           curl -fsS -D "$RUNNER_TEMP/h" -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
-            -o "$RUNNER_TEMP/release.jks" "$RELEASE_HUB_URL/api/apps/$SLUG/android/signing"
+            -o "$RUNNER_TEMP/release.jks" "$RELEASE_HUB_URL/api/apps/$RELEASE_HUB_SLUG/android/signing"
           header() { grep -i "^$1:" "$RUNNER_TEMP/h" | cut -d' ' -f2- | tr -d '\r'; }
           echo "$(header x-release-hub-keystore-sha256)  $RUNNER_TEMP/release.jks" | sha256sum -c
           {
@@ -84,5 +84,5 @@ jobs:
           curl -fsS -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
             -F "file=@app/build/outputs/apk/release/app-release.apk" \
             -F channel=direct -F "versionCode=$VERSION_CODE" -F "versionName=$VERSION_NAME" -F "notes=$NOTES" \
-            "$RELEASE_HUB_URL/api/apps/$SLUG/android/releases"
+            "$RELEASE_HUB_URL/api/apps/$RELEASE_HUB_SLUG/android/releases"
           rm -f "$RELEASE_STORE_FILE"
