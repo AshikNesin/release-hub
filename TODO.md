@@ -4,14 +4,14 @@ Pending items for the Android app (`mobile/`) and its setup. Tick them off as yo
 
 ## Set up the hub
 
-- [ ] Register the app on the hub: slug `release-hub`, add the android platform with package
+- [x] Register the app on the hub: slug `release-hub`, add the android platform with package
       `io.nesin.releasehub` (the hub generates its signing key).
 - [ ] Create an API token for your phone (hub UI: Settings › API tokens). One per device; revoke it if the
       phone is lost, since hub tokens can also read signing keys.
 
 ## Configure GitHub (release-hub repo)
 
-- [ ] `vars.RELEASE_HUB_URL` (e.g. `https://hub.example.com`) and an OIDC grant on the hub for
+- [x] `vars.RELEASE_HUB_URL` (e.g. `https://hub.example.com`) and an OIDC grant on the hub for
       `repo:AshikNesin@4201088/release-hub@1334919712:ref:refs/heads/main` (App `release-hub` →
       Configuration → Keyless publishing) so `.github/workflows/mobile-release.yml` can publish
       keyless. A `secrets.RELEASE_HUB_TOKEN` also still works if you prefer. Reuse "use immutable
@@ -22,7 +22,8 @@ Pending items for the Android app (`mobile/`) and its setup. Tick them off as yo
 
 ## First release and install
 
-- [ ] Bump `mobile/android/version.properties` if needed, then run **Mobile Release** (Actions tab).
+- [x] Bump `mobile/android/version.properties` if needed, then run **Mobile Release** (Actions tab).
+      First keyless release: v0.1.0 (code 1) published 2026-11-15, run 43684596184.
 - [ ] Install the first copy on your phone by hand (open `https://<hub>/apps/release-hub/download` on the
       phone, or the debug APK artifact from a `mobile.yml` run). Allow "Install unknown apps" for the
       browser once.
@@ -43,7 +44,7 @@ Pending items for the Android app (`mobile/`) and its setup. Tick them off as yo
 
 - [ ] Set a real feedback address in `mobile/android/app/src/main/res/values/config.xml`
       (`config_feedback_email`); "Send feedback" stays hidden while it's `@example.com`.
-- [ ] Confirm the first `mobile.yml` CI run is green, including the size budget (1.45 MB measured
+- [x] Confirm the first `mobile.yml` CI run is green, including the size budget (1.45 MB measured
       locally against 3 MB).
 
 ## Ideas and follow-ups
