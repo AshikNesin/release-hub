@@ -22,7 +22,7 @@ pnpm groot:sync       # apply it
 pnpm check            # repo checks + Android lint and unit tests
 ```
 
-CI lives at the root: `.github/workflows/mobile.yml` (checks, lint, tests, size budget, debug APK),
+CI lives at the root: `.github/workflows/release-hub.yml` (checks, lint, tests, size budget, debug APK),
 `mobile-sync.yml` (boilerplate sync PR twice a day) and `mobile-release.yml` (publishes the app to this
 release hub's direct channel, signed with the release hub's key).
 

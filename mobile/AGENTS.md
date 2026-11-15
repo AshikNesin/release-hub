@@ -61,7 +61,8 @@ Setup and prerequisites: `docs/quick-start.md`.
 
 Release Hub for Android: installs and auto-updates apps from a release-hub server. This app lives in
 `mobile/` of the release-hub repo (a groot-mobile-app child in a subdirectory): run every `pnpm` command
-from this folder, and CI from the repo root (`.github/workflows/mobile*.yml`). Product notes:
+from this folder, and CI from the repo root (`.github/workflows/release-hub.yml`, plus
+`mobile-release.yml` and `mobile-sync.yml`). Product notes:
 `docs/app/README.md`.
 
 - Kit, build-logic, `.groot/`, `scripts/` and `docs/` (outside `docs/app/`) are synced from the

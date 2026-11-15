@@ -18,14 +18,14 @@ Pending items for the Android app (`mobile/`) and its setup. Tick them off as yo
       subject claim" format from repo Settings → Actions → OIDC configuration if it ever changes.
 - [ ] `vars.GROOT_APP_ID` + `secrets.GROOT_APP_PRIVATE_KEY` (a GitHub App installed on this repo) so the
       sync PRs from `.github/workflows/mobile-sync.yml` trigger CI. Without it the PRs still open, but
-      `mobile.yml` won't run on them.
+      `release-hub.yml` won't run on them.
 
 ## First release and install
 
 - [x] Bump `mobile/android/version.properties` if needed, then run **Mobile Release** (Actions tab).
       First keyless release: v0.1.0 (code 1) published 2026-11-15, run 43684596184.
 - [ ] Install the first copy on your phone by hand (open `https://<release hub>/apps/release-hub/download` on the
-      phone, or the debug APK artifact from a `mobile.yml` run). Allow "Install unknown apps" for the
+      phone, or the debug APK artifact from a `release-hub.yml` run). Allow "Install unknown apps" for the
       browser once.
 - [ ] Open Release Hub, connect with the phone's token, allow notifications and "Install apps".
 
@@ -44,7 +44,7 @@ Pending items for the Android app (`mobile/`) and its setup. Tick them off as yo
 
 - [ ] Set a real feedback address in `mobile/android/app/src/main/res/values/config.xml`
       (`config_feedback_email`); "Send feedback" stays hidden while it's `@example.com`.
-- [x] Confirm the first `mobile.yml` CI run is green, including the size budget (1.45 MB measured
+- [x] Confirm the first `release-hub.yml` CI run is green, including the size budget (1.45 MB measured
       locally against 3 MB).
 
 ## Ideas and follow-ups
