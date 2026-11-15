@@ -59,7 +59,8 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 //
 // multipart form:
 //
-//	file        artifact (.apk/.aab/.ipa)
+//	file        artifact (.apk/.aab/.ipa; on the direct channel it must
+//	            be the installable package: .apk on android, .ipa on ios)
 //	channel     direct | internal | alpha | beta | public   (default direct)
 //	            internal → internal testing · alpha → closed testing
 //	            (auto-created track) · beta → open testing · public →
@@ -126,8 +127,24 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	// The direct channel serves the raw artifact to in-app updaters and the
+	// download link, so it only accepts the platform's installable package
+	// (.apk on android, .ipa on ios). An .aab or stray file on direct is a
+	// CI mistake — reject it before anything is stored.
+	name := filepath.Base(hdr.Filename)
+	if channel == "direct" {
+		ext := ".apk"
+		if plat.Platform == "ios" {
+			ext = ".ipa"
+		}
+		if !strings.HasSuffix(strings.ToLower(name), ext) {
+			writeErr(w, 400, fmt.Sprintf("direct-channel artifact must be an %s (got %s)", ext, name))
+			return
+		}
+	}
+
 	// Stream to storage while hashing; key = <slug>/<platform>/<versionCode>_<filename>
-	fileName := fmt.Sprintf("%d_%s", versionCode, filepath.Base(hdr.Filename))
+	fileName := fmt.Sprintf("%d_%s", versionCode, name)
 	key := slug + "/" + plat.Platform + "/" + fileName
 	size, sha, err := s.storage.Save(r.Context(), key, file)
 	if err != nil {

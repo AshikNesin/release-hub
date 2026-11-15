@@ -1,0 +1,13 @@
+#!/bin/sh
+# Orb setup: install a Go toolchain (needed for `make build` / `make test`).
+set -e
+if ! command -v go >/dev/null 2>&1; then
+  version="$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -1)"
+  curl -fsSL "https://go.dev/dl/${version}.linux-$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/').tar.gz" -o /tmp/go.tgz
+  rm -rf "$HOME/.local/go"
+  mkdir -p "$HOME/.local"
+  tar -C "$HOME/.local" -xzf /tmp/go.tgz
+  mkdir -p "$HOME/.local/bin"
+  ln -sf "$HOME/.local/go/bin/go" "$HOME/.local/bin/go"
+  ln -sf "$HOME/.local/go/bin/gofmt" "$HOME/.local/bin/gofmt"
+fi

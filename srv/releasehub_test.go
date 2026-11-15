@@ -232,6 +232,72 @@ func TestUploadAndManifestFlow(t *testing.T) {
 	}
 }
 
+// The direct channel only accepts the platform's installable package
+// (.apk on android, .ipa on ios); Play channels still take the .aab bundle.
+func TestDirectUploadRequiresInstallablePackage(t *testing.T) {
+	s, ts := newTestServer(t)
+	tok := "rh_directonly"
+	if _, err := s.DB.Exec("INSERT INTO api_tokens (name, token_hash) VALUES ('t', ?)", hashToken(tok)); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []struct{ path, body string }{
+		{"/api/apps", "slug=directonly"},
+		{"/api/apps/directonly/platforms", "platform=android&packageName=io.directonly"},
+		{"/api/apps/directonly/platforms", "platform=ios&packageName=io.directonly.ios"},
+	} {
+		req, _ := http.NewRequest("POST", ts.URL+f.path, strings.NewReader(f.body))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 201 {
+			t.Fatalf("%s: %d", f.path, resp.StatusCode)
+		}
+	}
+	upload := func(path, file, channel string) int {
+		body := &bytes.Buffer{}
+		mw := multipart.NewWriter(body)
+		fw, _ := mw.CreateFormFile("file", file)
+		fw.Write([]byte("bytes"))
+		if channel != "" {
+			mw.WriteField("channel", channel)
+		}
+		mw.Close()
+		req, _ := http.NewRequest("POST", ts.URL+path, body)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	// android direct: .aab and stray files are CI mistakes; .apk passes
+	// (case-insensitively). The rejected upload must not bump versionCode:
+	// the next .apk can reuse 1.
+	if got := upload("/api/apps/directonly/android/releases", "app-release.aab", "direct"); got != 400 {
+		t.Fatalf("direct .aab: expected 400, got %d", got)
+	}
+	if got := upload("/api/apps/directonly/android/releases", "notes.txt", ""); got != 400 { // channel defaults to direct
+		t.Fatalf("direct .txt: expected 400, got %d", got)
+	}
+	if got := upload("/api/apps/directonly/android/releases", "APP.APK", "direct"); got != 201 {
+		t.Fatalf("direct .APK: expected 201, got %d", got)
+	}
+	// Play channels keep taking the bundle.
+	if got := upload("/api/apps/directonly/android/releases", "app-release.aab", "internal"); got != 201 {
+		t.Fatalf("internal .aab: expected 201, got %d", got)
+	}
+	// ios direct: the installable package is the .ipa.
+	if got := upload("/api/apps/directonly/ios/releases", "App.ipa", "direct"); got != 201 {
+		t.Fatalf("ios direct .ipa: expected 201, got %d", got)
+	}
+}
+
 // App page share row: direct always (stable /get link); internal/public
 // (Play links) only while Play publishing is enabled for the platform.
 func TestAppPageShareLinks(t *testing.T) {
