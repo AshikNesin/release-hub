@@ -99,13 +99,15 @@ func (s *Server) handleV1ListOidcGrants(w http.ResponseWriter, r *http.Request) 
 
 // handleV1CreateOidcGrant POST /api/v1/apps/{slug}/oidc/grants
 // {issuer, subject, name?} — one grant per identity; one repo → one app.
+// A subject pasted without its ref part (GitHub's OIDC settings show just
+// `repo:owner@ID/name@ID`) is completed to the default-branch ref.
 func (s *Server) handleV1CreateOidcGrant(w http.ResponseWriter, r *http.Request) {
 	app, ok := s.appFromSlug(w, r, r.PathValue("slug"))
 	if !ok {
 		return
 	}
 	issuer := strings.TrimSpace(r.FormValue("issuer"))
-	subject := strings.TrimSpace(r.FormValue("subject"))
+	subject := normalizeSubject(strings.TrimSpace(r.FormValue("subject")))
 	name := strings.TrimSpace(r.FormValue("name"))
 	if issuer == "" || subject == "" {
 		writeErr(w, 400, "issuer and subject are required")

@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -262,6 +263,49 @@ func TestOidcGrantRevocationKillsTokens(t *testing.T) {
 	v1Do(t, ts, sess, "DELETE", "/api/v1/oidc/grants/"+itoa(grants[0].ID), nil, 200, nil)
 	if c := oidcUpload(t, ts, releaseHubTok, "app-one"); c != 401 {
 		t.Fatalf("upload after grant revoke: %d, want 401", c)
+	}
+}
+
+func TestOidcGrantSubjectAutoCompletesRef(t *testing.T) {
+	fi := newFakeIssuer(t)
+	s, ts := newTestServer(t)
+	sess := seedSession(t, s)
+	v1Do(t, ts, sess, "POST", "/api/v1/apps", map[string]string{"slug": "app-one"}, 201, nil)
+
+	cases := []struct{ paste, stored string }{
+		// GitHub's OIDC settings page shows the repo part without the ref.
+		{"repo:AshikNesin@4201088/example-repo@1456627934", "repo:AshikNesin@4201088/example-repo@1456627934:ref:refs/heads/main"},
+		{"repo:acme/legacy-repo", "repo:acme/legacy-repo:ref:refs/heads/main"},
+		// Already-complete subjects must not gain a second ref.
+		{"repo:acme/app-one:ref:refs/heads/main", "repo:acme/app-one:ref:refs/heads/main"},
+		{"repo:acme/app-one:environment:production", "repo:acme/app-one:environment:production"},
+	}
+	for i, c := range cases {
+		v1Do(t, ts, sess, "POST", "/api/v1/apps/app-one/oidc/grants", map[string]string{
+			"issuer": fi.issuer, "subject": c.paste,
+		}, 200, nil)
+		var rows []struct {
+			Subject string `json:"subject"`
+		}
+		v1Do(t, ts, sess, "GET", "/api/v1/apps/app-one/oidc/grants", nil, 200, &rows)
+		var have []string
+		for _, g := range rows {
+			have = append(have, g.Subject)
+		}
+		// created_at ties make the list order unstable; match by membership.
+		if len(rows) != i+1 || !slices.Contains(have, c.stored) {
+			t.Fatalf("case %d: stored subjects = %v, want %q among them", i, have, c.stored)
+		}
+		if c.paste != c.stored && slices.Contains(have, c.paste) {
+			t.Fatalf("case %d: pasted subject stored verbatim: %v", i, have)
+		}
+	}
+
+	// The completed grant matches a token minted on the default branch.
+	sub := "repo:AshikNesin@4201088/example-repo@1456627934:ref:refs/heads/main"
+	code, tok := exchange(t, ts, fi.token(t, fi.issuer, sub, oidcAudience, time.Now().Add(10*time.Minute)))
+	if code != 200 || tok == "" {
+		t.Fatalf("exchange with auto-completed subject: code=%d", code)
 	}
 }
 

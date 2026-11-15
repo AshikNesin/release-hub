@@ -109,8 +109,9 @@ Actions identity: register a grant binding that repo to **one app** (one repo
 token on every run.
 
 **Release Hub side** (App → Configuration → Keyless publishing): paste the repo's OIDC
-subject. For a run on the default branch it ends in `:ref:refs/heads/main`;
-the prefix depends on the repo's age:
+subject — a bare repo prefix is completed to the default-branch ref automatically
+(`repo:owner/name` or `repo:owner@OWNER-ID/name@REPO-ID` becomes
+`…:ref:refs/heads/main`). The prefix depends on the repo's age:
 
 - repos created before 2026-07-15: `repo:owner/name:ref:refs/heads/main`
 - newer repos use **immutable subject claims** (see the repo's

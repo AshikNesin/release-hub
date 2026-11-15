@@ -36,6 +36,19 @@ const oidcLeeway = 2 * time.Minute
 // with RS256. Restricting prevents algorithm confusion.
 var oidcSigAlgs = []jose.SignatureAlgorithm{jose.RS256, jose.ES256}
 
+// normalizeSubject completes a GitHub-style subject pasted without its ref
+// part: GitHub's OIDC settings page shows `repo:owner@ID/name@ID`, but the
+// token's subject also carries the ref (…:ref:refs/heads/main for a push to
+// the default branch). A bare `repo:` prefix gains that suffix; anything
+// already ref-like (":ref:", ":environment:", ":pull_request") is kept as-is.
+func normalizeSubject(subject string) string {
+	if !strings.HasPrefix(subject, "repo:") || strings.Contains(subject, ":ref:") ||
+		strings.Contains(subject, ":environment:") || strings.Contains(subject, ":pull_request") {
+		return subject
+	}
+	return subject + ":ref:refs/heads/main"
+}
+
 // discoverConfig fetches the issuer's OIDC discovery document and returns its
 // jwks_uri. Only called for issuers that have a registered grant.
 func discoverConfig(ctx context.Context, client *http.Client, issuer string) (string, error) {

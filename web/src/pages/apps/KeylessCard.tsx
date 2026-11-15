@@ -22,6 +22,23 @@ import type { AppDetail } from "@/lib/types";
 
 const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
 
+/** Default-branch ref suffix appended to a subject pasted without one. */
+const REF_SUFFIX = ":ref:refs/heads/main";
+
+/**
+ * GitHub's OIDC settings page shows just the repo part (`repo:owner@ID/name@ID`,
+ * or `repo:owner/name` on older repos), but the token's subject also carries the
+ * ref. Complete a bare prefix to the default branch; subjects that already name
+ * a ref, environment or pull request are kept verbatim.
+ */
+function completeSubject(subject: string): string {
+  const s = subject.trim();
+  if (!s.startsWith("repo:") || [":ref:", ":environment:", ":pull_request"].some((p) => s.includes(p))) {
+    return s;
+  }
+  return s + REF_SUFFIX;
+}
+
 /** The workflow snippet CI copies. Audience is fixed; subject comes from the grant. */
 function workflowSnippet(slug: string, releaseHubUrl: string): string {
   return `# .github/workflows/release.yml: keyless publish to ${slug}
@@ -171,16 +188,17 @@ export function KeylessCard({ app }: { app: AppDetail }) {
           className="flex flex-wrap items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (subject.trim()) void create.run({ subject: subject.trim(), name: name.trim() });
+            if (subject.trim()) void create.run({ subject: completeSubject(subject), name: name.trim() });
           }}
         >
           <div className="min-w-64 flex-1 space-y-2">
             <Label htmlFor="oidc-subject">Repository OIDC subject</Label>
             <Input
               id="oidc-subject"
-              placeholder="repo:owner/name:ref:refs/heads/main"
+              placeholder="repo:owner/name or repo:owner@ID/name@ID"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
+              onBlur={() => setSubject((s) => completeSubject(s))}
               className="font-mono"
               autoComplete="off"
               spellCheck={false}
@@ -202,9 +220,10 @@ export function KeylessCard({ app }: { app: AppDetail }) {
           </Button>
         </form>
         <Text variant="meta" className="block">
-          Find the exact subject under the workflow's{" "}
-          <code className={monoClass}>Actions OIDC issuer</code>; it differs per ref and event. The
-          issuer is fixed to <code className={monoClass}>{GITHUB_ISSUER}</code>.
+          Paste the subject from the repo's Settings → Actions → OIDC page —{" "}
+          <code className={monoClass}>repo:owner@ID/name@ID</code> is completed to the default-branch
+          ref (<code className={monoClass}>{REF_SUFFIX}</code>) automatically. The issuer is fixed
+          to <code className={monoClass}>{GITHUB_ISSUER}</code>.
         </Text>
 
         {grants?.length ? (
@@ -224,8 +243,8 @@ export function KeylessCard({ app }: { app: AppDetail }) {
   );
 }
 
-/** "repo:owner/name:…" → "owner/name" for display. */
+/** "repo:owner@ID/name@ID:…" → "owner/name" for display (IDs stripped). */
 function subjectRepo(subject: string): string {
-  const m = /^repo:([^:]+):/.exec(subject);
-  return m ? m[1] : subject;
+  const m = /^repo:([^:]+)/.exec(subject);
+  return m ? m[1].replace(/@\d+/g, "") : subject;
 }
