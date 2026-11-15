@@ -143,8 +143,10 @@ func (s *Server) handleApiUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Stream to storage while hashing; key = <slug>/<platform>/<versionCode>_<filename>
-	fileName := fmt.Sprintf("%d_%s", versionCode, name)
+	// Stream to storage while hashing; key = <slug>/<platform>/<slug>-v<versionCode>.<ext>.
+	// The stored name is canonical (slug + version) rather than the uploaded
+	// file name, so download URLs stay clean no matter what CI named the file.
+	fileName := fmt.Sprintf("%s-v%d%s", slug, versionCode, strings.ToLower(filepath.Ext(name)))
 	key := slug + "/" + plat.Platform + "/" + fileName
 	size, sha, err := s.storage.Save(r.Context(), key, file)
 	if err != nil {

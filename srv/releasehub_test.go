@@ -168,7 +168,7 @@ func TestUploadAndManifestFlow(t *testing.T) {
 		if respG.StatusCode != 302 {
 			t.Fatalf("expected 302 from %s, got %d", path, respG.StatusCode)
 		}
-		if loc := respG.Header.Get("Location"); !strings.Contains(loc, "/artifacts/demo/android/10_demo.apk") {
+		if loc := respG.Header.Get("Location"); !strings.Contains(loc, "/artifacts/demo/android/demo-v10.apk") {
 			t.Fatalf("unexpected redirect target from %s: %s", path, loc)
 		}
 	}
@@ -354,7 +354,7 @@ func TestDeleteApp(t *testing.T) {
 	if signLeft != 1 { // only keepme's generated key remains
 		t.Fatalf("signing keys after delete: %d", signLeft)
 	}
-	if _, err := s.storage.Open(context.Background(), "demo/android/10_a.apk"); err == nil {
+	if _, err := s.storage.Open(context.Background(), "demo/android/demo-v10.apk"); err == nil {
 		t.Fatal("demo artifact still in storage")
 	}
 
@@ -384,7 +384,7 @@ func TestDeleteApp(t *testing.T) {
 	if resp.StatusCode != 200 || len(rels) != 1 {
 		t.Fatalf("keepme after demo delete: %d %+v", resp.StatusCode, rels)
 	}
-	if _, err := s.storage.Open(context.Background(), "keepme/android/1_c.apk"); err != nil {
+	if _, err := s.storage.Open(context.Background(), "keepme/android/keepme-v1.apk"); err != nil {
 		t.Fatalf("keepme artifact must survive: %v", err)
 	}
 
@@ -659,7 +659,7 @@ func TestReleaseRetention(t *testing.T) {
 		t.Fatalf("keep=2 should leave 30/40, got %v", rels)
 	}
 	// The pruned artifact is gone from storage.
-	if _, err := s.storage.Open(context.Background(), "prune/android/10_app-10.apk"); err == nil {
+	if _, err := s.storage.Open(context.Background(), "prune/android/prune-v10.apk"); err == nil {
 		t.Fatal("pruned artifact still in storage")
 	}
 
