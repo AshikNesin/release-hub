@@ -43,8 +43,14 @@ jobs:
           oidc=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             -H "Accept: application/json; api-version=2.0" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=release-hub" | jq -r .value)
-          HUB_TOKEN=$(curl -fsS -X POST "$HUB_URL/api/oidc/exchange" \
-            --data-urlencode "token=$oidc" | jq -r .token)
+          resp=$(curl -sS -X POST "$HUB_URL/api/oidc/exchange" \
+            --data-urlencode "token=$oidc" -w '\n%{http_code}')
+          code=$(tail -n1 <<<"$resp"); body=$(sed '$d' <<<"$resp")
+          if [ "$code" != "200" ]; then
+            echo "::error::hub exchange failed (HTTP $code): $body — if the grant is missing or the subject differs, copy the subject from this message into the hub's Keyless publishing grant."
+            exit 1
+          fi
+          HUB_TOKEN=$(jq -r .token <<<"$body")
           echo "::add-mask::$HUB_TOKEN"
           echo "HUB_TOKEN=$HUB_TOKEN" >> "$GITHUB_ENV"
 
