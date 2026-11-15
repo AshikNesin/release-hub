@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"srv.exe.dev/db/dbgen"
 )
@@ -290,6 +291,27 @@ func TestDeleteApp(t *testing.T) {
 	upload("demo", "b.aab", "internal", 11)
 	upload("keepme", "c.apk", "direct", 1)
 
+	// An OIDC grant on demo plus a token minted through it: both must die
+	// with the app, or the scoped token would keep matching demo's publish
+	// endpoints even after the app (and its grant) are gone.
+	var demoID, grantID int64
+	if err := s.DB.QueryRow(`SELECT id FROM apps WHERE slug='demo'`).Scan(&demoID); err != nil {
+		t.Fatal(err)
+	}
+	scopedTok := "rh_oidc_deletetest"
+	if _, err := s.DB.Exec(`INSERT INTO oidc_grants (app_id, issuer, subject) VALUES (?, 'https://iss.test', 'repo:acme/demo')`,
+		demoID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DB.QueryRow(`SELECT id FROM oidc_grants WHERE app_id=?`, demoID).Scan(&grantID); err != nil {
+		t.Fatal(err)
+	}
+	expires := time.Now().Add(time.Hour)
+	if _, err := s.DB.Exec(`INSERT INTO api_tokens (name, token_hash, scope_slug, expires_at, oidc_grant_id)
+		VALUES ('oidc: demo', ?, 'demo', ?, ?)`, hashToken(scopedTok), expires, grantID); err != nil {
+		t.Fatal(err)
+	}
+
 	// Bearer API: delete the app.
 	req, _ := http.NewRequest("DELETE", ts.URL+"/api/apps/demo", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
@@ -314,12 +336,14 @@ func TestDeleteApp(t *testing.T) {
 		t.Fatalf("demo releases after delete: %d, want 404", resp.StatusCode)
 	}
 	for _, q := range []struct{ sql, what string }{
-		{`SELECT COUNT(*) FROM apps WHERE slug='demo'`, "app row"},
-		{`SELECT COUNT(*) FROM app_platforms ap JOIN apps a ON a.id=ap.app_id WHERE a.slug='demo'`, "platform rows"},
-		{`SELECT COUNT(*) FROM releases r JOIN app_platforms ap ON ap.id=r.app_platform_id JOIN apps a ON a.id=ap.app_id WHERE a.slug='demo'`, "release rows"},
+		{`SELECT COUNT(*) FROM apps WHERE id=?`, "app row"},
+		{`SELECT COUNT(*) FROM app_platforms WHERE app_id=?`, "platform rows"},
+		{`SELECT COUNT(*) FROM releases r JOIN app_platforms ap ON ap.id=r.app_platform_id WHERE ap.app_id=?`, "release rows"},
+		{`SELECT COUNT(*) FROM oidc_grants WHERE app_id=?`, "oidc grant rows"},
+		{`SELECT COUNT(*) FROM api_tokens t JOIN oidc_grants g ON g.id=t.oidc_grant_id WHERE g.app_id=?`, "minted oidc token rows"},
 	} {
 		var n int
-		if err := s.DB.QueryRow(q.sql).Scan(&n); err != nil || n != 0 {
+		if err := s.DB.QueryRow(q.sql, demoID).Scan(&n); err != nil || n != 0 {
 			t.Fatalf("%s after delete: %d (err %v)", q.what, n, err)
 		}
 	}
@@ -332,6 +356,19 @@ func TestDeleteApp(t *testing.T) {
 	}
 	if _, err := s.storage.Open(context.Background(), "demo/android/10_a.apk"); err == nil {
 		t.Fatal("demo artifact still in storage")
+	}
+
+	// The grant's minted token is dead too: refused even on demo's publish
+	// endpoints (its rows are gone, not just dangling).
+	reqScoped, _ := http.NewRequest("GET", ts.URL+"/api/apps/demo/releases", nil)
+	reqScoped.Header.Set("Authorization", "Bearer "+scopedTok)
+	respScoped, err := client.Do(reqScoped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	respScoped.Body.Close()
+	if respScoped.StatusCode != 401 {
+		t.Fatalf("minted oidc token after app delete: %d, want 401", respScoped.StatusCode)
 	}
 
 	// The other app is untouched: still lists, still serves its artifact.

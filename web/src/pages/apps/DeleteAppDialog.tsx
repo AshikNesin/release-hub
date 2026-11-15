@@ -21,8 +21,9 @@ import type { AppDetail } from "@/lib/types";
 
 /**
  * Delete an app and everything it owns: both platforms, every release and
- * artifact, the stored signing keys and Play wiring. Requires typing the
- * slug — the signing key cannot be recovered once the app is deleted.
+ * artifact, the stored signing keys, Play wiring and keyless (OIDC) grants.
+ * Requires typing the slug — the signing key cannot be recovered once the
+ * app is deleted.
  */
 export function DeleteAppDialog({ app }: { app: AppDetail }) {
   const [open, setOpen] = useState(false);
@@ -35,7 +36,7 @@ export function DeleteAppDialog({ app }: { app: AppDetail }) {
     confirm: {
       title: `Delete ${app.slug}?`,
       description:
-        "Every release, artifact and stored signing key for all its platforms is deleted from the release hub. This cannot be undone. Anything already published to Google Play stays on Play.",
+        "Every release, artifact, stored signing key and keyless (OIDC) grant for all its platforms is deleted from the release hub. This cannot be undone. Anything already published to Google Play stays on Play.",
       confirmLabel: "Delete app",
       destructive: true,
     },

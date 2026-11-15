@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -19,23 +20,22 @@ import (
 var migrationFS embed.FS
 
 // Open opens an sqlite database and prepares pragmas suitable for a small web app.
+//
+// The pragmas ride on the DSN: modernc.org/sqlite applies query parameters
+// per connection, whereas db.Exec would only configure whichever pooled
+// connection happened to run it — and foreign_keys (the ON DELETE CASCADE
+// behind app deletion) is per-connection in sqlite.
 func Open(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", path)
+	dsn := path
+	if i := strings.Index(dsn, "?"); i >= 0 { // caller-supplied params win
+		dsn = strings.TrimSuffix(dsn[:i], "&") + "&"
+	} else {
+		dsn += "?"
+	}
+	dsn += "_pragma=foreign_keys(1)&_pragma=busy_timeout(1000)&_pragma=journal_mode(wal)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
-	}
-	// Light pragmas similar
-	if _, err := db.Exec("PRAGMA foreign_keys=ON;"); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("enable foreign keys: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA journal_mode=wal;"); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("set WAL: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA busy_timeout=1000;"); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("set busy_timeout: %w", err)
 	}
 	return db, nil
 }

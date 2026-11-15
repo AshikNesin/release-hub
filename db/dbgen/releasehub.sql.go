@@ -275,6 +275,15 @@ func (q *Queries) DeleteApiTokensByGrant(ctx context.Context, oidcGrantID *int64
 	return err
 }
 
+const deleteApiTokensForAppGrants = `-- name: DeleteApiTokensForAppGrants :exec
+DELETE FROM api_tokens WHERE oidc_grant_id IN (SELECT id FROM oidc_grants WHERE app_id = ?)
+`
+
+func (q *Queries) DeleteApiTokensForAppGrants(ctx context.Context, appID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteApiTokensForAppGrants, appID)
+	return err
+}
+
 const deleteApp = `-- name: DeleteApp :exec
 DELETE FROM apps WHERE slug = ?
 `
@@ -308,6 +317,15 @@ DELETE FROM oidc_grants WHERE id = ?
 
 func (q *Queries) DeleteOidcGrant(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteOidcGrant, id)
+	return err
+}
+
+const deleteOidcGrantsByApp = `-- name: DeleteOidcGrantsByApp :exec
+DELETE FROM oidc_grants WHERE app_id = ?
+`
+
+func (q *Queries) DeleteOidcGrantsByApp(ctx context.Context, appID int64) error {
+	_, err := q.db.ExecContext(ctx, deleteOidcGrantsByApp, appID)
 	return err
 }
 

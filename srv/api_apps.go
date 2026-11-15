@@ -67,10 +67,11 @@ func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleApiDeleteApp DELETE /api/apps/{slug} — removes the app with all its
-// platforms, releases and stored signing keys, then deletes the app's
-// artifact subtree from storage (best effort: the release hub stays consistent even
-// if a storage error leaves files behind). What Google Play already
-// published stays on Play — the release hub only ever managed uploads.
+// platforms, releases, stored signing keys, OIDC grants and their minted
+// tokens, then deletes the app's artifact subtree from storage (best effort:
+// the release hub stays consistent even if a storage error leaves files
+// behind). What Google Play already published stays on Play — the release hub
+// only ever managed uploads.
 func (s *Server) handleApiDeleteApp(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	app, ok := s.appFromSlug(w, r, slug)
@@ -83,6 +84,18 @@ func (s *Server) handleApiDeleteApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+	q := dbgen.New(tx)
+	// Grants first: their minted tokens must die with the app. A scoped
+	// token that outlived its app could still publish if the same slug is
+	// ever re-registered (and cascades alone would only null its grant ref).
+	if err := q.DeleteApiTokensForAppGrants(r.Context(), app.ID); err != nil {
+		writeErr(w, 500, "revoke oidc tokens: "+err.Error())
+		return
+	}
+	if err := q.DeleteOidcGrantsByApp(r.Context(), app.ID); err != nil {
+		writeErr(w, 500, "revoke oidc grants: "+err.Error())
+		return
+	}
 	if _, err := tx.ExecContext(r.Context(), `DELETE FROM apps WHERE id = ?`, app.ID); err != nil {
 		writeErr(w, 500, "delete app: "+err.Error())
 		return

@@ -127,8 +127,14 @@ UPDATE oidc_grants SET last_used_at = ? WHERE id = ?;
 -- name: DeleteOidcGrant :exec
 DELETE FROM oidc_grants WHERE id = ?;
 
+-- name: DeleteOidcGrantsByApp :exec
+DELETE FROM oidc_grants WHERE app_id = ?;
+
 -- name: DeleteApiTokensByGrant :exec
 DELETE FROM api_tokens WHERE oidc_grant_id = ?;
+
+-- name: DeleteApiTokensForAppGrants :exec
+DELETE FROM api_tokens WHERE oidc_grant_id IN (SELECT id FROM oidc_grants WHERE app_id = ?);
 
 -- scoped api tokens (keyless publishing)
 

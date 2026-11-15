@@ -64,7 +64,8 @@ are added from the app's own page.
 POST /api/apps                              form: slug
 GET  /api/apps                              → [{slug, platforms:[{platform, packageName}]}]
 DELETE /api/apps/{slug}                     delete the app: platforms, releases,
-                                            artifacts and stored signing keys
+                                            artifacts, stored signing keys and
+                                            OIDC grants (minted tokens die too)
                                             (what Play published stays on Play)
 POST /api/apps/{slug}/platforms             form: platform, packageName
 POST /api/apps/{slug}/releases              multipart: file, channel, versionCode?,
