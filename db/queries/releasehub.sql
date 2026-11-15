@@ -118,6 +118,9 @@ INSERT INTO oidc_grants (app_id, issuer, subject, name) VALUES (?, ?, ?, ?);
 -- name: ListOidcGrantsByApp :many
 SELECT og.*, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id WHERE og.app_id = ? ORDER BY og.created_at;
 
+-- name: ListAllOidcGrants :many
+SELECT og.*, a.slug AS app_slug FROM oidc_grants og LEFT JOIN apps a ON a.id = og.app_id ORDER BY og.created_at;
+
 -- name: OidcGrantByIssuerSubject :one
 SELECT og.*, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id WHERE og.issuer = ? AND og.subject = ?;
 

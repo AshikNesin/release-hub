@@ -97,6 +97,35 @@ func (s *Server) handleV1ListOidcGrants(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, 200, out)
 }
 
+// handleV1ListAllOidcGrants GET /api/v1/oidc/grants — every grant across
+// apps, for the Settings page. A LEFT JOIN: a grant whose app is gone (app
+// deleted before grants were cleaned up) is stale, flagged with app:null.
+func (s *Server) handleV1ListAllOidcGrants(w http.ResponseWriter, r *http.Request) {
+	grants, err := dbgen.New(s.DB).ListAllOidcGrants(r.Context())
+	if err != nil {
+		writeErr(w, 500, "db error")
+		return
+	}
+	out := make([]map[string]any, 0, len(grants))
+	for _, g := range grants {
+		row := map[string]any{
+			"id":        g.ID,
+			"issuer":    g.Issuer,
+			"subject":   g.Subject,
+			"name":      g.Name,
+			"createdAt": g.CreatedAt.UTC().Format(time.RFC3339),
+			// nil (marshalled as JSON null) when the app is gone → stale.
+			"app": g.AppSlug,
+		}
+		if g.LastUsedAt != nil {
+			v := g.LastUsedAt.UTC().Format(time.RFC3339)
+			row["lastUsedAt"] = v
+		}
+		out = append(out, row)
+	}
+	writeJSON(w, 200, out)
+}
+
 // handleV1CreateOidcGrant POST /api/v1/apps/{slug}/oidc/grants
 // {issuer, subject, name?} — one grant per identity; one repo → one app.
 // A subject pasted without its ref part (GitHub's OIDC settings show just

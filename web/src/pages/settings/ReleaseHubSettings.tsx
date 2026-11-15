@@ -1,5 +1,6 @@
 import {
   FileBadge,
+  GitBranch,
   KeyRound,
   Palette,
   SlidersHorizontal,
@@ -12,6 +13,7 @@ import { monoClass } from "@groot/ui/typography";
 import { ThemeSettings } from "@groot/shell/components/ThemeSettings";
 import { Settings, type SettingsSection } from "@groot/shell/pages/settings/Settings";
 import { useSettings } from "@/lib/releaseHub";
+import { KeylessGrantsSettings } from "./KeylessGrantsSettings";
 import { PlayAccountsSettings } from "./PlayAccountsSettings";
 import { SettingsForm } from "./SettingsForm";
 import { TokensSettings } from "./TokensSettings";
@@ -164,6 +166,16 @@ const SECTIONS: SettingsSection[] = [
     keywords: ["token", "bearer", "ci", "api", "revoke"],
     items: [{ label: "Create a token" }, { label: "Revoke a token" }],
     element: <TokensSettings />,
+  },
+  {
+    id: "keyless",
+    label: "Keyless publishing",
+    group: "Access",
+    icon: GitBranch,
+    description: "OIDC grants: which repositories publish which apps.",
+    keywords: ["oidc", "grant", "github", "keyless", "stale", "claim"],
+    items: [{ label: "All grants", description: "Remove stale or active grants" }],
+    element: <KeylessGrantsSettings />,
   },
   {
     id: "google-play",

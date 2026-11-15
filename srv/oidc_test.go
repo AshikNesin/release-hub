@@ -435,3 +435,51 @@ func TestOidcScopePathMatching(t *testing.T) {
 }
 
 // ---- helpers ----
+
+// The Settings page lists every grant across apps; a grant whose app is gone
+// (deleted before grants were cleaned up) must still appear, flagged stale.
+func TestV1ListAllOidcGrantsFlagsStale(t *testing.T) {
+	s, ts := newTestServer(t)
+	sess := seedSession(t, s)
+
+	// A live grant on app-one…
+	if _, err := s.DB.Exec(`INSERT INTO apps (slug) VALUES ('app-one')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DB.Exec(`INSERT INTO oidc_grants (app_id, issuer, subject)
+		SELECT id, 'https://token.actions.githubusercontent.com', 'repo:acme/app-one:ref:refs/heads/main'
+		FROM apps WHERE slug='app-one'`); err != nil {
+		t.Fatal(err)
+	}
+	// …and a stale one whose app row was hard-deleted out from under it
+	// (what the pre-FK-fix app deletion left behind).
+	if _, err := s.DB.Exec(`PRAGMA foreign_keys=OFF;
+		INSERT INTO apps (slug) VALUES ('gone-app');
+		INSERT INTO oidc_grants (app_id, issuer, subject)
+			SELECT id, 'https://token.actions.githubusercontent.com', 'repo:acme/gone:ref:refs/heads/main'
+			FROM apps WHERE slug='gone-app';
+		DELETE FROM apps WHERE slug='gone-app';
+		PRAGMA foreign_keys=ON;`); err != nil {
+		t.Fatal(err)
+	}
+
+	var grants []struct {
+		ID      int64   `json:"id"`
+		Subject string  `json:"subject"`
+		App     *string `json:"app"`
+	}
+	v1Do(t, ts, sess, "GET", "/api/v1/oidc/grants", nil, 200, &grants)
+	if len(grants) != 2 {
+		t.Fatalf("grants: %+v", grants)
+	}
+	bySub := map[string]*string{}
+	for _, g := range grants {
+		bySub[g.Subject] = g.App
+	}
+	if v := bySub["repo:acme/app-one:ref:refs/heads/main"]; v == nil || *v != "app-one" {
+		t.Fatalf("live grant app: %+v", v)
+	}
+	if v := bySub["repo:acme/gone:ref:refs/heads/main"]; v != nil {
+		t.Fatalf("stale grant must have app:null, got %q", *v)
+	}
+}

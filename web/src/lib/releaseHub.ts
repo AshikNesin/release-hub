@@ -6,6 +6,7 @@ import type {
   AppSummary,
   ReleaseHubSettings,
   OidcGrant,
+  OidcGrantAll,
   Platform,
   PlayAccount,
   PlayTrack,
@@ -21,6 +22,7 @@ export const keys = {
   tokens: ["tokens"] as const,
   playAccounts: ["play-accounts"] as const,
   oidcGrants: (slug: string) => ["apps", slug, "oidc-grants"] as const,
+  allOidcGrants: ["oidc-grants"] as const,
   tracks: (slug: string, platform: Platform) => ["apps", slug, platform, "tracks"] as const,
 };
 
@@ -76,6 +78,7 @@ export const releaseHub = {
   deleteToken: (id: number) => apiClient.delete(`/tokens/${id}`),
   listOidcGrants: (slug: string) =>
     apiClient.get<OidcGrant[]>(`/apps/${encodeURIComponent(slug)}/oidc/grants`),
+  listAllOidcGrants: () => apiClient.get<OidcGrantAll[]>("/oidc/grants"),
   createOidcGrant: (
     slug: string,
     v: { issuer: string; subject: string; name?: string },
@@ -101,5 +104,7 @@ export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: re
 export const useTokens = () => useQuery({ queryKey: keys.tokens, queryFn: releaseHub.listTokens });
 export const useOidcGrants = (slug: string) =>
   useQuery({ queryKey: keys.oidcGrants(slug), queryFn: () => releaseHub.listOidcGrants(slug) });
+export const useAllOidcGrants = () =>
+  useQuery({ queryKey: keys.allOidcGrants, queryFn: releaseHub.listAllOidcGrants });
 export const usePlayAccounts = () =>
   useQuery({ queryKey: keys.playAccounts, queryFn: releaseHub.listPlayAccounts });

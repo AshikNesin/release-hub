@@ -84,7 +84,7 @@ export function KeylessCard({ app }: { app: AppDetail }) {
       success: () => ({ title: "Grant created", description: "That repo can now publish this app." }),
       errorTitle: "Could not create the grant",
       fallback: "Unable to create the grant",
-      invalidate: [keys.oidcGrants(app.slug)],
+      invalidate: [keys.oidcGrants(app.slug), keys.allOidcGrants],
       onSuccess: () => {
         setSubject("");
         setName("");
@@ -106,7 +106,7 @@ export function KeylessCard({ app }: { app: AppDetail }) {
     success: () => "Grant removed",
     errorTitle: "Could not remove the grant",
     fallback: "Unable to remove the grant",
-    invalidate: [keys.oidcGrants(app.slug)],
+    invalidate: [keys.oidcGrants(app.slug), keys.allOidcGrants],
   });
 
   return (

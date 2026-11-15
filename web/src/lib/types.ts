@@ -114,6 +114,11 @@ export interface OidcGrant {
   lastUsedAt: string | null;
 }
 
+/** Every grant across apps; `app` is null when its app was deleted (stale). */
+export interface OidcGrantAll extends OidcGrant {
+  app: string | null;
+}
+
 export interface PlayAccount {
   id: number;
   email: string;

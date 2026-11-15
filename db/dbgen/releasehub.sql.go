@@ -413,6 +413,53 @@ func (q *Queries) LatestReleaseForChannel(ctx context.Context, arg LatestRelease
 	return items, nil
 }
 
+const listAllOidcGrants = `-- name: ListAllOidcGrants :many
+SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, a.slug AS app_slug FROM oidc_grants og LEFT JOIN apps a ON a.id = og.app_id ORDER BY og.created_at
+`
+
+type ListAllOidcGrantsRow struct {
+	ID         int64      `json:"id"`
+	AppID      int64      `json:"app_id"`
+	Issuer     string     `json:"issuer"`
+	Subject    string     `json:"subject"`
+	Name       string     `json:"name"`
+	CreatedAt  time.Time  `json:"created_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	AppSlug    *string    `json:"app_slug"`
+}
+
+func (q *Queries) ListAllOidcGrants(ctx context.Context) ([]ListAllOidcGrantsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAllOidcGrants)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAllOidcGrantsRow{}
+	for rows.Next() {
+		var i ListAllOidcGrantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.AppID,
+			&i.Issuer,
+			&i.Subject,
+			&i.Name,
+			&i.CreatedAt,
+			&i.LastUsedAt,
+			&i.AppSlug,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listApiTokens = `-- name: ListApiTokens :many
 SELECT id, name, token_hash, created_at, last_used_at, scope_slug, expires_at, oidc_grant_id FROM api_tokens ORDER BY created_at
 `
