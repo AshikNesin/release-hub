@@ -61,6 +61,33 @@ func TestLocalStorageSaveOpenURL(t *testing.T) {
 	}
 }
 
+func TestLocalStorageDeletePrefix(t *testing.T) {
+	dir := t.TempDir()
+	l := &LocalStorage{Dir: dir, BaseURL: "http://hub.test"}
+	content := []byte("artifact-bytes")
+	for _, key := range []string{"demo/android/1_a.apk", "demo/ios/2_b.ipa", "other/android/1_c.apk"} {
+		if _, _, err := l.Save(nil, key, bytes.NewReader(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := l.DeletePrefix(nil, "demo/"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "demo")); !os.IsNotExist(err) {
+		t.Fatal("the demo/ subtree should be gone")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "other", "android", "1_c.apk")); err != nil {
+		t.Fatalf("unrelated artifact must survive: %v", err)
+	}
+	// Missing prefix is not an error; traversal is contained like path().
+	if err := l.DeletePrefix(nil, "missing/"); err != nil {
+		t.Fatal(err)
+	}
+	if p := l.path("../evil"); strings.HasPrefix(p, dir+"/..") || !strings.HasPrefix(p, dir) {
+		t.Fatalf("path() escaped dir: %s", p)
+	}
+}
+
 func TestS3ObjKeyPrefix(t *testing.T) {
 	s := &S3Storage{Prefix: "release-hub", Bucket: "b"}
 	if got := s.objKey("app/1_x.apk"); got != "release-hub/app/1_x.apk" {

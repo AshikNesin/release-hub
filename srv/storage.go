@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // Storage is the artifact backend: local FS or S3. Implementations must
@@ -37,6 +38,10 @@ type Storage interface {
 
 	// Delete removes the artifact. Best effort.
 	Delete(ctx context.Context, key string) error
+
+	// DeletePrefix removes every artifact whose key starts with prefix (one
+	// app's "<slug>/…" subtree). Best effort.
+	DeletePrefix(ctx context.Context, prefix string) error
 }
 
 // ---- local filesystem ----
@@ -89,6 +94,10 @@ func (l *LocalStorage) PublicURL(ctx context.Context, key string) (string, error
 
 func (l *LocalStorage) Delete(ctx context.Context, key string) error {
 	return os.Remove(l.path(key))
+}
+
+func (l *LocalStorage) DeletePrefix(ctx context.Context, prefix string) error {
+	return os.RemoveAll(l.path(prefix))
 }
 
 // ---- S3 ----
@@ -216,6 +225,46 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 		Bucket: aws.String(s.Bucket), Key: aws.String(s.objKey(key)),
 	})
 	return err
+}
+
+// DeletePrefix removes every object under the prefix (e.g. one app's
+// "slug/" subtree) by listing and batch-deleting, 1000 keys at a time.
+func (s *S3Storage) DeletePrefix(ctx context.Context, prefix string) error {
+	p := s.objKey(prefix)
+	if !strings.HasSuffix(p, "/") {
+		p += "/"
+	}
+	var keys []string
+	pag := s3.NewListObjectsV2Paginator(s.Client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.Bucket), Prefix: aws.String(p),
+	})
+	for pag.HasMorePages() {
+		page, err := pag.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("s3 list for delete: %w", err)
+		}
+		for _, obj := range page.Contents {
+			keys = append(keys, aws.ToString(obj.Key))
+		}
+	}
+	for len(keys) > 0 {
+		batch := keys
+		if len(batch) > 1000 {
+			batch = batch[:1000]
+		}
+		var objs []types.ObjectIdentifier
+		for _, k := range batch {
+			objs = append(objs, types.ObjectIdentifier{Key: aws.String(k)})
+		}
+		if _, err := s.Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.Bucket),
+			Delete: &types.Delete{Objects: objs, Quiet: aws.Bool(true)},
+		}); err != nil {
+			return fmt.Errorf("s3 batch delete: %w", err)
+		}
+		keys = keys[len(batch):]
+	}
+	return nil
 }
 
 // publicURLSafe strips the query (signature) from a presigned URL for display.

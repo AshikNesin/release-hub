@@ -232,6 +232,144 @@ func TestUploadAndManifestFlow(t *testing.T) {
 	}
 }
 
+// Deleting an app removes its platforms, releases, stored signing keys and
+// the whole artifact subtree — and leaves every other app untouched.
+func TestDeleteApp(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	client := ts.Client()
+
+	tok := "rh_deletetest"
+	if _, err := s.DB.Exec(
+		"INSERT INTO api_tokens (name, token_hash) VALUES ('test', ?)", hashToken(tok)); err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+	seedApp := func(slug string) {
+		t.Helper()
+		for _, f := range []struct{ path, body string }{
+			{"/api/apps", "slug=" + slug},
+			{"/api/apps/" + slug + "/platforms", "platform=android&packageName=io.test." + slug},
+		} {
+			req, _ := http.NewRequest("POST", ts.URL+f.path, strings.NewReader(f.body))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Authorization", "Bearer "+tok)
+			resp, err := client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != 201 {
+				t.Fatalf("%s: %d", f.path, resp.StatusCode)
+			}
+		}
+	}
+	upload := func(slug, file, channel string, code int64) {
+		t.Helper()
+		body := &bytes.Buffer{}
+		mw := multipart.NewWriter(body)
+		fw, _ := mw.CreateFormFile("file", file)
+		fw.Write([]byte("bytes-" + slug))
+		mw.WriteField("channel", channel)
+		mw.WriteField("versionCode", fmt.Sprint(code))
+		mw.Close()
+		req, _ := http.NewRequest("POST", ts.URL+"/api/apps/"+slug+"/android/releases", body)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 201 {
+			t.Fatalf("upload %s/%s: %d", slug, file, resp.StatusCode)
+		}
+	}
+	seedApp("demo")
+	seedApp("keepme")
+	upload("demo", "a.apk", "direct", 10)
+	upload("demo", "b.aab", "internal", 11)
+	upload("keepme", "c.apk", "direct", 1)
+
+	// Bearer API: delete the app.
+	req, _ := http.NewRequest("DELETE", ts.URL+"/api/apps/demo", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("delete app: %d", resp.StatusCode)
+	}
+
+	// Gone from the API, the DB (releases, platforms, signing keys) and storage.
+	req, _ = http.NewRequest("GET", ts.URL+"/api/apps/demo/releases", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 404 {
+		t.Fatalf("demo releases after delete: %d, want 404", resp.StatusCode)
+	}
+	for _, q := range []struct{ sql, what string }{
+		{`SELECT COUNT(*) FROM apps WHERE slug='demo'`, "app row"},
+		{`SELECT COUNT(*) FROM app_platforms ap JOIN apps a ON a.id=ap.app_id WHERE a.slug='demo'`, "platform rows"},
+		{`SELECT COUNT(*) FROM releases r JOIN app_platforms ap ON ap.id=r.app_platform_id JOIN apps a ON a.id=ap.app_id WHERE a.slug='demo'`, "release rows"},
+	} {
+		var n int
+		if err := s.DB.QueryRow(q.sql).Scan(&n); err != nil || n != 0 {
+			t.Fatalf("%s after delete: %d (err %v)", q.what, n, err)
+		}
+	}
+	var signLeft int
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM app_platforms WHERE sign_keystore != '' AND app_id IN (SELECT id FROM apps)`).Scan(&signLeft); err != nil {
+		t.Fatal(err)
+	}
+	if signLeft != 1 { // only keepme's generated key remains
+		t.Fatalf("signing keys after delete: %d", signLeft)
+	}
+	if _, err := s.storage.Open(context.Background(), "demo/android/10_a.apk"); err == nil {
+		t.Fatal("demo artifact still in storage")
+	}
+
+	// The other app is untouched: still lists, still serves its artifact.
+	req, _ = http.NewRequest("GET", ts.URL+"/api/apps/keepme/releases", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rels []map[string]any
+	json.NewDecoder(resp.Body).Decode(&rels)
+	resp.Body.Close()
+	if resp.StatusCode != 200 || len(rels) != 1 {
+		t.Fatalf("keepme after demo delete: %d %+v", resp.StatusCode, rels)
+	}
+	if _, err := s.storage.Open(context.Background(), "keepme/android/1_c.apk"); err != nil {
+		t.Fatalf("keepme artifact must survive: %v", err)
+	}
+
+	// Deleting again: 404.
+	req, _ = http.NewRequest("DELETE", ts.URL+"/api/apps/demo", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 404 {
+		t.Fatalf("double delete: %d, want 404", resp.StatusCode)
+	}
+
+	// The UI twin works the same through the envelope.
+	sess := seedSession(t, s)
+	v1Do(t, ts, sess, "DELETE", "/api/v1/apps/keepme", nil, 200, nil)
+	v1Do(t, ts, sess, "GET", "/api/v1/apps/keepme", nil, 404, nil)
+	v1Do(t, ts, "", "DELETE", "/api/v1/apps/whatever", nil, 401, nil)
+}
+
 // The direct channel only accepts the platform's installable package
 // (.apk on android, .ipa on ios); Play channels still take the .aab bundle.
 func TestDirectUploadRequiresInstallablePackage(t *testing.T) {

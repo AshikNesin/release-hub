@@ -66,6 +66,38 @@ func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, map[string]string{"slug": slug})
 }
 
+// handleApiDeleteApp DELETE /api/apps/{slug} — removes the app with all its
+// platforms, releases and stored signing keys, then deletes the app's
+// artifact subtree from storage (best effort: the hub stays consistent even
+// if a storage error leaves files behind). What Google Play already
+// published stays on Play — the hub only ever managed uploads.
+func (s *Server) handleApiDeleteApp(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	app, ok := s.appFromSlug(w, r, slug)
+	if !ok {
+		return
+	}
+	tx, err := s.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(r.Context(), `DELETE FROM apps WHERE id = ?`, app.ID); err != nil {
+		writeErr(w, 500, "delete app: "+err.Error())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	if err := s.storage.DeletePrefix(r.Context(), app.Slug+"/"); err != nil {
+		slog.Warn("app artifacts not fully deleted", "app", app.Slug, "error", err)
+	}
+	slog.Info("app deleted", "slug", app.Slug)
+	writeJSON(w, 200, map[string]any{"deleted": app.Slug})
+}
+
 // handleApiAddPlatform POST /api/apps/{slug}/platforms
 // (form: platform, packageName) — adds e.g. the ios variant of an app that
 // already exists as android. Android platforms get a generated signing key.

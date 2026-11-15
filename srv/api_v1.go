@@ -53,6 +53,7 @@ func (s *Server) v1Routes(mux *http.ServeMux) {
 	// Apps and platforms.
 	mux.HandleFunc("GET /api/v1/apps", s.v1(s.handleV1ListApps))
 	mux.HandleFunc("POST /api/v1/apps", s.v1(s.handleApiCreateApp))
+	mux.HandleFunc("DELETE /api/v1/apps/{slug}", s.v1(s.handleApiDeleteApp))
 	mux.HandleFunc("GET /api/v1/apps/{slug}", s.v1(s.handleV1AppDetail))
 	mux.HandleFunc("POST /api/v1/apps/{slug}/platforms", s.v1(s.handleApiAddPlatform))
 	mux.HandleFunc("DELETE /api/v1/apps/{slug}/{platform}/releases/{versionCode}", s.v1(s.handleApiDeleteRelease))

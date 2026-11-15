@@ -17,6 +17,7 @@ func (s *Server) routes() *http.ServeMux {
 	// API (bearer auth)
 	mux.HandleFunc("GET /api/apps", s.requireAPI(s.handleApiListApps))
 	mux.HandleFunc("POST /api/apps", s.requireAPI(s.handleApiCreateApp))
+	mux.HandleFunc("DELETE /api/apps/{slug}", s.requireAPI(s.handleApiDeleteApp))
 	mux.HandleFunc("POST /api/tokens", s.requireAPI(s.handleApiCreateToken))
 	mux.HandleFunc("POST /api/apps/{slug}/platforms", s.requireAPI(s.handleApiAddPlatform))
 	mux.HandleFunc("POST /api/apps/{slug}/releases", s.requireAPI(s.handleApiUpload))

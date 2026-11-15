@@ -29,6 +29,7 @@ export const hub = {
   listApps: () => apiClient.get<AppSummary[]>("/apps"),
   createApp: (slug: string) => apiClient.post<{ slug: string }>("/apps", { slug }),
   getApp: (slug: string) => apiClient.get<AppDetail>(`/apps/${encodeURIComponent(slug)}`),
+  deleteApp: (slug: string) => apiClient.delete<{ deleted: string }>(`/apps/${encodeURIComponent(slug)}`),
   addPlatform: (slug: string, v: { platform: Platform; packageName: string }) =>
     apiClient.post<{ signingKey?: string; signingSha256?: string }>(
       `/apps/${encodeURIComponent(slug)}/platforms`,

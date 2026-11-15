@@ -15,6 +15,7 @@ import { fromNow, platformLabel } from "@/lib/format";
 import type { AppDetail, PlatformDetail } from "@/lib/types";
 import { AddPlatformDialog } from "./AddPlatformDialog";
 import { ConfigurationPanel } from "./ConfigurationPanel";
+import { DeleteAppDialog } from "./DeleteAppDialog";
 import { DistributionPanel } from "./DistributionPanel";
 import { ReleasesPanel } from "./ReleasesPanel";
 
@@ -91,7 +92,10 @@ export function AppDetailPage() {
       }
       description={`Registered ${fromNow(app.createdAt)}`}
       actions={
-        canAddPlatform && app.platforms.length > 0 ? <AddPlatformDialog app={app} /> : undefined
+        <span className="flex gap-1.5">
+          {canAddPlatform && app.platforms.length > 0 ? <AddPlatformDialog app={app} /> : undefined}
+          <DeleteAppDialog app={app} />
+        </span>
       }
       maxWidth="6xl"
     >
