@@ -39,6 +39,7 @@ jobs:
       - name: Exchange the job's OIDC token for a hub token
         run: |
           set -euo pipefail
+          : "${HUB_URL:?RELEASE_HUB_URL repo variable is not set (Settings → Secrets and variables → Actions → Variables)}"
           oidc=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             -H "Accept: application/json; api-version=2.0" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=release-hub" | jq -r .value)
