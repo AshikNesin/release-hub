@@ -18,5 +18,5 @@ pnpm groot:check      # what would sync from the boilerplate
 pnpm groot:sync       # pull boilerplate changes (kit, build logic, tooling)
 ```
 
-The boilerplate's scheduled sync runs from the repo root as `.github/workflows/mobile-sync.yml` and opens a
+The boilerplate's scheduled sync runs from the repo root as `.github/workflows/groot-mobile-sync.yml` and opens a
 `chore/groot-mobile-sync` PR; see "Apps inside a monorepo" in `docs/guides/sync.md`.

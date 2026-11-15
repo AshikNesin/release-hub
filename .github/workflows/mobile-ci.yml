@@ -1,18 +1,18 @@
 # CI for the Android app in mobile/ (a groot-mobile-app child in a subdirectory). The boilerplate's
 # own ci.yml can't run from mobile/.github, so this is its root-level equivalent: same checks, same
 # composite action (mobile/.github/actions/setup-android, synced from the boilerplate).
-name: Release Hub
+name: Mobile CI
 
 on:
   pull_request:
     paths:
       - "mobile/**"
-      - ".github/workflows/release-hub.yml"
+      - ".github/workflows/mobile-ci.yml"
   push:
     branches: [main]
     paths:
       - "mobile/**"
-      - ".github/workflows/release-hub.yml"
+      - ".github/workflows/mobile-ci.yml"
 
 permissions:
   contents: read

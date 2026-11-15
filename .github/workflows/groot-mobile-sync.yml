@@ -1,6 +1,6 @@
 # Pulls groot-mobile-app (the boilerplate) changes into mobile/ and opens a chore/groot-mobile-sync PR,
 # twice a day. Root-level equivalent of the boilerplate's sync.yml, which can't run from mobile/.github.
-# The PR must trigger release-hub.yml, which PRs opened with GITHUB_TOKEN never do: configure
+# The PR must trigger mobile-ci.yml, which PRs opened with GITHUB_TOKEN never do: configure
 # vars.GROOT_APP_ID + secrets.GROOT_APP_PRIVATE_KEY (a GitHub App installed on this repo).
 name: Groot Mobile Sync
 
