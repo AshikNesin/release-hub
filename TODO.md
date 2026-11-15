@@ -12,9 +12,10 @@ Pending items for the Android app (`mobile/`) and its setup. Tick them off as yo
 ## Configure GitHub (release-hub repo)
 
 - [ ] `vars.RELEASE_HUB_URL` (e.g. `https://hub.example.com`) and an OIDC grant on the hub for
-      `repo:ashiknesin/release-hub:ref:refs/heads/main` (App `release-hub` → Configuration →
-      Keyless publishing) so `.github/workflows/mobile-release.yml` can publish keyless. A
-      `secrets.RELEASE_HUB_TOKEN` also still works if you prefer.
+      `repo:AshikNesin@4201088/release-hub@1334919712:ref:refs/heads/main` (App `release-hub` →
+      Configuration → Keyless publishing) so `.github/workflows/mobile-release.yml` can publish
+      keyless. A `secrets.RELEASE_HUB_TOKEN` also still works if you prefer. Reuse "use immutable
+      subject claim" format from repo Settings → Actions → OIDC configuration if it ever changes.
 - [ ] `vars.GROOT_APP_ID` + `secrets.GROOT_APP_PRIVATE_KEY` (a GitHub App installed on this repo) so the
       sync PRs from `.github/workflows/mobile-sync.yml` trigger CI. Without it the PRs still open, but
       `mobile.yml` won't run on them.

@@ -4,8 +4,9 @@
 #
 # Keyless: the repo's GitHub Actions OIDC identity is exchanged for a 1-hour hub token scoped to
 # this app, so no HUB_TOKEN secret is stored. Needs vars.RELEASE_HUB_URL and an OIDC grant on the
-# hub (App → Configuration → Keyless publishing) for this repo's subject
-# repo:ashiknesin/release-hub:ref:refs/heads/main (workflow_dispatch runs use the default branch).
+# hub (App → Configuration → Keyless publishing) for this repo's subject — with immutable subject
+# claims (repos created after 2026-07-15) the prefix carries owner/repo IDs; copy it from
+# Settings → Actions → OIDC configuration, then append :ref:refs/heads/main (default branch).
 name: Mobile Release
 
 on:

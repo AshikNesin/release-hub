@@ -109,11 +109,12 @@ Actions identity: register a grant binding that repo to **one app** (one repo
 token on every run.
 
 **Hub side** (App → Configuration → Keyless publishing): paste the repo's OIDC
-subject, e.g.
+subject. For a run on the default branch it ends in `:ref:refs/heads/main`;
+the prefix depends on the repo's age:
 
-```
-repo:ashiknesin/release-hub:ref:refs/heads/main
-```
+- repos created before 2026-07-15: `repo:owner/name:ref:refs/heads/main`
+- newer repos use **immutable subject claims** (see the repo's
+  Settings → Actions → OIDC configuration): `repo:owner@OWNER-ID/name@REPO-ID:ref:refs/heads/main`
 
 The subject differs per ref/event — grab it from a failed exchange's 401
 message or the workflow's OIDC debug output. The issuer is fixed to GitHub's
