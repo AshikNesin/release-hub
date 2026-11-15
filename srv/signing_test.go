@@ -73,10 +73,10 @@ func TestSigningRoundtrip(t *testing.T) {
 		t.Fatal("keystore bytes mismatch")
 	}
 	sum := sha256.Sum256(ksBytes)
-	if resp.Header.Get("X-Hub-Keystore-Sha256") != hex.EncodeToString(sum[:]) {
+	if resp.Header.Get("X-Release-Hub-Keystore-Sha256") != hex.EncodeToString(sum[:]) {
 		t.Fatal("sha header mismatch")
 	}
-	if resp.Header.Get("X-Hub-Store-Password") != "s3cret" || resp.Header.Get("X-Hub-Key-Alias") != "release" {
+	if resp.Header.Get("X-Release-Hub-Store-Password") != "s3cret" || resp.Header.Get("X-Release-Hub-Key-Alias") != "release" {
 		t.Fatal("config headers mismatch")
 	}
 
@@ -139,7 +139,7 @@ func TestCreateAppGeneratesSigning(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Fatalf("fetch signing: %d", resp.StatusCode)
 	}
-	pw := resp.Header.Get("X-Hub-Store-Password")
+	pw := resp.Header.Get("X-Release-Hub-Store-Password")
 	if len(pw) < 24 {
 		t.Fatalf("expected high-entropy store password, got %q", pw)
 	}

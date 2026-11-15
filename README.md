@@ -152,11 +152,11 @@ Fetch (CI / any coding env):
 ```bash
 curl -sD /tmp/h -H "Authorization: Bearer $HUB_TOKEN" \
      -o app.jks https://hub.example.com/api/apps/tinyfirewall/signing
-STORE_PW=$(grep -i x-hub-store-password /tmp/h | cut -d' ' -f2 | tr -d '\r')
-ALIAS=$(grep -i x-hub-key-alias /tmp/h | cut -d' ' -f2 | tr -d '\r')
-KEY_PW=$(grep -i x-hub-key-password /tmp/h | cut -d' ' -f2 | tr -d '\r')
+STORE_PW=$(grep -i x-release-hub-store-password /tmp/h | cut -d' ' -f2 | tr -d '\r')
+ALIAS=$(grep -i x-release-hub-key-alias /tmp/h | cut -d' ' -f2 | tr -d '\r')
+KEY_PW=$(grep -i x-release-hub-key-password /tmp/h | cut -d' ' -f2 | tr -d '\r')
 # verify integrity:
-echo "$(grep -i x-hub-keystore-sha256 /tmp/h | cut -d' ' -f2 | tr -d '\r')  app.jks" | sha256sum -c
+echo "$(grep -i x-release-hub-keystore-sha256 /tmp/h | cut -d' ' -f2 | tr -d '\r')  app.jks" | sha256sum -c
 ```
 
 Then point gradle at it (`signingConfigs` reading env vars). Delete with

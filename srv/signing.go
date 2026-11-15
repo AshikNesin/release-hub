@@ -89,7 +89,7 @@ func (s *Server) handleApiSetSigning(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleApiGetSigning GET /api/apps/{slug}/signing
-// Returns the keystore bytes (X-Hub-Keystore-Sha256 header) and config
+// Returns the keystore bytes (X-Release-Hub-Keystore-Sha256 header) and config
 // headers for CI: any authenticated build env can produce signed releases.
 // It is a bearer-auth endpoint — never expose it publicly.
 func (s *Server) handleApiGetSigning(w http.ResponseWriter, r *http.Request) {
@@ -115,10 +115,10 @@ func (s *Server) handleApiGetSigning(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal(cfgRaw, &cfg)
 	sum := sha256.Sum256(ks)
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("X-Hub-Keystore-Sha256", hex.EncodeToString(sum[:]))
-	w.Header().Set("X-Hub-Store-Password", cfg.StorePassword)
-	w.Header().Set("X-Hub-Key-Alias", cfg.KeyAlias)
-	w.Header().Set("X-Hub-Key-Password", cfg.KeyPassword)
+	w.Header().Set("X-Release-Hub-Keystore-Sha256", hex.EncodeToString(sum[:]))
+	w.Header().Set("X-Release-Hub-Store-Password", cfg.StorePassword)
+	w.Header().Set("X-Release-Hub-Key-Alias", cfg.KeyAlias)
+	w.Header().Set("X-Release-Hub-Key-Password", cfg.KeyPassword)
 	w.WriteHeader(200)
 	_, _ = w.Write(ks)
 }
@@ -314,10 +314,10 @@ func FetchSigningForBuild(hubBaseURL, slug, token, outPath string) (storePasswor
 	if err = os.WriteFile(outPath, ks, 0o600); err != nil {
 		return
 	}
-	storePassword = resp.Header.Get("X-Hub-Store-Password")
-	keyAlias = resp.Header.Get("X-Hub-Key-Alias")
-	keyPassword = resp.Header.Get("X-Hub-Key-Password")
-	sha = resp.Header.Get("X-Hub-Keystore-Sha256")
+	storePassword = resp.Header.Get("X-Release-Hub-Store-Password")
+	keyAlias = resp.Header.Get("X-Release-Hub-Key-Alias")
+	keyPassword = resp.Header.Get("X-Release-Hub-Key-Password")
+	sha = resp.Header.Get("X-Release-Hub-Keystore-Sha256")
 	return
 }
 

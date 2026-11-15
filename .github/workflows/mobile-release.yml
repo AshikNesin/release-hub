@@ -40,15 +40,15 @@ jobs:
           curl -fsS -D "$RUNNER_TEMP/h" -H "Authorization: Bearer $HUB_TOKEN" \
             -o "$RUNNER_TEMP/release.jks" "$HUB_URL/api/apps/$SLUG/android/signing"
           header() { grep -i "^$1:" "$RUNNER_TEMP/h" | cut -d' ' -f2- | tr -d '\r'; }
-          echo "$(header x-hub-keystore-sha256)  $RUNNER_TEMP/release.jks" | sha256sum -c
+          echo "$(header x-release-hub-keystore-sha256)  $RUNNER_TEMP/release.jks" | sha256sum -c
           {
             echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks"
-            echo "RELEASE_KEY_ALIAS=$(header x-hub-key-alias)"
+            echo "RELEASE_KEY_ALIAS=$(header x-release-hub-key-alias)"
           } >> "$GITHUB_ENV"
-          echo "::add-mask::$(header x-hub-store-password)"
-          echo "::add-mask::$(header x-hub-key-password)"
-          echo "RELEASE_STORE_PASSWORD=$(header x-hub-store-password)" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_PASSWORD=$(header x-hub-key-password)" >> "$GITHUB_ENV"
+          echo "::add-mask::$(header x-release-hub-store-password)"
+          echo "::add-mask::$(header x-release-hub-key-password)"
+          echo "RELEASE_STORE_PASSWORD=$(header x-release-hub-store-password)" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=$(header x-release-hub-key-password)" >> "$GITHUB_ENV"
 
       - name: Build the signed release APK
         working-directory: mobile/android
