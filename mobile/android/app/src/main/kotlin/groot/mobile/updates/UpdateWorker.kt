@@ -6,9 +6,9 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import groot.kit.log.Log
 import groot.mobile.GrootMobileApp
-import groot.mobile.data.hub.HubException
+import groot.mobile.data.releasehub.ReleaseHubException
 
-/** The periodic background check scheduled by [UpdateScheduler]. Exits early when there's no hub. */
+/** The periodic background check scheduled by [UpdateScheduler]. Exits early when there's no release hub. */
 class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val container = (applicationContext as GrootMobileApp).container
@@ -16,7 +16,7 @@ class UpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             val summary = container.updateRunner.run()
             Log.i(TAG) { "checked ${summary.checked}, installed ${summary.installed.size}, pending ${summary.pending.size}" }
             Result.success()
-        } catch (e: HubException) {
+        } catch (e: ReleaseHubException) {
             Log.w(TAG, e) { "check failed: ${e.message}" }
             // A rejected token won't fix itself; anything else (network) is worth a retry.
             if (e.unauthorized || runAttemptCount >= MAX_ATTEMPTS) Result.failure() else Result.retry()

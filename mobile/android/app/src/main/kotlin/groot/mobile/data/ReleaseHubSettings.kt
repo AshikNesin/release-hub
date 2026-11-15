@@ -10,13 +10,13 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import groot.mobile.data.hub.HubEndpoint
+import groot.mobile.data.releasehub.ReleaseHubEndpoint
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-private val Context.hubSettingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "hub_settings")
+private val Context.releaseHubSettingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "hub_settings")
 
 /** How background updates behave. */
 data class UpdatePrefs(
@@ -38,14 +38,14 @@ data class UpdatePrefs(
     }
 }
 
-/** The hub connection and update preferences. The token is encrypted with [cipher] before it's stored. */
-class HubSettings(private val dataStore: DataStore<Preferences>, private val cipher: SecretCipher) {
+/** The release hub connection and update preferences. The token is encrypted with [cipher] before it's stored. */
+class ReleaseHubSettings(private val dataStore: DataStore<Preferences>, private val cipher: SecretCipher) {
     /** The saved hub, or null when not connected (or the token can't be decrypted on this device). */
-    val endpoint: Flow<HubEndpoint?> = dataStore.data
+    val endpoint: Flow<ReleaseHubEndpoint?> = dataStore.data
         .map { prefs ->
             val url = prefs[BASE_URL] ?: return@map null
             val token = prefs[TOKEN]?.let(cipher::decrypt) ?: return@map null
-            HubEndpoint(url, token)
+            ReleaseHubEndpoint(url, token)
         }
         .distinctUntilChanged()
 
@@ -64,11 +64,11 @@ class HubSettings(private val dataStore: DataStore<Preferences>, private val cip
         }
         .distinctUntilChanged()
 
-    suspend fun currentEndpoint(): HubEndpoint? = endpoint.first()
+    suspend fun currentEndpoint(): ReleaseHubEndpoint? = endpoint.first()
 
     suspend fun currentUpdatePrefs(): UpdatePrefs = updatePrefs.first()
 
-    suspend fun connect(endpoint: HubEndpoint) {
+    suspend fun connect(endpoint: ReleaseHubEndpoint) {
         val encrypted = cipher.encrypt(endpoint.token)
         dataStore.edit {
             it[BASE_URL] = endpoint.baseUrl
@@ -110,6 +110,6 @@ class HubSettings(private val dataStore: DataStore<Preferences>, private val cip
         private val LAST_CHECKED = longPreferencesKey("last_checked_at")
 
         fun create(context: Context, cipher: SecretCipher = KeystoreSecretCipher()) =
-            HubSettings(context.applicationContext.hubSettingsDataStore, cipher)
+            ReleaseHubSettings(context.applicationContext.releaseHubSettingsDataStore, cipher)
     }
 }

@@ -79,7 +79,7 @@ func TestV1AuthFlow(t *testing.T) {
 	var st struct{ NeedsSetup bool }
 	v1Do(t, ts, "", "GET", "/api/v1/auth/setup", nil, 200, &st)
 	if !st.NeedsSetup {
-		t.Fatal("fresh hub must need setup")
+		t.Fatal("fresh release hub must need setup")
 	}
 	env := v1Do(t, ts, "", "GET", "/api/v1/auth/me", nil, 401, nil)
 	if env.Error.Code != "SESSION_INVALID" {
@@ -296,8 +296,8 @@ func TestSPAFallback(t *testing.T) {
 		"favicon.svg":     {Data: []byte("<svg/>")},
 	}
 	s, err := New(Options{
-		DBPath: filepath.Join(dir, "db.sqlite3"), BaseURL: "http://hub.test",
-		Storage: &LocalStorage{Dir: filepath.Join(dir, "artifacts"), BaseURL: "http://hub.test"},
+		DBPath: filepath.Join(dir, "db.sqlite3"), BaseURL: "http://release-hub.test",
+		Storage: &LocalStorage{Dir: filepath.Join(dir, "artifacts"), BaseURL: "http://release-hub.test"},
 		UI:      ui,
 	})
 	if err != nil {
@@ -317,7 +317,7 @@ func TestSPAFallback(t *testing.T) {
 	}
 	for _, p := range []string{"/", "/apps", "/apps/demo?tab=distribution", "/settings/tokens", "/login"} {
 		if code, body, _ := get(p); code != 200 || !strings.Contains(body, "id=root") {
-			t.Fatalf("%s: %d %q — want the SPA shell", p, code, body)
+			t.Fatalf("%s: %d %q; want the SPA shell", p, code, body)
 		}
 	}
 	if code, body, h := get("/assets/app-1.js"); code != 200 || body != "console.log(1)" || !strings.Contains(h.Get("Cache-Control"), "immutable") {

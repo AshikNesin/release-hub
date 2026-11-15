@@ -102,7 +102,7 @@ fun AppsRoute(
     )
 }
 
-/** Home: every hub app grouped by what it needs, with install and update actions. */
+/** Home: every release hub app grouped by what it needs, with install and update actions. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppsScreen(
@@ -217,7 +217,7 @@ private fun AppList(
         )
         for ((status, title) in sections) {
             val entries = if (status == null) {
-                groups[AppStatus.UpToDate].orEmpty() + groups[AppStatus.AheadOfHub].orEmpty()
+                groups[AppStatus.UpToDate].orEmpty() + groups[AppStatus.AheadOfReleaseHub].orEmpty()
             } else {
                 groups[status].orEmpty()
             }

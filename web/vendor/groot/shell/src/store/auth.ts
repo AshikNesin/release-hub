@@ -2,12 +2,12 @@
 // scripts/sync-groot.sh). Same public surface as groot's store so the vendored
 // Layout, ProtectedRoute, query-client and useSignOut work unchanged, minus
 // what release-hub does not have: emails, passkeys and multiple accounts.
-// The hub has one admin, signed in with a password (Go: srv/api_v1.go).
+// The release hub has one admin, signed in with a password (Go: srv/api_v1.go).
 import { create } from "zustand";
 import { ApiError, apiClient } from "@groot/shell/lib/api";
 import { describeError } from "@groot/shell/lib/feedback";
 
-/** The signed-in user (`GET /auth/me`): always the hub admin. */
+/** The signed-in user (`GET /auth/me`): always the release hub admin. */
 export interface SessionUser {
   id: number;
   email: string;

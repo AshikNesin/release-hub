@@ -10,7 +10,7 @@ import { SkeletonList } from "@groot/ui/loading-skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@groot/ui/table";
 import { monoClass, Text } from "@groot/ui/typography";
 import { useAction } from "@groot/shell/lib/feedback";
-import { hub, keys, usePlayAccounts } from "@/lib/hub";
+import { releaseHub, keys, usePlayAccounts } from "@/lib/releaseHub";
 import { fromNow } from "@/lib/format";
 import type { PlayAccount } from "@/lib/types";
 
@@ -19,10 +19,10 @@ export function PlayAccountsSettings() {
   const [file, setFile] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const add = useAction((f: File) => hub.addPlayAccount(f), {
+  const add = useAction((f: File) => releaseHub.addPlayAccount(f), {
     success: (res) => ({
       title: "Service account saved",
-      description: `${res.serviceAccount} — enable it per app on the app's Configuration tab.`,
+      description: `${res.serviceAccount}: enable it per app on the app's Configuration tab.`,
     }),
     errorTitle: "Could not save the service account",
     fallback: "Unable to save the service account",
@@ -32,7 +32,7 @@ export function PlayAccountsSettings() {
       if (fileInput.current) fileInput.current.value = "";
     },
   });
-  const remove = useAction((a: PlayAccount) => hub.deletePlayAccount(a.id), {
+  const remove = useAction((a: PlayAccount) => releaseHub.deletePlayAccount(a.id), {
     confirm: (a) => ({
       title: `Remove ${a.email}?`,
       description: a.usedBy.length

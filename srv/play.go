@@ -89,23 +89,23 @@ func classifyPlayError(err error) error {
 	var gerr *googleapi.Error
 	if !errors.As(err, &gerr) {
 		if strings.Contains(err.Error(), "invalid_grant") || strings.Contains(err.Error(), "invalid_client") {
-			return fmt.Errorf("credentials rejected (invalid_grant) — the service-account JSON key is wrong or revoked; upload a fresh key in Settings")
+			return fmt.Errorf("credentials rejected (invalid_grant): the service-account JSON key is wrong or revoked; upload a fresh key in Settings")
 		}
 		return err
 	}
 	switch gerr.Code {
 	case 401:
-		return fmt.Errorf("%s — the service-account JSON key is wrong or revoked; upload a fresh key in Settings", gerr.Message)
+		return fmt.Errorf("%s: the service-account JSON key is wrong or revoked; upload a fresh key in Settings", gerr.Message)
 	case 403:
 		// The API-disabled case has its own precise remedy (the enable URL);
 		// don't bury it under the generic no-access hints.
 		if strings.Contains(gerr.Message, "has not been used in project") ||
 			strings.Contains(gerr.Message, "it is disabled") {
-			return fmt.Errorf("%s — open the URL in this message and click Enable, wait a few minutes, then test again. (This is the Google Play Android Developer API switch in the service account's Cloud project; normally the Play Console → Setup → API access link enables it automatically.)", gerr.Message)
+			return fmt.Errorf("%s: open the URL in this message and click Enable, wait a few minutes, then test again. (This is the Google Play Android Developer API switch in the service account's Cloud project; normally the Play Console → Setup → API access link enables it automatically.)", gerr.Message)
 		}
-		return fmt.Errorf("%s — no access to this package. Causes in order of likelihood: (1) app not created in Play yet (the API cannot create apps), (2) service account not invited in Play Console → Users & permissions → Invite new users with 'Create and manage releases', (3) API access not linked in Play Console → Setup → API access. Note: a newly invited service account or fresh API link can take up to 24h (usually minutes) to take effect.", gerr.Message)
+		return fmt.Errorf("%s: no access to this package. Causes in order of likelihood: (1) app not created in Play yet (the API cannot create apps), (2) service account not invited in Play Console → Users & permissions → Invite new users with 'Create and manage releases', (3) API access not linked in Play Console → Setup → API access. Note: a newly invited service account or fresh API link can take up to 24h (usually minutes) to take effect.", gerr.Message)
 	case 404:
-		return fmt.Errorf("%s — no app with this package exists in Play yet; create it in Play Console first (the API cannot create apps)", gerr.Message)
+		return fmt.Errorf("%s: no app with this package exists in Play yet; create it in Play Console first (the API cannot create apps)", gerr.Message)
 	default:
 		// Draft-app gate: closed/open/production releases are rejected until
 		// the app has left draft state. An internal-track release alone does
@@ -115,19 +115,19 @@ func classifyPlayError(err error) error {
 		// release as DRAFT in Console and send it) — once the app status
 		// changes from Draft, API 'completed' releases work on all tracks.
 		if strings.Contains(gerr.Message, "Only releases with status draft may be created on draft app") {
-			return fmt.Errorf("%s — the app is still in DRAFT state on Play: non-internal 'completed' releases are blocked until the app has been sent for review at least once. In Play Console: Publishing overview → send the pending internal release for review (or create the closed release as a draft there and send it). After the app leaves draft, retry this upload (bump versionCode).", gerr.Message)
+			return fmt.Errorf("%s: the app is still in DRAFT state on Play: non-internal 'completed' releases are blocked until the app has been sent for review at least once. In Play Console: Publishing overview → send the pending internal release for review (or create the closed release as a draft there and send it). After the app leaves draft, retry this upload (bump versionCode).", gerr.Message)
 		}
 		return err
 	}
 }
 
-// trackFor maps hub channels to Play track identifiers.
+// trackFor maps release-release-hub channels to Play track identifiers.
 //
 // The simple Android-convention model:
 //
 //	public    → production
 //	beta      → beta       (Google's OPEN testing track id)
-//	alpha     → alpha      (the hub's CLOSED testing track, auto-created)
+//	alpha     → alpha      (the release hub's CLOSED testing track, auto-created)
 //	internal  → internal   (internal testing)
 //	direct    → —          (no Play involvement)
 //
@@ -156,13 +156,13 @@ func trackFor(channel string) (string, bool) {
 	return "", false
 }
 
-// alphaTrack is the closed testing track the hub uses for the alpha
+// alphaTrack is the closed testing track the release hub uses for the alpha
 // channel — created automatically via edits.tracks.create on first use.
 const alphaTrack = "alpha"
 
 var closedTrackNameRx = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9-]{1,28}$`)
 
-// trackIsClosed reports whether a hub channel targets the hub's closed
+// trackIsClosed reports whether a release-hub channel targets the release hub's closed
 // testing track (alpha — or its legacy spellings closed/closed:<name>) —
 // the only tracks where pushing tester groups via the API is accepted.
 func trackIsClosed(channel string) bool {
@@ -257,7 +257,7 @@ func (p *PlayPublisher) Publish(ctx context.Context, aabPath, channel, versionNa
 	return releaseName, nil
 }
 
-// ensureClosedTrack returns the Play track identifier for a hub closed
+// ensureClosedTrack returns the Play track identifier for a release hub closed
 // channel, creating the track first when it doesn't exist yet. Play's
 // edits.tracks.create supports exactly one type — closedTesting — which is
 // precisely what we need. Harmless no-op when the track already exists

@@ -46,7 +46,7 @@ fun ConnectRoute(viewModel: ConnectViewModel, onConnected: () -> Unit, onNavigat
     )
 }
 
-/** Hub URL + API token, checked against the hub before they're saved. */
+/** Hub URL + API token, checked against the release hub before they're saved. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConnectScreen(
@@ -107,7 +107,7 @@ fun ConnectScreen(
                 keyboardActions = KeyboardActions(onDone = { onConnect() }),
                 modifier = Modifier.fillMaxWidth(),
             )
-            state.hubError?.let {
+            state.releaseHubError?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
             }
             Button(

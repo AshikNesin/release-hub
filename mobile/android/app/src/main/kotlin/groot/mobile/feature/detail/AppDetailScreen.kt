@@ -47,7 +47,7 @@ import groot.mobile.R
 import groot.mobile.data.InstalledApps
 import groot.mobile.data.catalog.AppStatus
 import groot.mobile.data.catalog.CatalogEntry
-import groot.mobile.data.hub.HubRelease
+import groot.mobile.data.releasehub.ReleaseHubRelease
 import groot.mobile.install.InstallState
 import groot.mobile.ui.AppIcon
 import groot.mobile.ui.AppIconLoader
@@ -103,7 +103,7 @@ fun AppDetailScreen(
     canOpen: Boolean,
     onNavigateUp: () -> Unit,
     onInstall: () -> Unit,
-    onInstallRelease: (HubRelease) -> Unit,
+    onInstallRelease: (ReleaseHubRelease) -> Unit,
     onOpen: () -> Unit,
     onUninstall: () -> Unit,
     onAutoUpdateChange: (Boolean) -> Unit,
@@ -286,10 +286,10 @@ private fun History(
     entry: CatalogEntry,
     history: HistoryState,
     busy: Boolean,
-    onInstallRelease: (HubRelease) -> Unit,
+    onInstallRelease: (ReleaseHubRelease) -> Unit,
     onRetry: () -> Unit,
 ) {
-    var confirm by remember { mutableStateOf<HubRelease?>(null) }
+    var confirm by remember { mutableStateOf<ReleaseHubRelease?>(null) }
     val context = LocalContext.current
     SettingsSection(title = stringResource(R.string.detail_section_history)) {
         when {

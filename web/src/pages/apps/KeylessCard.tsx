@@ -16,15 +16,15 @@ import { Label } from "@groot/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@groot/ui/table";
 import { Text, monoClass } from "@groot/ui/typography";
 import { useAction } from "@groot/shell/lib/feedback";
-import { hub, keys, useOidcGrants } from "@/lib/hub";
+import { releaseHub, keys, useOidcGrants } from "@/lib/releaseHub";
 import { formatDateTime, fromNow } from "@/lib/format";
 import type { AppDetail } from "@/lib/types";
 
 const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
 
 /** The workflow snippet CI copies. Audience is fixed; subject comes from the grant. */
-function workflowSnippet(slug: string, hubUrl: string): string {
-  return `# .github/workflows/release.yml — keyless publish to ${slug}
+function workflowSnippet(slug: string, releaseHubUrl: string): string {
+  return `# .github/workflows/release.yml: keyless publish to ${slug}
 permissions:
   id-token: write   # request the repo's OIDC token
   contents: read
@@ -34,31 +34,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Get a hub token (no stored secret)
+      - name: Get a release-hub token (no stored secret)
         run: |
           oidc=$(curl -fsS \\
             -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \\
             -H "Accept: application/json; api-version=2.0" \\
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=release-hub" | jq -r .value)
-          HUB_TOKEN=$(curl -fsS -X POST "${hubUrl}/api/oidc/exchange" \\
+          RELEASE_HUB_TOKEN=$(curl -fsS -X POST "${releaseHubUrl}/api/oidc/exchange" \\
             --data-urlencode "token=$oidc" | jq -r .token)
-          echo "::add-mask::$HUB_TOKEN"
-          echo "HUB_TOKEN=$HUB_TOKEN" >> "$GITHUB_ENV"
+          echo "::add-mask::$RELEASE_HUB_TOKEN"
+          echo "RELEASE_HUB_TOKEN=$RELEASE_HUB_TOKEN" >> "$GITHUB_ENV"
       # …then upload as usual:
-      # curl -H "Authorization: Bearer $HUB_TOKEN" -F file=@app-release.apk \\
-      #   -F channel=direct "${hubUrl}/api/apps/${slug}/releases"`;
+      # curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" -F file=@app-release.apk \\
+      #   -F channel=direct "${releaseHubUrl}/api/apps/${slug}/releases"`;
 }
 
 export function KeylessCard({ app }: { app: AppDetail }) {
   const { data: grants, isLoading } = useOidcGrants(app.slug);
   const [subject, setSubject] = useState("");
   const [name, setName] = useState("");
-  // The hub's own base URL, as the upload URLs already carry it.
-  const hubUrl = app.platforms[0]?.uploadUrl?.replace(/\/api\/apps.*$/, "") ?? "";
+  // The release hub's own base URL, as the upload URLs already carry it.
+  const releaseHubUrl = app.platforms[0]?.uploadUrl?.replace(/\/api\/apps.*$/, "") ?? "";
 
   const create = useAction(
     (v: { subject: string; name: string }) =>
-      hub.createOidcGrant(app.slug, {
+      releaseHub.createOidcGrant(app.slug, {
         issuer: GITHUB_ISSUER,
         subject: v.subject,
         name: v.name,
@@ -74,7 +74,7 @@ export function KeylessCard({ app }: { app: AppDetail }) {
       },
     },
   );
-  const revoke = useAction((id: number) => hub.deleteOidcGrant(id), {
+  const revoke = useAction((id: number) => releaseHub.deleteOidcGrant(id), {
     confirm: (id) => {
       const g = grants?.find((x) => x.id === id);
       return {
@@ -100,7 +100,7 @@ export function KeylessCard({ app }: { app: AppDetail }) {
         </CardTitle>
         <CardDescription>
           Let a GitHub repo publish this app with no stored secret: its Actions
-          identity is exchanged for a 1-hour hub token scoped to{" "}
+          identity is exchanged for a 1-hour release-hub token scoped to{" "}
           <code className={monoClass}>{app.slug}</code> alone. One repo → one app.
         </CardDescription>
         <CardAction>
@@ -116,7 +116,7 @@ export function KeylessCard({ app }: { app: AppDetail }) {
           <EmptyState
             icon={GitBranch}
             title="No keyless grants yet"
-            description="Add the repository that publishes this app and drop the HUB_TOKEN secret from CI."
+            description="Add the repository that publishes this app and drop the RELEASE_HUB_TOKEN secret from CI."
           />
         ) : (
           <div className="overflow-hidden rounded-xl border">
@@ -203,7 +203,7 @@ export function KeylessCard({ app }: { app: AppDetail }) {
         </form>
         <Text variant="meta" className="block">
           Find the exact subject under the workflow's{" "}
-          <code className={monoClass}>Actions OIDC issuer</code> — it differs per ref and event. The
+          <code className={monoClass}>Actions OIDC issuer</code>; it differs per ref and event. The
           issuer is fixed to <code className={monoClass}>{GITHUB_ISSUER}</code>.
         </Text>
 
@@ -212,9 +212,9 @@ export function KeylessCard({ app }: { app: AppDetail }) {
             <GitBranch />
             <AlertTitle>Workflow snippet</AlertTitle>
             <AlertDescription className="w-full space-y-2">
-              <p>No HUB_TOKEN secret needed — just <code className={monoClass}>id-token: write</code>.</p>
+              <p>No RELEASE_HUB_TOKEN secret needed; just <code className={monoClass}>id-token: write</code>.</p>
               <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-xs">
-                <code>{workflowSnippet(app.slug, hubUrl || "https://hub.example.com")}</code>
+                <code>{workflowSnippet(app.slug, releaseHubUrl || "https://release-hub.example.com")}</code>
               </pre>
             </AlertDescription>
           </Alert>

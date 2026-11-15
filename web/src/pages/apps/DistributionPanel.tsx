@@ -14,11 +14,11 @@ import { metaLabelClass, Text } from "@groot/ui/typography";
 import { useAction } from "@groot/shell/lib/feedback";
 import { CHANNELS, ChannelBadge } from "@/components/badges";
 import { CopyField } from "@/components/copy";
-import { hub, keys } from "@/lib/hub";
+import { releaseHub, keys } from "@/lib/releaseHub";
 import type { PlatformDetail } from "@/lib/types";
 
 export function DistributionPanel({ slug, platform }: { slug: string; platform: PlatformDetail }) {
-  const invite = useAction(() => hub.inviteTesters(slug, platform.platform), {
+  const invite = useAction(() => releaseHub.inviteTesters(slug, platform.platform), {
     confirm: {
       title: "Invite testers to alpha?",
       description:
@@ -40,7 +40,7 @@ export function DistributionPanel({ slug, platform }: { slug: string; platform: 
         <CardHeader>
           <CardTitle>Share links</CardTitle>
           <CardDescription>
-            Stable URLs that always resolve to the newest release on each channel — safe to put in a
+            Stable URLs that always resolve to the newest release on each channel, safe to put in a
             README or send to testers.
           </CardDescription>
         </CardHeader>
@@ -50,7 +50,7 @@ export function DistributionPanel({ slug, platform }: { slug: string; platform: 
               <div className="flex flex-col gap-0.5">
                 <ChannelBadge channel={s.label} className="w-fit" />
                 <Text variant="meta" className="hidden sm:block">
-                  {CHANNELS[s.label]?.where.replace(" — direct APK + update manifest", "")}
+                  {CHANNELS[s.label]?.where.replace(", direct APK + update manifest", "")}
                 </Text>
               </div>
               <CopyField value={s.url} what={`${s.label} link`} />
@@ -77,7 +77,7 @@ export function DistributionPanel({ slug, platform }: { slug: string; platform: 
             <CardTitle>Testers</CardTitle>
             <CardDescription>
               Google Groups go to the alpha (closed testing) track through the API. Individual
-              emails can't be pushed by Google's API — paste them into Play Console's tester lists.
+              emails can't be pushed by Google's API; paste them into Play Console's tester lists.
             </CardDescription>
             <CardAction>
               <Button
@@ -105,12 +105,12 @@ export function DistributionPanel({ slug, platform }: { slug: string; platform: 
                 </div>
               ) : (
                 <Text variant="meta" className="mt-1 block">
-                  None yet —{" "}
+                  None yet.{" "}
                   <Link
                     to="/settings/testers"
                     className="underline underline-offset-2 hover:text-foreground"
                   >
-                    add Google Group addresses in Settings
+                    Add Google Group addresses in Settings
                   </Link>
                   .
                 </Text>

@@ -9,7 +9,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/** Encrypts small secrets (the hub token) before they're written to disk. */
+/** Encrypts small secrets (the release-hub token) before they're written to disk. */
 interface SecretCipher {
     fun encrypt(plain: String): String
 
@@ -18,8 +18,8 @@ interface SecretCipher {
 }
 
 /**
- * AES-256-GCM with a key that lives in the Android Keystore and never leaves the device. The hub
- * token unlocks signing keys on the hub, so it's never stored in plain text.
+ * AES-256-GCM with a key that lives in the Android Keystore and never leaves the device. The release hub
+ * token unlocks signing keys on the release hub, so it's never stored in plain text.
  */
 class KeystoreSecretCipher(private val alias: String = "release_hub_token") : SecretCipher {
     override fun encrypt(plain: String): String {

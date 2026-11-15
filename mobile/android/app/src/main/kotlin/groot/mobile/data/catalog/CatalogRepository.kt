@@ -1,11 +1,11 @@
 package groot.mobile.data.catalog
 
-import groot.mobile.data.HubSettings
+import groot.mobile.data.ReleaseHubSettings
 import groot.mobile.data.InstalledApps
-import groot.mobile.data.hub.HubApi
-import groot.mobile.data.hub.HubEndpoint
-import groot.mobile.data.hub.HubException
-import groot.mobile.data.hub.HubRelease
+import groot.mobile.data.releasehub.ReleaseHubApi
+import groot.mobile.data.releasehub.ReleaseHubEndpoint
+import groot.mobile.data.releasehub.ReleaseHubException
+import groot.mobile.data.releasehub.ReleaseHubRelease
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -26,12 +26,12 @@ data class CatalogState(
 )
 
 /**
- * The hub's apps joined with what's installed. One instance per process, shared by every screen and
+ * The release hub's apps joined with what's installed. One instance per process, shared by every screen and
  * the background worker, so a refresh anywhere shows up everywhere.
  */
 class CatalogRepository(
-    private val api: HubApi,
-    private val settings: HubSettings,
+    private val api: ReleaseHubApi,
+    private val settings: ReleaseHubSettings,
     private val installedApps: InstalledApps,
     private val selfPackage: String,
     private val clock: () -> Long = System::currentTimeMillis,
@@ -39,16 +39,16 @@ class CatalogRepository(
     private val _state = MutableStateFlow(CatalogState())
     val state: StateFlow<CatalogState> = _state.asStateFlow()
 
-    /** Reloads from the hub. Returns the fresh entries, or throws [HubException] (also recorded in [state]). */
+    /** Reloads from the release hub. Returns the fresh entries, or throws [ReleaseHubException] (also recorded in [state]). */
     suspend fun refresh(): List<CatalogEntry> {
-        val endpoint = settings.currentEndpoint() ?: throw HubException("Not connected to a hub")
+        val endpoint = settings.currentEndpoint() ?: throw ReleaseHubException("Not connected to a release hub")
         _state.update { it.copy(refreshing = true) }
         return try {
             val entries = load(endpoint)
             settings.markChecked(clock())
             _state.value = CatalogState(entries = entries, loaded = true)
             entries
-        } catch (e: HubException) {
+        } catch (e: ReleaseHubException) {
             _state.update { it.copy(refreshing = false, error = e.message) }
             throw e
         }
@@ -59,7 +59,7 @@ class CatalogRepository(
         runCatching { refresh() }
     }
 
-    /** Re-reads one package's installed version after an install or uninstall, without a hub round trip. */
+    /** Re-reads one package's installed version after an install or uninstall, without a release hub round trip. */
     fun refreshInstalled(packageName: String) {
         _state.update { state ->
             state.copy(
@@ -79,17 +79,17 @@ class CatalogRepository(
 
     fun entry(slug: String): CatalogEntry? = _state.value.entries.firstOrNull { it.slug == slug }
 
-    suspend fun releases(slug: String): List<HubRelease> {
-        val endpoint = settings.currentEndpoint() ?: throw HubException("Not connected to a hub")
+    suspend fun releases(slug: String): List<ReleaseHubRelease> {
+        val endpoint = settings.currentEndpoint() ?: throw ReleaseHubException("Not connected to a release hub")
         return api.releases(endpoint, slug)
     }
 
-    /** Forgets everything loaded from the previous hub. */
+    /** Forgets everything loaded from the previous release hub. */
     fun clear() {
         _state.value = CatalogState()
     }
 
-    private suspend fun load(endpoint: HubEndpoint): List<CatalogEntry> = coroutineScope {
+    private suspend fun load(endpoint: ReleaseHubEndpoint): List<CatalogEntry> = coroutineScope {
         val apps = api.listApps(endpoint)
         val limit = Semaphore(PARALLEL_REQUESTS)
         apps.map { app ->
@@ -99,7 +99,7 @@ class CatalogRepository(
                 try {
                     val latest = limit.withPermit { api.latest(endpoint, app.slug) }
                     CatalogEntry(app, installed, latest, isSelf)
-                } catch (e: HubException) {
+                } catch (e: ReleaseHubException) {
                     if (e.unauthorized) throw e
                     CatalogEntry(app, installed, latest = null, isSelf = isSelf, error = e.message)
                 }

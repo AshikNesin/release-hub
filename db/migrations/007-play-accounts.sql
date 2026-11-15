@@ -1,4 +1,4 @@
--- Hub-wide Google Play service accounts: one credential shared by every
+-- Release-hub-wide Google Play service accounts: one credential shared by every
 -- app; per-platform rows keep only an enabled flag (+ optional account
 -- link for future multi-account use).
 CREATE TABLE IF NOT EXISTS play_accounts (

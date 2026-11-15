@@ -8,12 +8,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import groot.kit.buildinfo.BuildInfo
 import groot.kit.log.Log
 import groot.kit.theme.ThemeModeStore
-import groot.mobile.data.HubSettings
+import groot.mobile.data.ReleaseHubSettings
 import groot.mobile.data.InstalledApps
 import groot.mobile.data.PackageManagerInstalledApps
 import groot.mobile.data.catalog.CatalogRepository
-import groot.mobile.data.hub.HttpHubApi
-import groot.mobile.data.hub.HubApi
+import groot.mobile.data.releasehub.HttpReleaseHubApi
+import groot.mobile.data.releasehub.ReleaseHubApi
 import groot.mobile.install.AndroidInstallUi
 import groot.mobile.install.AppVisibility
 import groot.mobile.install.HttpApkDownloader
@@ -56,13 +56,13 @@ class AppContainer(context: Context) {
 
     val themeModeStore: ThemeModeStore = ThemeModeStore.create(appContext)
 
-    val hubSettings: HubSettings = HubSettings.create(appContext)
+    val releaseHubSettings: ReleaseHubSettings = ReleaseHubSettings.create(appContext)
 
-    val hubApi: HubApi = HttpHubApi()
+    val releaseHubApi: ReleaseHubApi = HttpReleaseHubApi()
 
     val installedApps: InstalledApps = PackageManagerInstalledApps(appContext)
 
-    val catalog = CatalogRepository(hubApi, hubSettings, installedApps, selfPackage = appContext.packageName)
+    val catalog = CatalogRepository(releaseHubApi, releaseHubSettings, installedApps, selfPackage = appContext.packageName)
 
     val visibility = AppVisibility()
 
@@ -79,7 +79,7 @@ class AppContainer(context: Context) {
         apkDir = File(appContext.cacheDir, "apks"),
     )
 
-    val updateRunner = UpdateRunner(hubSettings, catalog, installController, notifications::updatesAvailable)
+    val updateRunner = UpdateRunner(releaseHubSettings, catalog, installController, notifications::updatesAvailable)
 
     private val scheduler = UpdateScheduler(appContext)
 
@@ -91,8 +91,8 @@ class AppContainer(context: Context) {
 
     val graph = AppGraph(
         themeModeStore = themeModeStore,
-        hubSettings = hubSettings,
-        hubApi = hubApi,
+        releaseHubSettings = releaseHubSettings,
+        releaseHubApi = releaseHubApi,
         catalog = catalog,
         installController = installController,
         installTracker = installTracker,
@@ -108,10 +108,10 @@ class AppContainer(context: Context) {
         allowCleartext = BuildConfig.DEBUG,
     )
 
-    /** Schedules, reschedules or cancels the background check whenever the hub or update settings change. */
+    /** Schedules, reschedules or cancels the background check whenever the release hub or update settings change. */
     fun keepUpdateScheduleInSync() {
         appScope.launch {
-            combine(hubSettings.endpoint, hubSettings.updatePrefs) { endpoint, prefs ->
+            combine(releaseHubSettings.endpoint, releaseHubSettings.updatePrefs) { endpoint, prefs ->
                 (endpoint != null) to prefs.copy(lastCheckedAt = 0, excludedSlugs = emptySet())
             }
                 .distinctUntilChanged()

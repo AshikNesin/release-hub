@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { monoClass, Text } from "@groot/ui/typography";
 import { useAction } from "@groot/shell/lib/feedback";
 import { CopyField } from "@/components/copy";
-import { hub, keys, useTokens } from "@/lib/hub";
+import { releaseHub, keys, useTokens } from "@/lib/releaseHub";
 import { formatDateTime, fromNow } from "@/lib/format";
 import type { ApiToken } from "@/lib/types";
 
@@ -19,10 +19,10 @@ export function TokensSettings() {
   const [name, setName] = useState("");
   const [fresh, setFresh] = useState<{ name: string; token: string } | null>(null);
 
-  const create = useAction((n: string) => hub.createToken(n), {
+  const create = useAction((n: string) => releaseHub.createToken(n), {
     success: (t) => ({
       title: "Token created",
-      description: `Copy “${t.name}” now — it is shown only once.`,
+      description: `Copy “${t.name}” now; it is shown only once.`,
     }),
     errorTitle: "Could not create the token",
     fallback: "Unable to create the token",
@@ -32,7 +32,7 @@ export function TokensSettings() {
       setName("");
     },
   });
-  const revoke = useAction((t: ApiToken) => hub.deleteToken(t.id), {
+  const revoke = useAction((t: ApiToken) => releaseHub.deleteToken(t.id), {
     confirm: (t) => ({
       title: `Revoke “${t.name}”?`,
       description:
@@ -80,9 +80,9 @@ export function TokensSettings() {
           {fresh && (
             <Alert>
               <KeyRound />
-              <AlertTitle>New token “{fresh.name}” — copy it now</AlertTitle>
+              <AlertTitle>New token “{fresh.name}”; copy it now</AlertTitle>
               <AlertDescription className="w-full space-y-2">
-                <p>It won't be shown again. Store it as a CI secret, e.g. HUB_TOKEN.</p>
+                <p>It won't be shown again. Store it as a CI secret, e.g. RELEASE_HUB_TOKEN.</p>
                 <CopyField value={fresh.token} what="Token" className="w-full" />
               </AlertDescription>
             </Alert>

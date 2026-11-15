@@ -1,6 +1,6 @@
 package groot.mobile.updates
 
-import groot.mobile.data.HubSettings
+import groot.mobile.data.ReleaseHubSettings
 import groot.mobile.data.catalog.AppStatus
 import groot.mobile.data.catalog.CatalogEntry
 import groot.mobile.data.catalog.CatalogRepository
@@ -21,12 +21,12 @@ data class UpdateRunSummary(
  * WorkManager so it's tested with fakes.
  */
 class UpdateRunner(
-    private val settings: HubSettings,
+    private val settings: ReleaseHubSettings,
     private val catalog: CatalogRepository,
     private val installer: InstallController,
     private val notify: (List<String>) -> Unit,
 ) {
-    /** Throws [groot.mobile.data.hub.HubException] when the hub can't be read. */
+    /** Throws [groot.mobile.data.releasehub.ReleaseHubException] when the release hub can't be read. */
     suspend fun run(): UpdateRunSummary {
         if (settings.currentEndpoint() == null) return UpdateRunSummary(0, emptyList(), emptyList())
         val prefs = settings.currentUpdatePrefs()

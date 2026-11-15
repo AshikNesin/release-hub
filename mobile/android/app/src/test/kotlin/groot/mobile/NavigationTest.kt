@@ -9,7 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import groot.kit.theme.GrootTheme
-import groot.mobile.data.hub.HubApp
+import groot.mobile.data.releasehub.ReleaseHubApp
 import groot.mobile.navigation.AppNavHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -28,12 +28,12 @@ class NavigationTest {
     private fun setApp() = compose.setContent { GrootTheme { AppNavHost(graph = app.graph) } }
 
     @Test
-    fun `without a hub, home offers to connect, settings and about open and back returns`() {
+    fun `without a release hub, home offers to connect, settings and about open and back returns`() {
         setApp()
         compose.onNodeWithText("Your own app store").assertExists()
 
-        compose.onNodeWithText("Connect to a hub").performClick()
-        compose.onNodeWithText("Hub URL").assertExists()
+        compose.onNodeWithText("Connect to a release hub").performClick()
+        compose.onNodeWithText("Release hub URL").assertExists()
         compose.onNodeWithContentDescription("Navigate up").performClick()
 
         compose.onNodeWithContentDescription("Settings").performClick()
@@ -48,9 +48,9 @@ class NavigationTest {
     }
 
     @Test
-    fun `connected, home lists hub apps by status and opens an app's page`() {
+    fun `connected, home lists release hub apps by status and opens an app's page`() {
         runBlocking { app.settings.connect(fakeEndpoint) }
-        app.api.apps = listOf(HubApp("demo", "io.demo"), HubApp("notes", "io.notes"))
+        app.api.apps = listOf(ReleaseHubApp("demo", "io.demo"), ReleaseHubApp("notes", "io.notes"))
         app.api.manifests = mapOf("demo" to manifest(2, notes = "Faster sync"), "notes" to manifest(1))
         app.api.releases = mapOf("demo" to listOf(release(2), release(1)))
         app.installed.install("io.demo", 1, label = "Demo")
@@ -63,7 +63,7 @@ class NavigationTest {
         compose.onNodeWithText("Install").assertExists()
 
         compose.onNodeWithText("Demo").performClick()
-        compose.onNodeWithText("Latest on hub").assertExists()
+        compose.onNodeWithText("Latest on release hub").assertExists()
         compose.onNodeWithText("Faster sync").assertExists()
         compose.onNodeWithText("RELEASE HISTORY").performScrollTo().assertExists()
 

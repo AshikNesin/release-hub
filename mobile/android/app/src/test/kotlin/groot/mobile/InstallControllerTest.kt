@@ -3,7 +3,7 @@ package groot.mobile
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import groot.mobile.data.hub.HubApp
+import groot.mobile.data.releasehub.ReleaseHubApp
 import groot.mobile.install.InstallException
 import groot.mobile.install.InstallResult
 import groot.mobile.install.InstallState
@@ -22,7 +22,7 @@ class InstallControllerTest {
     private suspend fun TestScope.appWithUpdate(): TestApp {
         val app = TestApp(backgroundScope)
         app.settings.connect(fakeEndpoint)
-        app.api.apps = listOf(HubApp("demo", "io.demo"))
+        app.api.apps = listOf(ReleaseHubApp("demo", "io.demo"))
         app.api.manifests = mapOf("demo" to manifest(2))
         app.installed.install("io.demo", 1, label = "Demo")
         app.catalog.refresh()

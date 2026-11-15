@@ -14,7 +14,7 @@ import {
 import { Form, FormField } from "@groot/ui/form";
 import { Input } from "@groot/ui/input";
 import { useAction } from "@groot/shell/lib/feedback";
-import { hub, keys } from "@/lib/hub";
+import { releaseHub, keys } from "@/lib/releaseHub";
 
 // Mirrors slugRe in srv/api_releases.go.
 const schema = z.object({
@@ -24,7 +24,7 @@ const schema = z.object({
 export function RegisterAppDialog({ trigger }: { trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const create = useAction((slug: string) => hub.createApp(slug), {
+  const create = useAction((slug: string) => releaseHub.createApp(slug), {
     success: (_, slug) => ({
       title: "App registered",
       description: `Add the ${slug} platform next.`,
@@ -52,7 +52,7 @@ export function RegisterAppDialog({ trigger }: { trigger?: React.ReactNode }) {
         <DialogHeader>
           <DialogTitle>Register app</DialogTitle>
           <DialogDescription>
-            Just a slug — one per product. Android and iOS platforms are added from the app's page.
+            Just a slug, one per product. Android and iOS platforms are added from the app's page.
           </DialogDescription>
         </DialogHeader>
         <Form

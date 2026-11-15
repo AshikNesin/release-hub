@@ -2,7 +2,7 @@ package groot.mobile
 
 import android.content.pm.PackageInstaller
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import groot.mobile.data.hub.HubApp
+import groot.mobile.data.releasehub.ReleaseHubApp
 import groot.mobile.updates.UpdateRunner
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class UpdateRunnerTest {
     @Test
-    fun `does nothing without a hub`() = runTest {
+    fun `does nothing without a release hub`() = runTest {
         val app = TestApp(backgroundScope)
         val notified = mutableListOf<List<String>>()
         val summary = UpdateRunner(app.settings, app.catalog, app.controller) { notified += it }.run()
@@ -29,8 +29,8 @@ class UpdateRunnerTest {
         app.ui.foreground = false
         app.settings.connect(fakeEndpoint)
         app.settings.setAutoUpdateFor("manual", enabled = false)
-        app.api.apps = listOf(HubApp("hub", SELF_PACKAGE), HubApp("auto", "io.auto"), HubApp("manual", "io.manual"), HubApp("new", "io.new"))
-        app.api.manifests = mapOf("hub" to manifest(3), "auto" to manifest(2), "manual" to manifest(2), "new" to manifest(1))
+        app.api.apps = listOf(ReleaseHubApp("release-hub", SELF_PACKAGE), ReleaseHubApp("auto", "io.auto"), ReleaseHubApp("manual", "io.manual"), ReleaseHubApp("new", "io.new"))
+        app.api.manifests = mapOf("release-hub" to manifest(3), "auto" to manifest(2), "manual" to manifest(2), "new" to manifest(1))
         app.installed.install(SELF_PACKAGE, 2, label = "Release Hub")
         app.installed.install("io.auto", 1, label = "Auto")
         app.installed.install("io.manual", 1, label = "Manual")
@@ -59,7 +59,7 @@ class UpdateRunnerTest {
         val app = TestApp(backgroundScope)
         app.settings.connect(fakeEndpoint)
         app.settings.setAutoUpdate(false)
-        app.api.apps = listOf(HubApp("a", "io.a"))
+        app.api.apps = listOf(ReleaseHubApp("a", "io.a"))
         app.api.manifests = mapOf("a" to manifest(2))
         app.installed.install("io.a", 1, label = "A")
 

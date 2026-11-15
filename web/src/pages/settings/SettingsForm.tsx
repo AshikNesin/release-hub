@@ -16,14 +16,14 @@ import { Textarea } from "@groot/ui/textarea";
 import { Text } from "@groot/ui/typography";
 import { cn } from "@groot/ui/lib/utils";
 import { useAction } from "@groot/shell/lib/feedback";
-import { hub, keys, useSettings } from "@/lib/hub";
-import type { HubSettings, SettingsPatch } from "@/lib/types";
+import { releaseHub, keys, useSettings } from "@/lib/releaseHub";
+import type { ReleaseHubSettings, SettingsPatch } from "@/lib/types";
 
 export interface SettingField {
   key: keyof SettingsPatch;
   label: string;
   /** Read the current value out of the settings payload. */
-  read: (s: HubSettings) => string;
+  read: (s: ReleaseHubSettings) => string;
   placeholder?: string;
   hint?: ReactNode;
   multiline?: boolean;
@@ -32,7 +32,7 @@ export interface SettingField {
 }
 
 /**
- * A card of hub settings with one Save: only this card's keys are sent
+ * A card of release hub settings with one Save: only this card's keys are sent
  * (PATCH /api/v1/settings saves just the keys present).
  */
 export function SettingsForm({
@@ -49,14 +49,14 @@ export function SettingsForm({
   children?: ReactNode;
 }) {
   const { data: settings, isLoading } = useSettings();
-  const initial = (s: HubSettings) => Object.fromEntries(fields.map((f) => [f.key, f.read(s)]));
+  const initial = (s: ReleaseHubSettings) => Object.fromEntries(fields.map((f) => [f.key, f.read(s)]));
   const [values, setValues] = useState<Record<string, string>>({});
   useEffect(() => {
     if (settings) setValues(initial(settings));
     // Reset the draft whenever the saved settings change.
   }, [settings]);
 
-  const save = useAction((patch: SettingsPatch) => hub.patchSettings(patch), {
+  const save = useAction((patch: SettingsPatch) => releaseHub.patchSettings(patch), {
     success: `${title} saved`,
     errorTitle: `Could not save ${title.toLowerCase()}`,
     fallback: "Unable to save the settings",

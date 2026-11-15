@@ -28,12 +28,12 @@ type Storage interface {
 	// sha256. Implementations must clean up on failure.
 	Save(ctx context.Context, key string, src io.Reader) (size int64, sha256Hex string, err error)
 
-	// Open returns a reader for the artifact (for the hub to serve/proxy).
+	// Open returns a reader for the artifact (for the release hub to serve/proxy).
 	Open(ctx context.Context, key string) (io.ReadCloser, error)
 
 	// PublicURL returns the URL devices should download from. For local
-	// storage this is a hub-relative path; for S3 a presigned GET (or public
-	// bucket URL) so traffic bypasses the hub entirely.
+	// storage this is a release-hub-relative path; for S3 a presigned GET (or public
+	// bucket URL) so traffic bypasses the release hub entirely.
 	PublicURL(ctx context.Context, key string) (string, error)
 
 	// Delete removes the artifact. Best effort.
@@ -48,7 +48,7 @@ type Storage interface {
 
 type LocalStorage struct {
 	Dir     string // absolute dir under which artifacts/<slug>/<file> live
-	BaseURL string // hub base URL for building download links
+	BaseURL string // release-hub base URL for building download links
 }
 
 func (l *LocalStorage) path(key string) string {

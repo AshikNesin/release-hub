@@ -2,7 +2,7 @@ package srv
 
 // Keyless publishing: verify short-lived OIDC identity tokens (GitHub
 // Actions, or any OIDC issuer) against the issuer's published keys and mint
-// an app-scoped hub token, so CI never stores a secret. Grants are registered
+// an app-scoped release-hub token, so CI never stores a secret. Grants are registered
 // per identity: issuer + subject → one app (srv/api_oidc.go, db migration 011).
 
 import (
@@ -26,7 +26,7 @@ import (
 // oidcAudience is the audience CI must request on its OIDC tokens.
 const oidcAudience = "release-hub"
 
-// exchangeTTL is how long a hub token minted by an OIDC exchange lives.
+// exchangeTTL is how long a release-hub token minted by an OIDC exchange lives.
 const exchangeTTL = time.Hour
 
 // oidcLeeway is the clock-skew allowance for exp/nbf/iat.
@@ -219,7 +219,7 @@ func (s *Server) verifyOIDCToken(ctx context.Context, raw string) (dbgen.OidcGra
 		return grant, errors.New("signature verification failed")
 	}
 
-	// Claims must match the grant and the hub, with a little clock leeway.
+	// Claims must match the grant and the release hub, with a little clock leeway.
 	if err := claims.ValidateWithLeeway(jwt.Expected{
 		Issuer:     grant.Issuer,
 		Subject:    grant.Subject,

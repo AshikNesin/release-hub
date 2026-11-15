@@ -1,27 +1,27 @@
 package groot.mobile.data.catalog
 
 import groot.mobile.data.InstalledApp
-import groot.mobile.data.hub.HubApp
-import groot.mobile.data.hub.HubManifest
+import groot.mobile.data.releasehub.ReleaseHubApp
+import groot.mobile.data.releasehub.ReleaseHubManifest
 
-/** Where an app stands on this device against the hub's newest direct release. */
+/** Where an app stands on this device against the release hub's newest direct release. */
 enum class AppStatus {
     UpdateAvailable,
     NotInstalled,
     UpToDate,
 
-    /** Installed build is newer than the hub's (e.g. a local debug build). */
-    AheadOfHub,
+    /** Installed build is newer than the release hub's (e.g. a local debug build). */
+    AheadOfReleaseHub,
 
-    /** The hub has no direct-channel release for it yet. */
+    /** The release hub has no direct-channel release for it yet. */
     NoRelease,
 }
 
-/** One hub app as this device sees it. */
+/** One release hub app as this device sees it. */
 data class CatalogEntry(
-    val app: HubApp,
+    val app: ReleaseHubApp,
     val installed: InstalledApp?,
-    val latest: HubManifest?,
+    val latest: ReleaseHubManifest?,
     /** True for Release Hub's own entry: installing it updates this app. */
     val isSelf: Boolean = false,
     /** Why the latest release couldn't be read, if it couldn't. */
@@ -37,7 +37,7 @@ data class CatalogEntry(
             val installed = installed ?: return AppStatus.NotInstalled
             return when {
                 installed.versionCode < latest.versionCode -> AppStatus.UpdateAvailable
-                installed.versionCode > latest.versionCode -> AppStatus.AheadOfHub
+                installed.versionCode > latest.versionCode -> AppStatus.AheadOfReleaseHub
                 else -> AppStatus.UpToDate
             }
         }

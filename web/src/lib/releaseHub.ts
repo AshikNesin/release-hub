@@ -4,7 +4,7 @@ import type {
   ApiToken,
   AppDetail,
   AppSummary,
-  HubSettings,
+  ReleaseHubSettings,
   OidcGrant,
   Platform,
   PlayAccount,
@@ -27,7 +27,7 @@ export const keys = {
 const plat = (slug: string, platform: Platform) => `/apps/${encodeURIComponent(slug)}/${platform}`;
 
 /** Every call the UI makes, typed. The shell's apiClient unwraps the envelope. */
-export const hub = {
+export const releaseHub = {
   listApps: () => apiClient.get<AppSummary[]>("/apps"),
   createApp: (slug: string) => apiClient.post<{ slug: string }>("/apps", { slug }),
   getApp: (slug: string) => apiClient.get<AppDetail>(`/apps/${encodeURIComponent(slug)}`),
@@ -68,8 +68,8 @@ export const hub = {
       channel: "alpha",
     }),
 
-  getSettings: () => apiClient.get<HubSettings>("/settings"),
-  patchSettings: (patch: SettingsPatch) => apiClient.patch<HubSettings>("/settings", patch),
+  getSettings: () => apiClient.get<ReleaseHubSettings>("/settings"),
+  patchSettings: (patch: SettingsPatch) => apiClient.patch<ReleaseHubSettings>("/settings", patch),
   listTokens: () => apiClient.get<ApiToken[]>("/tokens"),
   createToken: (name: string) =>
     apiClient.post<{ name: string; token: string }>("/tokens", { name }),
@@ -94,12 +94,12 @@ export const hub = {
   deletePlayAccount: (id: number) => apiClient.delete(`/play-accounts/${id}`),
 };
 
-export const useApps = () => useQuery({ queryKey: keys.apps, queryFn: hub.listApps });
+export const useApps = () => useQuery({ queryKey: keys.apps, queryFn: releaseHub.listApps });
 export const useApp = (slug: string) =>
-  useQuery({ queryKey: keys.app(slug), queryFn: () => hub.getApp(slug) });
-export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: hub.getSettings });
-export const useTokens = () => useQuery({ queryKey: keys.tokens, queryFn: hub.listTokens });
+  useQuery({ queryKey: keys.app(slug), queryFn: () => releaseHub.getApp(slug) });
+export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: releaseHub.getSettings });
+export const useTokens = () => useQuery({ queryKey: keys.tokens, queryFn: releaseHub.listTokens });
 export const useOidcGrants = (slug: string) =>
-  useQuery({ queryKey: keys.oidcGrants(slug), queryFn: () => hub.listOidcGrants(slug) });
+  useQuery({ queryKey: keys.oidcGrants(slug), queryFn: () => releaseHub.listOidcGrants(slug) });
 export const usePlayAccounts = () =>
-  useQuery({ queryKey: keys.playAccounts, queryFn: hub.listPlayAccounts });
+  useQuery({ queryKey: keys.playAccounts, queryFn: releaseHub.listPlayAccounts });

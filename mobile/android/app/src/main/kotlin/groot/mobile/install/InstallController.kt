@@ -5,7 +5,7 @@ import android.content.pm.PackageInstaller
 import groot.kit.log.Log
 import groot.mobile.data.catalog.CatalogEntry
 import groot.mobile.data.catalog.CatalogRepository
-import groot.mobile.data.hub.HubManifest
+import groot.mobile.data.releasehub.ReleaseHubManifest
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
@@ -68,7 +68,7 @@ class InstallController(
      * report through notifications instead of screens. Returns once Android has a final answer, or
      * [InstallResult.WaitingForUser] if the person hasn't confirmed within the wait.
      */
-    suspend fun install(entry: CatalogEntry, manifest: HubManifest? = entry.latest, background: Boolean = false): InstallResult {
+    suspend fun install(entry: CatalogEntry, manifest: ReleaseHubManifest? = entry.latest, background: Boolean = false): InstallResult {
         val release = manifest ?: return InstallResult.Failed
         val packageName = entry.packageName
         if (tracker.get(packageName)?.busy == true) return InstallResult.WaitingForUser
@@ -80,7 +80,7 @@ class InstallController(
         return mutex.withLock { installLocked(entry, release, background) }
     }
 
-    private suspend fun installLocked(entry: CatalogEntry, release: HubManifest, background: Boolean): InstallResult {
+    private suspend fun installLocked(entry: CatalogEntry, release: ReleaseHubManifest, background: Boolean): InstallResult {
         val packageName = entry.packageName
         val apk = File(apkDir, "${entry.slug}-${release.versionCode}.apk")
         try {
@@ -166,7 +166,7 @@ fun installFailureMessage(status: Int, message: String?): String {
     return when {
         "DOWNGRADE" in raw -> "Android doesn't install an older version over a newer one. Uninstall first."
         "UPDATE_INCOMPATIBLE" in raw || status == PackageInstaller.STATUS_FAILURE_CONFLICT ->
-            "The installed app is signed with a different key. Uninstall it, then install from the hub."
+            "The installed app is signed with a different key. Uninstall it, then install from the release hub."
         status == PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> "This APK isn't compatible with this device."
         status == PackageInstaller.STATUS_FAILURE_STORAGE -> "Not enough storage to install."
         status == PackageInstaller.STATUS_FAILURE_BLOCKED -> "The install was blocked on this device."

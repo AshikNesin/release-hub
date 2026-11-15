@@ -16,7 +16,7 @@ import { Input } from "@groot/ui/input";
 import { Label } from "@groot/ui/label";
 import { monoClass } from "@groot/ui/typography";
 import { useAction } from "@groot/shell/lib/feedback";
-import { hub, keys } from "@/lib/hub";
+import { releaseHub, keys } from "@/lib/releaseHub";
 import type { AppDetail } from "@/lib/types";
 
 /**
@@ -31,11 +31,11 @@ export function DeleteAppDialog({ app }: { app: AppDetail }) {
   const releaseCount = app.platforms.reduce((n, p) => n + p.releases.length, 0);
   const hasSigningKey = app.platforms.some((p) => p.signing.hasKey);
 
-  const del = useAction(() => hub.deleteApp(app.slug), {
+  const del = useAction(() => releaseHub.deleteApp(app.slug), {
     confirm: {
       title: `Delete ${app.slug}?`,
       description:
-        "Every release, artifact and stored signing key for all its platforms is deleted from the hub. This cannot be undone. Anything already published to Google Play stays on Play.",
+        "Every release, artifact and stored signing key for all its platforms is deleted from the release hub. This cannot be undone. Anything already published to Google Play stays on Play.",
       confirmLabel: "Delete app",
       destructive: true,
     },
@@ -67,7 +67,7 @@ export function DeleteAppDialog({ app }: { app: AppDetail }) {
         <DialogHeader>
           <DialogTitle>Delete {app.slug}?</DialogTitle>
           <DialogDescription>
-            This permanently deletes the app from the hub: all {releaseCount}{" "}
+            This permanently deletes the app from the release hub: all {releaseCount}{" "}
             {releaseCount === 1 ? "release" : "releases"} and their artifacts, every platform's
             package, retention and Play wiring.
           </DialogDescription>

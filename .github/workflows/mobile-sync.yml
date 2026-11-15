@@ -66,8 +66,8 @@ jobs:
             (if (.breakingChanges // []) | length > 0 then "### ⚠ Breaking changes\n" + ((.breakingChanges | map("- " + .)) | join("\n")) + "\n" else empty end),
             "### Auto-applied (\((.autoApply // []) | length))", ((.autoApply // [])[] | "- `mobile/" + . + "`"), "",
             "### Merged (\((.autoMerged // []) | length))", ((.autoMerged // [])[] | "- `mobile/" + . + "`"), "",
-            "### Conflicts — run `pnpm groot:resolve` in mobile/ (\((.conflicts // []) | length))", ((.conflicts // [])[] | "- `mobile/" + (if type == "object" then .file else . end) + "`"), "",
-            "### Drift — new upstream paths, not synced (\((.drift // []) | length))", ((.drift // [])[] | "- `" + . + "`")
+            "### Conflicts: run `pnpm groot:resolve` in mobile/ (\((.conflicts // []) | length))", ((.conflicts // [])[] | "- `mobile/" + (if type == "object" then .file else . end) + "`"), "",
+            "### Drift: new upstream paths, not synced (\((.drift // []) | length))", ((.drift // [])[] | "- `" + . + "`")
           ' .groot/sync-report.json > /tmp/sync-pr-body.md
 
       - name: Open or update the sync PR

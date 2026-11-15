@@ -16,7 +16,7 @@ import { Input } from "@groot/ui/input";
 import { Label } from "@groot/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@groot/ui/select";
 import { useAction } from "@groot/shell/lib/feedback";
-import { hub, keys } from "@/lib/hub";
+import { releaseHub, keys } from "@/lib/releaseHub";
 import { platformLabel } from "@/lib/format";
 import type { AppDetail, Platform } from "@/lib/types";
 
@@ -60,7 +60,7 @@ export function AddPlatformDialog({ app }: { app: AppDetail }) {
   const [open, setOpen] = useState(false);
   const taken = new Set(app.platforms.map((p) => p.platform));
   const options = (["android", "ios"] as const).filter((p) => !taken.has(p));
-  const add = useAction((v: Values) => hub.addPlatform(app.slug, v), {
+  const add = useAction((v: Values) => releaseHub.addPlatform(app.slug, v), {
     success: (res, v) => ({
       title: `${platformLabel(v.platform)} platform added`,
       description: res.signingKey

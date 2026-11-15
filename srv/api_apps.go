@@ -68,9 +68,9 @@ func (s *Server) handleApiCreateApp(w http.ResponseWriter, r *http.Request) {
 
 // handleApiDeleteApp DELETE /api/apps/{slug} — removes the app with all its
 // platforms, releases and stored signing keys, then deletes the app's
-// artifact subtree from storage (best effort: the hub stays consistent even
+// artifact subtree from storage (best effort: the release hub stays consistent even
 // if a storage error leaves files behind). What Google Play already
-// published stays on Play — the hub only ever managed uploads.
+// published stays on Play — the release hub only ever managed uploads.
 func (s *Server) handleApiDeleteApp(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	app, ok := s.appFromSlug(w, r, slug)

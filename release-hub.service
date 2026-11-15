@@ -1,5 +1,5 @@
 [Unit]
-Description=release-hub — app release distribution hub
+Description=release-hub: app release distribution hub
 After=network.target
 
 [Service]

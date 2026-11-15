@@ -5,13 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import groot.mobile.data.HubSettings
+import groot.mobile.data.ReleaseHubSettings
 import groot.mobile.data.UpdatePrefs
 import groot.mobile.data.catalog.CatalogEntry
 import groot.mobile.data.catalog.CatalogRepository
-import groot.mobile.data.hub.HubException
-import groot.mobile.data.hub.HubManifest
-import groot.mobile.data.hub.HubRelease
+import groot.mobile.data.releasehub.ReleaseHubException
+import groot.mobile.data.releasehub.ReleaseHubManifest
+import groot.mobile.data.releasehub.ReleaseHubRelease
 import groot.mobile.install.InstallController
 import groot.mobile.install.InstallResult
 import groot.mobile.install.InstallState
@@ -28,7 +28,7 @@ import kotlinx.coroutines.launch
 data class HistoryState(
     val loading: Boolean = true,
     /** Installable (direct-channel APK) releases, newest first. */
-    val releases: List<HubRelease> = emptyList(),
+    val releases: List<ReleaseHubRelease> = emptyList(),
     val error: String? = null,
 )
 
@@ -41,7 +41,7 @@ data class AppDetailUiState(
 
 class AppDetailViewModel(
     private val slug: String,
-    private val settings: HubSettings,
+    private val settings: ReleaseHubSettings,
     private val catalog: CatalogRepository,
     private val installer: InstallController,
     tracker: InstallTracker,
@@ -66,14 +66,14 @@ class AppDetailViewModel(
         viewModelScope.launch {
             history.value = try {
                 HistoryState(loading = false, releases = catalog.releases(slug).filter { it.installable })
-            } catch (e: HubException) {
+            } catch (e: ReleaseHubException) {
                 HistoryState(loading = false, error = e.message)
             }
         }
     }
 
     /** Installs [release] (the newest by default). */
-    fun install(release: HubManifest? = null) {
+    fun install(release: ReleaseHubManifest? = null) {
         val entry = state.value.entry ?: return
         installScope.launch {
             if (installer.install(entry, release ?: entry.latest) == InstallResult.NeedsPermission) {
@@ -101,7 +101,7 @@ class AppDetailViewModel(
     companion object {
         fun factory(
             slug: String,
-            settings: HubSettings,
+            settings: ReleaseHubSettings,
             catalog: CatalogRepository,
             installer: InstallController,
             tracker: InstallTracker,

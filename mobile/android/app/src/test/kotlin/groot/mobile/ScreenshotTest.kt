@@ -14,7 +14,7 @@ import groot.mobile.data.InstalledApp
 import groot.mobile.data.UpdatePrefs
 import groot.mobile.data.catalog.CatalogEntry
 import groot.mobile.data.catalog.CatalogState
-import groot.mobile.data.hub.HubApp
+import groot.mobile.data.releasehub.ReleaseHubApp
 import groot.mobile.feature.about.AboutScreen
 import groot.mobile.feature.apps.AppsScreen
 import groot.mobile.feature.apps.AppsUiState
@@ -132,7 +132,7 @@ class ScreenshotTest {
 
     @Composable
     private fun Connect() = ConnectScreen(
-        state = ConnectUiState(url = HUB_URL, hubError = "The hub rejected the API token"),
+        state = ConnectUiState(url = RELEASE_HUB_URL, releaseHubError = "The release hub rejected the API token"),
         onUrlChange = {},
         onTokenChange = {},
         onConnect = {},
@@ -143,8 +143,8 @@ class ScreenshotTest {
     private fun Settings(mode: ThemeMode) = SettingsScreen(
         themeMode = mode,
         onThemeModeChange = {},
-        hubUrl = HUB_URL,
-        onOpenHub = {},
+        releaseHubUrl = RELEASE_HUB_URL,
+        onOpenReleaseHub = {},
         onDisconnect = {},
         prefs = UpdatePrefs(lastCheckedAt = 1_794_650_000_000),
         onAutoUpdateChange = {},
@@ -167,12 +167,12 @@ class ScreenshotTest {
 private fun installed(pkg: String, label: String, code: Long) = InstalledApp(pkg, label, code, "1.$code", SELF_PACKAGE)
 
 private val sampleEntries = listOf(
-    CatalogEntry(HubApp("tinyfirewall", "io.nesin.tinyfirewall"), installed("io.nesin.tinyfirewall", "Tiny Firewall", 142), manifest(143, notes = "Faster rule sync.\nFixes a crash on Android 16.")),
-    CatalogEntry(HubApp("budget", "io.nesin.budget"), installed("io.nesin.budget", "Budget", 20), manifest(21)),
-    CatalogEntry(HubApp("notes", "io.nesin.notes"), null, manifest(3)),
-    CatalogEntry(HubApp("hub", SELF_PACKAGE), installed(SELF_PACKAGE, "Release Hub", 1), manifest(1), isSelf = true),
-    CatalogEntry(HubApp("groot-demo", "io.nesin.groot"), installed("io.nesin.groot", "Groot Demo", 9), manifest(7)),
-    CatalogEntry(HubApp("prototype", "io.nesin.prototype"), null, null),
+    CatalogEntry(ReleaseHubApp("tinyfirewall", "io.nesin.tinyfirewall"), installed("io.nesin.tinyfirewall", "Tiny Firewall", 142), manifest(143, notes = "Faster rule sync.\nFixes a crash on Android 16.")),
+    CatalogEntry(ReleaseHubApp("budget", "io.nesin.budget"), installed("io.nesin.budget", "Budget", 20), manifest(21)),
+    CatalogEntry(ReleaseHubApp("notes", "io.nesin.notes"), null, manifest(3)),
+    CatalogEntry(ReleaseHubApp("release-hub", SELF_PACKAGE), installed(SELF_PACKAGE, "Release Hub", 1), manifest(1), isSelf = true),
+    CatalogEntry(ReleaseHubApp("groot-demo", "io.nesin.groot"), installed("io.nesin.groot", "Groot Demo", 9), manifest(7)),
+    CatalogEntry(ReleaseHubApp("prototype", "io.nesin.prototype"), null, null),
 ).sortedWith(CatalogEntry.ORDER)
 
 private val sampleApps = AppsUiState(

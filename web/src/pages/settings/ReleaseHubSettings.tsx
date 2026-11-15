@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@groot/ui/alert";
 import { monoClass } from "@groot/ui/typography";
 import { ThemeSettings } from "@groot/shell/components/ThemeSettings";
 import { Settings, type SettingsSection } from "@groot/shell/pages/settings/Settings";
-import { useSettings } from "@/lib/hub";
+import { useSettings } from "@/lib/releaseHub";
 import { PlayAccountsSettings } from "./PlayAccountsSettings";
 import { SettingsForm } from "./SettingsForm";
 import { TokensSettings } from "./TokensSettings";
@@ -78,13 +78,13 @@ function TestersSettings() {
           <TriangleAlert className="text-warning" />
           <AlertDescription>
             Inviting replaces the track's tester list with exactly these groups. Testers added
-            directly in Play Console are removed — manage testers here or in Console, not both.
+            directly in Play Console are removed; manage testers here or in Console, not both.
           </AlertDescription>
         </Alert>
       </SettingsForm>
       <SettingsForm
         title="Individual tester emails"
-        description="Google's API cannot push personal addresses. The hub keeps this list as the source of truth: it's on every Play-enabled app's Distribution tab, ready to paste into Play Console's email lists, and served by GET /api/apps/{slug}/{platform}/testers."
+        description="Google's API cannot push personal addresses. The release hub keeps this list as the source of truth: it's on every Play-enabled app's Distribution tab, ready to paste into Play Console's email lists, and served by GET /api/apps/{slug}/{platform}/testers."
         fields={[
           {
             key: "play_tester_emails",
@@ -125,7 +125,7 @@ const SECTIONS: SettingsSection[] = [
   {
     id: "general",
     label: "General",
-    group: "Hub",
+    group: "Release hub",
     icon: SlidersHorizontal,
     description: "Defaults applied across every app.",
     keywords: ["bundle", "prefix", "package", "retention", "prune", "storage"],
@@ -138,7 +138,7 @@ const SECTIONS: SettingsSection[] = [
   {
     id: "testers",
     label: "Testers",
-    group: "Hub",
+    group: "Release hub",
     icon: Users,
     description: "Who gets Play testing builds.",
     keywords: ["beta", "alpha", "google groups", "email", "closed testing"],
@@ -148,7 +148,7 @@ const SECTIONS: SettingsSection[] = [
   {
     id: "signing",
     label: "Signing",
-    group: "Hub",
+    group: "Release hub",
     icon: FileBadge,
     description: "Certificate details for generated keystores.",
     keywords: ["keystore", "certificate", "organization", "country", "dn"],
@@ -187,6 +187,6 @@ const SECTIONS: SettingsSection[] = [
   },
 ];
 
-export function HubSettingsPage() {
+export function ReleaseHubSettingsPage() {
   return <Settings sections={SECTIONS} />;
 }

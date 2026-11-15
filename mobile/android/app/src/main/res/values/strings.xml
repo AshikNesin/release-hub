@@ -8,8 +8,8 @@
     <!-- Apps -->
     <string name="apps_connect_title">Your own app store</string>
     <string name="apps_connect_body">Connect to your release-hub server to install your apps and keep them up to date.</string>
-    <string name="apps_connect_action">Connect to a hub</string>
-    <string name="apps_empty">No Android apps on this hub yet. Register one in the hub, upload an APK to the direct channel, and it shows up here.</string>
+    <string name="apps_connect_action">Connect to a release hub</string>
+    <string name="apps_empty">No Android apps on this release hub yet. Register one in the release hub, upload an APK to the direct channel, and it shows up here.</string>
     <string name="apps_section_updates">Updates</string>
     <string name="apps_section_not_installed">Not installed</string>
     <string name="apps_section_installed">Installed</string>
@@ -33,14 +33,14 @@
     <string name="status_installing">Installing…</string>
     <string name="status_waiting_for_user">Confirm to install</string>
     <string name="status_update_line">%1$s → %2$s</string>
-    <string name="status_ahead">%1$s · newer than the hub (%2$s)</string>
+    <string name="status_ahead">%1$s · newer than the release hub (%2$s)</string>
     <string name="status_no_release">Nothing on the direct channel</string>
 
     <!-- App detail -->
     <string name="detail_section_versions">Versions</string>
     <string name="detail_installed">Installed</string>
     <string name="detail_not_installed">Not installed</string>
-    <string name="detail_latest">Latest on hub</string>
+    <string name="detail_latest">Latest on release hub</string>
     <string name="detail_none">None</string>
     <string name="detail_size">Download size</string>
     <string name="detail_published">Published</string>
@@ -59,26 +59,26 @@
     <string name="detail_history_latest">Latest</string>
     <string name="detail_install_version">Install %1$s?</string>
     <string name="detail_install_version_body">Android won’t install an older version over a newer one; uninstall first to go back.</string>
-    <string name="detail_missing">This app isn’t on the hub any more.</string>
+    <string name="detail_missing">This app isn’t on the release hub any more.</string>
     <string name="detail_signer_hint">Updates only install when the APK is signed with the same key as the installed app. Apps installed from Play are signed by Play.</string>
 
     <!-- Connect -->
-    <string name="connect_title">Hub</string>
-    <string name="connect_intro">Release Hub reads your apps from your release-hub server with an API token. Create one in the hub under Settings › API tokens.</string>
-    <string name="connect_url">Hub URL</string>
-    <string name="connect_url_hint">hub.example.com</string>
+    <string name="connect_title">Release hub</string>
+    <string name="connect_intro">Release Hub reads your apps from your release-hub server with an API token. Create one in the release hub under Settings › API tokens.</string>
+    <string name="connect_url">Release hub URL</string>
+    <string name="connect_url_hint">release-hub.example.com</string>
     <string name="connect_token">API token</string>
     <string name="connect_token_hint">rh_…</string>
     <string name="connect_token_keep">Leave empty to keep the saved token</string>
     <string name="connect_action">Connect</string>
     <string name="connect_checking">Checking…</string>
-    <string name="connect_invalid_url">Enter the hub’s address, e.g. https://hub.example.com</string>
+    <string name="connect_invalid_url">Enter the release hub’s address, e.g. https://release-hub.example.com</string>
     <string name="connect_missing_token">Enter an API token</string>
     <string name="connect_cleartext">Plain http is allowed only in debug builds. Use https so the token stays private.</string>
-    <string name="connect_security_note">The token is encrypted on this device with a key that never leaves it. It can also read signing keys on the hub, so create one just for this phone and revoke it if the phone is lost.</string>
+    <string name="connect_security_note">The token is encrypted on this device with a key that never leaves it. It can also read signing keys on the release hub, so create one just for this phone and revoke it if the phone is lost.</string>
 
     <!-- Settings -->
-    <string name="settings_section_hub">Hub</string>
+    <string name="settings_section_hub">Release hub</string>
     <string name="settings_hub">Server</string>
     <string name="settings_hub_none">Not connected</string>
     <string name="settings_disconnect">Disconnect</string>

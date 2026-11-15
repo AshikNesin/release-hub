@@ -66,9 +66,9 @@ from this folder, and CI from the repo root (`.github/workflows/mobile*.yml`). P
 
 - Kit, build-logic, `.groot/`, `scripts/` and `docs/` (outside `docs/app/`) are synced from the
   boilerplate; never edit them here. Kit fixes go upstream with `pnpm groot:upstream`.
-- The hub API is the contract: keep `data/hub/HubJson.kt` in step with the server's `srv/public.go`,
+- The release hub API is the contract: keep `data/releasehub/ReleaseHubJson.kt` in step with the server's `srv/public.go`,
   `srv/api_apps.go` and `srv/api_releases.go`. Only the bearer API (`/api/...`) and public endpoints
   are for devices; never call `/api/v1` (browser session only).
-- Never send the hub token anywhere but the hub (artifact URLs may be S3/CDN) and never log it.
+- Never send the release-release-hub token anywhere but the release hub (artifact URLs may be S3/CDN) and never log it.
 - Installs go through `InstallController` only, so the queue, progress and notifications stay consistent.
 

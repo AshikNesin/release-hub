@@ -55,7 +55,7 @@ export function Login() {
   };
 
   return (
-    <AuthFrame title="Welcome back" subtitle="Sign in with the hub's admin password.">
+    <AuthFrame title="Welcome back" subtitle="Sign in with the release hub's admin password.">
       <Form
         schema={loginSchema}
         defaultValues={{ password: "" }}

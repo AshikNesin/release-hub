@@ -9,7 +9,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_releases_platform_code
 
 -- Prune override for a platform: how many direct-channel releases to keep
 -- when auto-pruning runs after an upload. NULL (default) = inherit the
--- hub-wide Settings value; 0 = keep everything (never prune).
+-- release-hub-wide Settings value; 0 = keep everything (never prune).
 ALTER TABLE app_platforms ADD COLUMN prune_keep INTEGER;
 
 INSERT OR IGNORE INTO migrations (migration_number, migration_name)

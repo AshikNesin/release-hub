@@ -12,7 +12,7 @@ import (
 
 func TestLocalStorageSaveOpenURL(t *testing.T) {
 	dir := t.TempDir()
-	l := &LocalStorage{Dir: dir, BaseURL: "http://hub.test/"}
+	l := &LocalStorage{Dir: dir, BaseURL: "http://release-hub.test/"}
 	content := []byte("artifact-bytes")
 
 	size, sha, err := l.Save(nil, "app/1_file.apk", bytes.NewReader(content))
@@ -39,7 +39,7 @@ func TestLocalStorageSaveOpenURL(t *testing.T) {
 	}
 
 	u, _ := l.PublicURL(nil, "app/1_file.apk")
-	if u != "http://hub.test/artifacts/app/1_file.apk" {
+	if u != "http://release-hub.test/artifacts/app/1_file.apk" {
 		t.Fatalf("url %s", u)
 	}
 
@@ -63,7 +63,7 @@ func TestLocalStorageSaveOpenURL(t *testing.T) {
 
 func TestLocalStorageDeletePrefix(t *testing.T) {
 	dir := t.TempDir()
-	l := &LocalStorage{Dir: dir, BaseURL: "http://hub.test"}
+	l := &LocalStorage{Dir: dir, BaseURL: "http://release-hub.test"}
 	content := []byte("artifact-bytes")
 	for _, key := range []string{"demo/android/1_a.apk", "demo/ios/2_b.ipa", "other/android/1_c.apk"} {
 		if _, _, err := l.Save(nil, key, bytes.NewReader(content)); err != nil {

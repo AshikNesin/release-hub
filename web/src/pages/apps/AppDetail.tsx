@@ -10,7 +10,7 @@ import { PageLayout } from "@groot/shell/components/layout/PageLayout";
 import { Section } from "@groot/shell/components/layout/Section";
 import { ApiError } from "@groot/shell/lib/api";
 import { PlatformBadge } from "@/components/badges";
-import { useApp } from "@/lib/hub";
+import { useApp } from "@/lib/releaseHub";
 import { fromNow, platformLabel } from "@/lib/format";
 import type { AppDetail, PlatformDetail } from "@/lib/types";
 import { AddPlatformDialog } from "./AddPlatformDialog";
@@ -59,7 +59,7 @@ export function AppDetailPage() {
             description={
               missing
                 ? `No app is registered as “${slug}”.`
-                : "The hub did not answer. Retry in a moment."
+                : "The release hub did not answer. Retry in a moment."
             }
             action={
               missing ? (

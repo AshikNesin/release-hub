@@ -1,4 +1,4 @@
--- Play publish status per release: the hub records a release even when the
+-- Play publish status per release: the release hub records a release even when the
 -- Play push fails, and the failure almost always needs a MANUAL action in
 -- Play Console (send for review, grant permission, enable API…). Persist
 -- the outcome so the UI can show it until superseded by a newer release.

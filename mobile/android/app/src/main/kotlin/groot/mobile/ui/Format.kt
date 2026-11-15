@@ -12,7 +12,7 @@ fun versionLabel(name: String, code: Long): String = if (name.isBlank()) "$code"
 
 fun sizeLabel(context: Context, bytes: Long): String? = bytes.takeIf { it > 0 }?.let { Formatter.formatShortFileSize(context, it) }
 
-/** A hub RFC 3339 timestamp as a local medium date, or null when absent or unparseable. */
+/** An RFC 3339 timestamp as a local medium date, or null when absent or unparseable. */
 fun dateLabel(rfc3339: String, zone: ZoneId = ZoneId.systemDefault()): String? = runCatching {
     OffsetDateTime.parse(rfc3339).atZoneSameInstant(zone).format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
 }.getOrNull()

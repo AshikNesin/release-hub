@@ -41,7 +41,7 @@ import { monoClass, Text } from "@groot/ui/typography";
 import { describeError, useAction } from "@groot/shell/lib/feedback";
 import { CHANNELS, ChannelBadge } from "@/components/badges";
 import { CopyField } from "@/components/copy";
-import { hub, keys } from "@/lib/hub";
+import { releaseHub, keys } from "@/lib/releaseHub";
 import type { AppDetail, PlatformDetail, Preflight } from "@/lib/types";
 import { uploadCommand } from "./ReleasesPanel";
 
@@ -145,7 +145,7 @@ function SigningCard({ slug, platform }: { slug: string; platform: PlatformDetai
 function RetentionCard({ slug, platform }: { slug: string; platform: PlatformDetail }) {
   const { retention } = platform;
   const [value, setValue] = useState(retention.override === null ? "" : String(retention.override));
-  const save = useAction((keep: number | null) => hub.setRetention(slug, platform.platform, keep), {
+  const save = useAction((keep: number | null) => releaseHub.setRetention(slug, platform.platform, keep), {
     success: (res) => ({ title: "Retention saved", description: `Keeping ${res.label}.` }),
     errorTitle: "Could not save retention",
     fallback: "Unable to save retention",
@@ -178,7 +178,7 @@ function RetentionCard({ slug, platform }: { slug: string; platform: PlatformDet
               min={0}
               inputMode="numeric"
               className="w-36"
-              placeholder="Hub setting"
+              placeholder="Release hub setting"
               value={value}
               onChange={(e) => setValue(e.target.value)}
             />
@@ -190,7 +190,7 @@ function RetentionCard({ slug, platform }: { slug: string; platform: PlatformDet
         </form>
         <Text variant="meta" className="mt-3 block">
           Now keeping {retention.label}
-          {retention.override === null ? " (from the hub setting)" : ""}. Blank inherits Settings →
+          {retention.override === null ? " (from the release hub setting)" : ""}. Blank inherits Settings →
           General; 0 keeps everything.
         </Text>
       </CardContent>
@@ -246,11 +246,11 @@ function PlayCard({ app, platform }: { app: AppDetail; platform: PlatformDetail 
 
 function PlayEnabled({ app, platform }: { app: AppDetail; platform: PlatformDetail }) {
   const [check, setCheck] = useState<Preflight | "running" | null>(null);
-  const disable = useAction(() => hub.setPlay(app.slug, platform.platform, { enable: false }), {
+  const disable = useAction(() => releaseHub.setPlay(app.slug, platform.platform, { enable: false }), {
     confirm: {
       title: "Disable Google Play publishing?",
       description:
-        "Uploads keep landing on the hub but stop being pushed to Play. The shared service account stays in Settings.",
+        "Uploads keep landing on the release hub but stop being pushed to Play. The shared service account stays in Settings.",
       confirmLabel: "Disable",
       destructive: true,
     },
@@ -263,7 +263,7 @@ function PlayEnabled({ app, platform }: { app: AppDetail; platform: PlatformDeta
   const runCheck = async () => {
     setCheck("running");
     try {
-      setCheck(await hub.preflight(app.slug, platform.platform));
+      setCheck(await releaseHub.preflight(app.slug, platform.platform));
     } catch (error) {
       setCheck({ ok: false, detail: describeError(error, "The connection check failed.") });
     }
@@ -319,7 +319,7 @@ function TracksDialog({ slug, platform }: { slug: string; platform: PlatformDeta
   const [open, setOpen] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: keys.tracks(slug, platform.platform),
-    queryFn: () => hub.tracks(slug, platform.platform),
+    queryFn: () => releaseHub.tracks(slug, platform.platform),
     enabled: open,
     staleTime: 30_000,
     retry: false,
@@ -358,7 +358,7 @@ function TracksDialog({ slug, platform }: { slug: string; platform: PlatformDeta
               <TableHeader>
                 <TableRow>
                   <TableHead className="pl-4">Track</TableHead>
-                  <TableHead>Hub channel</TableHead>
+                  <TableHead>Release hub channel</TableHead>
                   <TableHead className="pr-4">Releases</TableHead>
                 </TableRow>
               </TableHeader>
@@ -379,7 +379,7 @@ function TracksDialog({ slug, platform }: { slug: string; platform: PlatformDeta
                           ))}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">None</span>
                       )}
                     </TableCell>
                   </TableRow>
@@ -402,7 +402,7 @@ function PlayEnable({ app, platform }: { app: AppDetail; platform: PlatformDetai
   const [file, setFile] = useState<File | null>(null);
   const enable = useAction(
     () =>
-      hub.setPlay(
+      releaseHub.setPlay(
         app.slug,
         platform.platform,
         account === NEW_KEY ? { file: file as File } : { account: Number(account) },
@@ -472,7 +472,7 @@ function PlayEnable({ app, platform }: { app: AppDetail; platform: PlatformDetai
           >
             Play Console
           </a>{" "}
-          with package <span className={monoClass}>{platform.packageName}</span> first — the API
+          with package <span className={monoClass}>{platform.packageName}</span> first; the API
           can't create apps.
         </Text>
       </div>

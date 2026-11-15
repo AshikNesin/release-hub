@@ -63,7 +63,7 @@ func (s *Server) v1Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/apps/{slug}/{platform}/tracks", s.v1(s.handleApiListTracks))
 	mux.HandleFunc("POST /api/v1/apps/{slug}/{platform}/testers", s.v1(s.handleApiInviteTesters))
 
-	// Hub settings, tokens, shared Play accounts.
+	// Release hub settings, tokens, shared Play accounts.
 	mux.HandleFunc("GET /api/v1/settings", s.v1(s.handleV1GetSettings))
 	mux.HandleFunc("PATCH /api/v1/settings", s.v1(s.handleV1PatchSettings))
 	mux.HandleFunc("GET /api/v1/tokens", s.v1(s.handleV1ListTokens))
@@ -305,7 +305,7 @@ func (s *Server) handleV1Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if set {
-		writeErr(w, 403, "setup is already complete — sign in instead")
+		writeErr(w, 403, "setup is already complete; sign in instead")
 		return
 	}
 	pw := r.FormValue("password")

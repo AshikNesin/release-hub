@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/release-hub ./cmd/srv
 
 # ---- run ----
 FROM alpine:3.20
-RUN adduser -D -u 10001 hub && apk add --no-cache su-exec ca-certificates
+RUN adduser -D -u 10001 release-hub && apk add --no-cache su-exec ca-certificates
 COPY --from=build /out/release-hub /usr/local/bin/release-hub
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 VOLUME ["/data"]

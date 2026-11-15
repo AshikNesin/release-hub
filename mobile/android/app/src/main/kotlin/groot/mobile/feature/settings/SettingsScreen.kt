@@ -43,10 +43,10 @@ fun SettingsRoute(
     canInstall: () -> Boolean,
     onNavigateUp: () -> Unit,
     onOpenAbout: () -> Unit,
-    onOpenHub: () -> Unit,
+    onOpenReleaseHub: () -> Unit,
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
-    val hubUrl by viewModel.hubUrl.collectAsStateWithLifecycle()
+    val releaseHubUrl by viewModel.releaseHubUrl.collectAsStateWithLifecycle()
     val prefs by viewModel.updatePrefs.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var installAllowed by remember { mutableStateOf(true) }
@@ -64,8 +64,8 @@ fun SettingsRoute(
     SettingsScreen(
         themeMode = themeMode,
         onThemeModeChange = viewModel::setThemeMode,
-        hubUrl = hubUrl,
-        onOpenHub = onOpenHub,
+        releaseHubUrl = releaseHubUrl,
+        onOpenReleaseHub = onOpenReleaseHub,
         onDisconnect = viewModel::disconnect,
         prefs = prefs,
         onAutoUpdateChange = viewModel::setAutoUpdate,
@@ -95,8 +95,8 @@ fun SettingsRoute(
 fun SettingsScreen(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
-    hubUrl: String?,
-    onOpenHub: () -> Unit,
+    releaseHubUrl: String?,
+    onOpenReleaseHub: () -> Unit,
     onDisconnect: () -> Unit,
     prefs: UpdatePrefs,
     onAutoUpdateChange: (Boolean) -> Unit,
@@ -120,7 +120,7 @@ fun SettingsScreen(
         about = SettingsAbout(
             appName = stringResource(R.string.app_name),
             buildInfo = buildInfo,
-            // No "Rate the app": Release Hub ships from the hub, not Play. Feedback shows once a real
+            // No "Rate the app": Release Hub ships from the release hub, not Play. Feedback shows once a real
             // address is set in res/values/config.xml.
             feedbackEmail = stringResource(R.string.config_feedback_email).takeUnless { it.endsWith("@example.com") },
             makerName = stringResource(R.string.config_maker_name),
@@ -130,11 +130,11 @@ fun SettingsScreen(
         SettingsSection(title = stringResource(R.string.settings_section_hub)) {
             SettingsNavigationRow(
                 title = stringResource(R.string.settings_hub),
-                value = hubUrl?.let(::hostOf) ?: stringResource(R.string.settings_hub_none),
+                value = releaseHubUrl?.let(::hostOf) ?: stringResource(R.string.settings_hub_none),
                 icon = painterResource(R.drawable.ic_cloud),
-                onClick = onOpenHub,
+                onClick = onOpenReleaseHub,
             )
-            if (hubUrl != null) {
+            if (releaseHubUrl != null) {
                 SettingsActionRow(
                     title = stringResource(R.string.settings_disconnect),
                     summary = stringResource(R.string.settings_disconnect_summary),

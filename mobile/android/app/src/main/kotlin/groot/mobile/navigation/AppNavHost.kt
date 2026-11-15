@@ -84,7 +84,7 @@ fun AppNavHost(
         composable(Routes.APPS) {
             ScreenContainer {
                 val viewModel: AppsViewModel = viewModel(
-                    factory = AppsViewModel.factory(graph.hubSettings, graph.catalog, graph.installController, graph.installTracker, graph.appScope),
+                    factory = AppsViewModel.factory(graph.releaseHubSettings, graph.catalog, graph.installController, graph.installTracker, graph.appScope),
                 )
                 AppsRoute(
                     viewModel = viewModel,
@@ -101,7 +101,7 @@ fun AppNavHost(
             ScreenContainer {
                 val viewModel: AppDetailViewModel = viewModel(
                     factory = AppDetailViewModel.factory(
-                        slug, graph.hubSettings, graph.catalog, graph.installController, graph.installTracker, graph.appScope,
+                        slug, graph.releaseHubSettings, graph.catalog, graph.installController, graph.installTracker, graph.appScope,
                     ),
                 )
                 AppDetailRoute(
@@ -116,7 +116,7 @@ fun AppNavHost(
         composable(Routes.CONNECT) {
             ScreenContainer {
                 val viewModel: ConnectViewModel = viewModel(
-                    factory = ConnectViewModel.factory(graph.hubApi, graph.hubSettings, graph.allowCleartext),
+                    factory = ConnectViewModel.factory(graph.releaseHubApi, graph.releaseHubSettings, graph.allowCleartext),
                 )
                 ConnectRoute(
                     viewModel = viewModel,
@@ -128,7 +128,7 @@ fun AppNavHost(
         composable(Routes.SETTINGS) {
             ScreenContainer {
                 val viewModel: SettingsViewModel = viewModel(
-                    factory = SettingsViewModel.factory(graph.themeModeStore, graph.hubSettings, graph.catalog),
+                    factory = SettingsViewModel.factory(graph.themeModeStore, graph.releaseHubSettings, graph.catalog),
                 )
                 SettingsRoute(
                     viewModel = viewModel,
@@ -136,7 +136,7 @@ fun AppNavHost(
                     canInstall = graph.installController::canInstall,
                     onNavigateUp = navController::navigateUp,
                     onOpenAbout = { navController.navigate(Routes.ABOUT) },
-                    onOpenHub = { navController.navigate(Routes.CONNECT) },
+                    onOpenReleaseHub = { navController.navigate(Routes.CONNECT) },
                 )
             }
         }

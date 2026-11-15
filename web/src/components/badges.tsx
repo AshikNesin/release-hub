@@ -5,12 +5,12 @@ import { cn } from "@groot/ui/lib/utils";
 import { platformLabel } from "@/lib/format";
 import type { Channel, Platform, Release } from "@/lib/types";
 
-/** Where each hub channel lands, for tooltips and the dot colour. */
+/** Where each release hub channel lands, for tooltips and the dot colour. */
 export const CHANNELS: Record<string, { label: string; dot: string; where: string }> = {
   direct: {
     label: "direct",
     dot: "bg-muted-foreground",
-    where: "Hub only — direct APK + update manifest",
+    where: "Release hub only, direct APK + update manifest",
   },
   internal: { label: "internal", dot: "bg-info", where: "Play internal testing" },
   alpha: { label: "alpha", dot: "bg-warning", where: "Play closed testing (alpha track)" },
@@ -30,7 +30,7 @@ export function ChannelBadge({ channel, className }: { channel: Channel; classNa
 
 export const isPlayChannel = (channel: Channel) => channel !== "direct" && !!channel;
 
-/** Play outcome of one release; nothing for hub-only (direct) releases. */
+/** Play outcome of one release; nothing for release-hub-only (direct) releases. */
 export function PlayStatus({ release }: { release: Release }) {
   if (!isPlayChannel(release.channel)) return null;
   switch (release.playStatus) {

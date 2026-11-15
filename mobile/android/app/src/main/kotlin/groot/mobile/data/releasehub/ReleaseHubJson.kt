@@ -1,13 +1,13 @@
-package groot.mobile.data.hub
+package groot.mobile.data.releasehub
 
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
-/** Parsers for the hub's bearer and public API. Pure functions over response bodies, so tests need no server. */
-object HubJson {
+/** Parsers for the release hub's bearer and public API. Pure functions over response bodies, so tests need no server. */
+object ReleaseHubJson {
     /** Apps with an android platform; iOS-only apps are left out. */
-    fun parseApps(body: String): List<HubApp> = parse(body) {
+    fun parseApps(body: String): List<ReleaseHubApp> = parse(body) {
         val array = JSONArray(body)
         buildList {
             for (i in 0 until array.length()) {
@@ -16,16 +16,16 @@ object HubJson {
                 for (j in 0 until platforms.length()) {
                     val p = platforms.getJSONObject(j)
                     if (p.optString("platform") == "android") {
-                        add(HubApp(slug = app.getString("slug"), packageName = p.getString("packageName")))
+                        add(ReleaseHubApp(slug = app.getString("slug"), packageName = p.getString("packageName")))
                     }
                 }
             }
         }.sortedBy { it.slug }
     }
 
-    fun parseManifest(body: String): HubManifest = parse(body) {
+    fun parseManifest(body: String): ReleaseHubManifest = parse(body) {
         val o = JSONObject(body)
-        HubManifest(
+        ReleaseHubManifest(
             versionCode = o.getLong("versionCode"),
             versionName = o.optString("versionName"),
             apkUrl = o.getString("apkUrl"),
@@ -36,12 +36,12 @@ object HubJson {
         )
     }
 
-    /** Newest first, as the hub returns them. */
-    fun parseReleases(body: String): List<HubRelease> = parse(body) {
+    /** Newest first, as the release hub returns them. */
+    fun parseReleases(body: String): List<ReleaseHubRelease> = parse(body) {
         val array = JSONArray(body)
         List(array.length()) { i ->
             val o: JSONObject = array.getJSONObject(i)
-            HubRelease(
+            ReleaseHubRelease(
                 versionCode = o.getLong("versionCode"),
                 versionName = o.optString("versionName"),
                 channel = o.optString("channel"),
@@ -58,6 +58,6 @@ object HubJson {
     private inline fun <T> parse(body: String, block: () -> T): T = try {
         block()
     } catch (e: JSONException) {
-        throw HubException("The hub sent a response this app doesn't understand", cause = e)
+        throw ReleaseHubException("The release hub sent a response this app doesn't understand", cause = e)
     }
 }

@@ -1,7 +1,7 @@
 package groot.mobile
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import groot.mobile.data.hub.HubException
+import groot.mobile.data.releasehub.ReleaseHubException
 import groot.mobile.feature.connect.ConnectError
 import groot.mobile.feature.connect.ConnectViewModel
 import kotlinx.coroutines.Dispatchers
@@ -22,8 +22,8 @@ import org.junit.runner.RunWith
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 class ConnectViewModelTest {
-    private val api = FakeHubApi()
-    private val settings = fakeHubSettings()
+    private val api = FakeReleaseHubApi()
+    private val settings = fakeReleaseHubSettings()
 
     @Before
     fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -32,9 +32,9 @@ class ConnectViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     @Test
-    fun `a working URL and token are checked against the hub, then saved`() = runTest {
+    fun `a working URL and token are checked against the release hub, then saved`() = runTest {
         val vm = ConnectViewModel(api, settings, allowCleartext = false)
-        vm.onUrlChange("hub.example.com/")
+        vm.onUrlChange("release-hub.example.com/")
         vm.onTokenChange(" rh_test ")
         vm.connect()
 
@@ -45,20 +45,20 @@ class ConnectViewModelTest {
     }
 
     @Test
-    fun `the hub's refusal is shown and nothing is saved`() = runTest {
-        api.failure = HubException("The hub rejected the API token", 401)
+    fun `the release hub's refusal is shown and nothing is saved`() = runTest {
+        api.failure = ReleaseHubException("The release hub rejected the API token", 401)
         val vm = ConnectViewModel(api, settings, allowCleartext = false)
-        vm.onUrlChange(HUB_URL)
+        vm.onUrlChange(RELEASE_HUB_URL)
         vm.onTokenChange("rh_wrong")
         vm.connect()
 
-        assertEquals("The hub rejected the API token", vm.state.value.hubError)
+        assertEquals("The release hub rejected the API token", vm.state.value.releaseHubError)
         assertFalse(vm.state.value.connected)
         assertNull(settings.currentEndpoint())
     }
 
     @Test
-    fun `bad input never reaches the hub`() = runTest {
+    fun `bad input never reaches the release hub`() = runTest {
         val vm = ConnectViewModel(api, settings, allowCleartext = false)
         vm.onUrlChange("ftp://nope")
         vm.onTokenChange("rh_x")
@@ -69,7 +69,7 @@ class ConnectViewModelTest {
         vm.connect()
         assertEquals(ConnectError.Cleartext, vm.state.value.inputError)
 
-        vm.onUrlChange(HUB_URL)
+        vm.onUrlChange(RELEASE_HUB_URL)
         vm.onTokenChange("")
         vm.connect()
         assertEquals(ConnectError.MissingToken, vm.state.value.inputError)
@@ -77,7 +77,7 @@ class ConnectViewModelTest {
     }
 
     @Test
-    fun `debug builds may use a plain-http hub on the LAN`() = runTest {
+    fun `debug builds may use a plain-http release hub on the LAN`() = runTest {
         val vm = ConnectViewModel(api, settings, allowCleartext = true)
         vm.onUrlChange("http://192.168.1.5:9100")
         vm.onTokenChange("rh_test")
@@ -86,10 +86,10 @@ class ConnectViewModelTest {
     }
 
     @Test
-    fun `an empty token keeps the saved one for the same hub`() = runTest {
+    fun `an empty token keeps the saved one for the same release hub`() = runTest {
         settings.connect(fakeEndpoint)
         val vm = ConnectViewModel(api, settings, allowCleartext = false)
-        assertEquals(HUB_URL, vm.state.value.url)
+        assertEquals(RELEASE_HUB_URL, vm.state.value.url)
         assertTrue(vm.state.value.hasSavedToken)
 
         vm.connect()

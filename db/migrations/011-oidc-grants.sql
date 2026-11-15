@@ -1,6 +1,6 @@
 -- Keyless publishing: OIDC grants bind one external identity (a GitHub repo's
 -- Actions subject) to one app, so CI can exchange a short-lived OIDC token
--- for a hub token with no stored secret. One repo → one app (UNIQUE on the
+-- for a release-hub token with no stored secret. One repo → one app (UNIQUE on the
 -- identity), and the minted token is scoped to that app's publish endpoints.
 
 CREATE TABLE IF NOT EXISTS oidc_grants (
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS oidc_grants (
 
 -- Minted exchange tokens are api_tokens with a scope and an expiry; a row
 -- also remembers which grant minted it, so revoking the grant kills its
--- outstanding tokens immediately. scope_slug '' = hub-wide (handmade tokens).
+-- outstanding tokens immediately. scope_slug '' = release-hub-wide (handmade tokens).
 ALTER TABLE api_tokens ADD COLUMN scope_slug TEXT NOT NULL DEFAULT '';
 ALTER TABLE api_tokens ADD COLUMN expires_at TIMESTAMP;
 ALTER TABLE api_tokens ADD COLUMN oidc_grant_id INTEGER REFERENCES oidc_grants(id) ON DELETE SET NULL;

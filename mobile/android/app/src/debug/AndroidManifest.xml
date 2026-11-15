@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug builds may talk to a hub on the local network over plain http (`make run` serves :9100).
+<!-- Debug builds may talk to a release hub on the local network over plain http (`make run` serves :9100).
      Release builds are https only: the bearer token must not cross the network in cleartext. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">

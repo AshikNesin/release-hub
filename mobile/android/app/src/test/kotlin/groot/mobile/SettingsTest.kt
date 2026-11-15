@@ -34,7 +34,7 @@ class SettingsTest {
     @Test
     fun `the token is stored encrypted, never as typed`() = runTest {
         val store = FakePreferencesDataStore()
-        val settings = fakeHubSettings(store)
+        val settings = fakeReleaseHubSettings(store)
         settings.connect(fakeEndpoint)
 
         val stored = store.data.first()[stringPreferencesKey("token_encrypted")]
@@ -44,7 +44,7 @@ class SettingsTest {
 
     @Test
     fun `update preferences have safe defaults and per-app opt-outs`() = runTest {
-        val settings = fakeHubSettings()
+        val settings = fakeReleaseHubSettings()
         val defaults = settings.currentUpdatePrefs()
         assertTrue(defaults.autoUpdate)
         assertTrue(defaults.unmeteredOnly)
@@ -62,10 +62,10 @@ class SettingsTest {
         val app = TestApp(backgroundScope)
         val themeStore = fakeThemeModeStore()
         val vm = SettingsViewModel(themeStore, app.settings, app.catalog)
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.hubUrl.collect {} }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.releaseHubUrl.collect {} }
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.updatePrefs.collect {} }
         app.settings.connect(fakeEndpoint)
-        assertEquals(HUB_URL, vm.hubUrl.value)
+        assertEquals(RELEASE_HUB_URL, vm.releaseHubUrl.value)
 
         vm.setThemeMode(ThemeMode.Dark)
         vm.setUnmeteredOnly(false)
@@ -77,7 +77,7 @@ class SettingsTest {
         vm.disconnect()
         assertNull(app.settings.currentEndpoint())
         // The URL stays, so reconnecting only needs a token.
-        assertEquals(HUB_URL, app.settings.baseUrl.first())
+        assertEquals(RELEASE_HUB_URL, app.settings.baseUrl.first())
 
         vm.resetAll()
         assertEquals(ThemeMode.System, themeStore.themeMode.first())

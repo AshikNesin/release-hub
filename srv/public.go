@@ -25,7 +25,7 @@ type releaseManifest struct {
 	Sha256      string `json:"sha256"`
 	Size        int64  `json:"size"`
 	// Additive fields (older updaters ignore them): release notes for the
-	// Release Hub app's "What's new", and when the release was uploaded.
+	// release-hub app's "What's new", and when the release was uploaded.
 	Notes     string `json:"notes"`
 	CreatedAt string `json:"createdAt"`
 }
@@ -75,7 +75,7 @@ func (s *Server) handleManifest(w http.ResponseWriter, r *http.Request) {
 // handleGetRelease GET /apps/{slug}/download and /apps/{slug}/download/{platform}
 // Stable, shareable download link: ?channel=direct|internal|beta|public
 // (default direct).
-//   - direct:         302 → newest direct-channel artifact on this hub
+//   - direct:         302 → newest direct-channel artifact on this release hub
 //   - internal:       302 → Play internal-testing opt-in page (join as
 //     tester, then install from Play)
 //   - beta:           302 → Play open-testing opt-in page
@@ -129,7 +129,7 @@ func (s *Server) handleGetRelease(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleArtifact GET /artifacts/{slug}/{file} — public. For local storage
-// this streams from disk; for S3 it 302s to a presigned URL so the hub never
+// this streams from disk; for S3 it 302s to a presigned URL so the release hub never
 // proxies bucket traffic.
 func (s *Server) handleArtifact(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")

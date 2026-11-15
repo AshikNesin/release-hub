@@ -153,22 +153,22 @@ func TestOidcExchangeMintsScopedToken(t *testing.T) {
 	seedGrant(t, s, "app-one", fi.issuer, sub)
 	seedGrant(t, s, "app-two", fi.issuer, "repo:acme/app-two:ref:refs/heads/main")
 
-	code, hubTok := exchange(t, ts, fi.token(t, fi.issuer, sub, oidcAudience, time.Now().Add(10*time.Minute)))
-	if code != 200 || !strings.HasPrefix(hubTok, "rh_") {
-		t.Fatalf("exchange: code=%d token=%q", code, hubTok)
+	code, releaseHubTok := exchange(t, ts, fi.token(t, fi.issuer, sub, oidcAudience, time.Now().Add(10*time.Minute)))
+	if code != 200 || !strings.HasPrefix(releaseHubTok, "rh_") {
+		t.Fatalf("exchange: code=%d token=%q", code, releaseHubTok)
 	}
 
 	// Publish to the granted app: allowed.
-	if c := oidcUpload(t, ts, hubTok, "app-one"); c != 201 {
+	if c := oidcUpload(t, ts, releaseHubTok, "app-one"); c != 201 {
 		t.Fatalf("scoped upload to its own app: %d", c)
 	}
 	// Publish to another app: refused, even though the same token hash is valid.
-	if c := oidcUpload(t, ts, hubTok, "app-two"); c != 403 {
+	if c := oidcUpload(t, ts, releaseHubTok, "app-two"); c != 403 {
 		t.Fatalf("scoped upload to another app: %d, want 403", c)
 	}
-	// Hub-wide endpoints: refused.
+	// Release-hub-wide endpoints: refused.
 	req, _ := http.NewRequest("GET", ts.URL+"/api/apps", nil)
-	req.Header.Set("Authorization", "Bearer "+hubTok)
+	req.Header.Set("Authorization", "Bearer "+releaseHubTok)
 	resp, err := ts.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +179,7 @@ func TestOidcExchangeMintsScopedToken(t *testing.T) {
 	}
 	// Signing-key fetch on the granted app: allowed (CI signs with it).
 	req, _ = http.NewRequest("GET", ts.URL+"/api/apps/app-one/android/signing", nil)
-	req.Header.Set("Authorization", "Bearer "+hubTok)
+	req.Header.Set("Authorization", "Bearer "+releaseHubTok)
 	resp, err = ts.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -245,8 +245,8 @@ func TestOidcGrantRevocationKillsTokens(t *testing.T) {
 	s, ts := newTestServer(t)
 	seedGrant(t, s, "app-one", fi.issuer, sub)
 
-	_, hubTok := exchange(t, ts, fi.token(t, fi.issuer, sub, oidcAudience, time.Now().Add(10*time.Minute)))
-	if c := oidcUpload(t, ts, hubTok, "app-one"); c != 201 {
+	_, releaseHubTok := exchange(t, ts, fi.token(t, fi.issuer, sub, oidcAudience, time.Now().Add(10*time.Minute)))
+	if c := oidcUpload(t, ts, releaseHubTok, "app-one"); c != 201 {
 		t.Fatalf("upload before revoke: %d", c)
 	}
 
@@ -260,7 +260,7 @@ func TestOidcGrantRevocationKillsTokens(t *testing.T) {
 		t.Fatalf("grants: %+v", grants)
 	}
 	v1Do(t, ts, sess, "DELETE", "/api/v1/oidc/grants/"+itoa(grants[0].ID), nil, 200, nil)
-	if c := oidcUpload(t, ts, hubTok, "app-one"); c != 401 {
+	if c := oidcUpload(t, ts, releaseHubTok, "app-one"); c != 401 {
 		t.Fatalf("upload after grant revoke: %d, want 401", c)
 	}
 }
@@ -294,18 +294,18 @@ func TestOidcMintedTokenExpires(t *testing.T) {
 	seedGrant(t, s, "app-one", fi.issuer, sub)
 
 	// Mint a token that expired a minute ago by backdating the row.
-	_, hubTok := exchange(t, ts, fi.token(t, fi.issuer, sub, oidcAudience, time.Now().Add(10*time.Minute)))
+	_, releaseHubTok := exchange(t, ts, fi.token(t, fi.issuer, sub, oidcAudience, time.Now().Add(10*time.Minute)))
 	_, err := s.DB.Exec("UPDATE api_tokens SET expires_at = ? WHERE token_hash = ?",
-		time.Now().Add(-time.Minute), hashToken(hubTok))
+		time.Now().Add(-time.Minute), hashToken(releaseHubTok))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c := oidcUpload(t, ts, hubTok, "app-one"); c != 401 {
+	if c := oidcUpload(t, ts, releaseHubTok, "app-one"); c != 401 {
 		t.Fatalf("expired minted token: %d, want 401", c)
 	}
 	// …and the row is gone.
 	var n int
-	if err := s.DB.QueryRow("SELECT COUNT(*) FROM api_tokens WHERE token_hash = ?", hashToken(hubTok)).Scan(&n); err != nil {
+	if err := s.DB.QueryRow("SELECT COUNT(*) FROM api_tokens WHERE token_hash = ?", hashToken(releaseHubTok)).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
 	if n != 0 {
@@ -352,7 +352,7 @@ func TestOidcJwksRotate(t *testing.T) {
 
 func TestOidcScopePathMatching(t *testing.T) {
 	allow := func(method, path string) bool {
-		req, _ := http.NewRequest(method, "http://hub"+path, nil)
+		req, _ := http.NewRequest(method, "http://release-hub"+path, nil)
 		return oidcScopeAllows(req, "app-one")
 	}
 	for _, c := range [][2]string{

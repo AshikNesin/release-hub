@@ -5,7 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import groot.mobile.data.HubSettings
+import groot.mobile.data.ReleaseHubSettings
 import groot.mobile.data.catalog.AppStatus
 import groot.mobile.data.catalog.CatalogEntry
 import groot.mobile.data.catalog.CatalogRepository
@@ -39,7 +39,7 @@ data class AppsUiState(
  * the screen mid-download doesn't cancel them.
  */
 class AppsViewModel(
-    private val settings: HubSettings,
+    private val settings: ReleaseHubSettings,
     private val catalog: CatalogRepository,
     private val installer: InstallController,
     tracker: InstallTracker,
@@ -57,7 +57,7 @@ class AppsViewModel(
     val needsInstallPermission: StateFlow<Boolean> = _needsInstallPermission.asStateFlow()
 
     init {
-        // Load whenever a hub is (re)connected; forget the old hub's apps on disconnect.
+        // Load whenever a release hub is (re)connected; forget the old hub's apps on disconnect.
         viewModelScope.launch {
             settings.endpoint.distinctUntilChanged().collect { endpoint ->
                 if (endpoint == null) catalog.clear() else catalog.refreshQuietly()
@@ -101,7 +101,7 @@ class AppsViewModel(
 
     companion object {
         fun factory(
-            settings: HubSettings,
+            settings: ReleaseHubSettings,
             catalog: CatalogRepository,
             installer: InstallController,
             tracker: InstallTracker,

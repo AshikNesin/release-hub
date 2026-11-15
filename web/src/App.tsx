@@ -20,8 +20,8 @@ import { LoadingSpinner } from "@groot/ui/loading-spinner";
 const AppDetailPage = lazy(() =>
   import("@/pages/apps/AppDetail").then((m) => ({ default: m.AppDetailPage })),
 );
-const HubSettingsPage = lazy(() =>
-  import("@/pages/settings/HubSettings").then((m) => ({ default: m.HubSettingsPage })),
+const ReleaseHubSettingsPage = lazy(() =>
+  import("@/pages/settings/ReleaseHubSettings").then((m) => ({ default: m.ReleaseHubSettingsPage })),
 );
 
 const pageFallback = (
@@ -29,7 +29,7 @@ const pageFallback = (
     <LoadingSpinner size="md" />
   </div>
 );
-import { useApps } from "@/lib/hub";
+import { useApps } from "@/lib/releaseHub";
 
 /** Every page with a place in the navigation: a route, a sidebar row or account-menu row, and a ⌘K entry. */
 const PAGES: Array<NavDestination & { element: ReactNode; path?: string }> = [
@@ -41,7 +41,7 @@ const PAGES: Array<NavDestination & { element: ReactNode; path?: string }> = [
     path: "/settings/*",
     fullPage: true,
     shortcut: "mod+,",
-    element: <HubSettingsPage />,
+    element: <ReleaseHubSettingsPage />,
   },
 ];
 

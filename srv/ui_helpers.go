@@ -127,7 +127,7 @@ func (s *Server) settlePlayStatus(r *http.Request, plat dbgen.AppPlatform, relea
 		}
 		// Play release names are "versionName (bundleVersionCode)".
 		wantName := fmt.Sprintf("%s (%d)", rel.VersionName, rel.VersionCode)
-		// Hub versionCode can trail the Play bundle code by the hub-only rows
+		// Release hub versionCode can trail the Play bundle code by the release-hub-only rows
 		// recorded after failed pushes — match on either the name form or any
 		// release on the track containing the versionName.
 		if set := onPlay[track]; set != nil {

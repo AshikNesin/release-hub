@@ -1,6 +1,6 @@
 package groot.mobile.install
 
-import groot.mobile.data.hub.HubManifest
+import groot.mobile.data.releasehub.ReleaseHubManifest
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -10,20 +10,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
-/** Downloads an APK and proves it's the one the hub described. */
+/** Downloads an APK and proves it's the one the release hub described. */
 interface ApkDownloader {
     /** Writes the APK to [dest]; throws [InstallException] on network failure or a size/checksum mismatch. */
-    suspend fun download(manifest: HubManifest, dest: File, onProgress: (Float?) -> Unit)
+    suspend fun download(manifest: ReleaseHubManifest, dest: File, onProgress: (Float?) -> Unit)
 }
 
 class InstallException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
- * [ApkDownloader] over HttpURLConnection. Artifact URLs are public (hub, S3 presigned or CDN), so the hub
+ * [ApkDownloader] over HttpURLConnection. Artifact URLs are public (hub, S3 presigned or CDN), so the release hub
  * token is never sent with them. The SHA-256 from the manifest is checked before anything is installed.
  */
 class HttpApkDownloader : ApkDownloader {
-    override suspend fun download(manifest: HubManifest, dest: File, onProgress: (Float?) -> Unit) =
+    override suspend fun download(manifest: ReleaseHubManifest, dest: File, onProgress: (Float?) -> Unit) =
         withContext(Dispatchers.IO) {
             dest.parentFile?.mkdirs()
             val partial = File(dest.path + ".part")
@@ -75,13 +75,13 @@ class HttpApkDownloader : ApkDownloader {
     }
 }
 
-/** Throws when the bytes aren't the release the hub described. Size and hash are skipped when the hub omits them. */
-internal fun verify(manifest: HubManifest, size: Long, sha256: String) {
+/** Throws when the bytes aren't the release the release hub described. Size and hash are skipped when the release hub omits them. */
+internal fun verify(manifest: ReleaseHubManifest, size: Long, sha256: String) {
     if (manifest.size > 0 && size != manifest.size) {
         throw InstallException("Download size doesn't match the release ($size of ${manifest.size} bytes)")
     }
     if (manifest.sha256.isNotEmpty() && !manifest.sha256.equals(sha256, ignoreCase = true)) {
-        throw InstallException("Checksum mismatch: the download isn't the release the hub published")
+        throw InstallException("Checksum mismatch: the download isn't the release the release hub published")
     }
 }
 

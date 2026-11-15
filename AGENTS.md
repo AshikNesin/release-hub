@@ -19,5 +19,5 @@ the binary. See README.md for structure, the UI section in particular.
   backwards compatible.
 - `mobile/` is the Android app, a groot-mobile-app child in a subdirectory. Its rules are in
   `mobile/AGENTS.md`; run its `pnpm` commands from `mobile/`. The app reads the bearer API and the
-  public manifest: when changing those responses, update `mobile/android/app/.../data/hub/HubJson.kt`
+  public manifest: when changing those responses, update `mobile/android/app/.../data/releasehub/ReleaseHubJson.kt`
   (additive fields only; installed apps on old versions keep parsing the old shape).

@@ -3,7 +3,7 @@ package srv
 // OIDC keyless publishing — HTTP surface.
 //
 //   - POST /api/oidc/exchange   (public): CI's OIDC identity token → a
-//     short-lived hub bearer token scoped to one app's publish endpoints.
+//     short-lived release hub bearer token scoped to one app's publish endpoints.
 //   - /api/v1/oidc/grants …     (session): grant CRUD for the UI.
 //
 // Grants live in oidc_grants (migration 011): issuer + subject → one app.

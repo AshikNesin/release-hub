@@ -5,10 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import groot.mobile.data.HubSettings
-import groot.mobile.data.hub.HubApi
-import groot.mobile.data.hub.HubEndpoint
-import groot.mobile.data.hub.HubException
+import groot.mobile.data.ReleaseHubSettings
+import groot.mobile.data.releasehub.ReleaseHubApi
+import groot.mobile.data.releasehub.ReleaseHubEndpoint
+import groot.mobile.data.releasehub.ReleaseHubException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,19 +21,19 @@ enum class ConnectError { InvalidUrl, MissingToken, Cleartext }
 data class ConnectUiState(
     val url: String = "",
     val token: String = "",
-    /** A token is already saved for the hub, so the field may stay empty. */
+    /** A token is already saved for the release hub, so the field may stay empty. */
     val hasSavedToken: Boolean = false,
     val checking: Boolean = false,
     val inputError: ConnectError? = null,
-    /** The hub's answer when the check failed. */
-    val hubError: String? = null,
+    /** The release hub's answer when the check failed. */
+    val releaseHubError: String? = null,
     val connected: Boolean = false,
 )
 
-/** Checks a hub URL + token against the hub before saving them. */
+/** Checks a release hub URL + token against the release hub before saving them. */
 class ConnectViewModel(
-    private val api: HubApi,
-    private val settings: HubSettings,
+    private val api: ReleaseHubApi,
+    private val settings: ReleaseHubSettings,
     private val allowCleartext: Boolean,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ConnectUiState())
@@ -47,14 +47,14 @@ class ConnectViewModel(
         }
     }
 
-    fun onUrlChange(url: String) = _state.update { it.copy(url = url, inputError = null, hubError = null) }
+    fun onUrlChange(url: String) = _state.update { it.copy(url = url, inputError = null, releaseHubError = null) }
 
-    fun onTokenChange(token: String) = _state.update { it.copy(token = token, inputError = null, hubError = null) }
+    fun onTokenChange(token: String) = _state.update { it.copy(token = token, inputError = null, releaseHubError = null) }
 
     fun connect() {
         val current = _state.value
         if (current.checking) return
-        val url = HubEndpoint.normalizeUrl(current.url)
+        val url = ReleaseHubEndpoint.normalizeUrl(current.url)
             ?: return _state.update { it.copy(inputError = ConnectError.InvalidUrl) }
         if (url.startsWith("http://", ignoreCase = true) && !allowCleartext) {
             return _state.update { it.copy(inputError = ConnectError.Cleartext) }
@@ -67,20 +67,20 @@ class ConnectViewModel(
                 _state.update { it.copy(inputError = ConnectError.MissingToken) }
                 return@launch
             }
-            _state.update { it.copy(url = url, checking = true, hubError = null) }
-            val endpoint = HubEndpoint(url, token)
+            _state.update { it.copy(url = url, checking = true, releaseHubError = null) }
+            val endpoint = ReleaseHubEndpoint(url, token)
             try {
                 api.listApps(endpoint)
                 settings.connect(endpoint)
                 _state.update { it.copy(checking = false, connected = true, token = "") }
-            } catch (e: HubException) {
-                _state.update { it.copy(checking = false, hubError = e.message) }
+            } catch (e: ReleaseHubException) {
+                _state.update { it.copy(checking = false, releaseHubError = e.message) }
             }
         }
     }
 
     companion object {
-        fun factory(api: HubApi, settings: HubSettings, allowCleartext: Boolean): ViewModelProvider.Factory =
+        fun factory(api: ReleaseHubApi, settings: ReleaseHubSettings, allowCleartext: Boolean): ViewModelProvider.Factory =
             viewModelFactory { initializer { ConnectViewModel(api, settings, allowCleartext) } }
     }
 }

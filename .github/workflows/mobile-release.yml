@@ -1,10 +1,10 @@
-# Publishes the Release Hub Android app to your hub's direct channel, so installed copies update
-# themselves like any other app. Bump mobile/android/version.properties first: the hub refuses a
+# Publishes the Release Hub Android app to your release hub's direct channel, so installed copies update
+# themselves like any other app. Bump mobile/android/version.properties first: the release hub refuses a
 # versionCode it already has, and devices only update to a higher one.
 #
-# Keyless: the repo's GitHub Actions OIDC identity is exchanged for a 1-hour hub token scoped to
-# this app, so no HUB_TOKEN secret is stored. Needs vars.RELEASE_HUB_URL and an OIDC grant on the
-# hub (App → Configuration → Keyless publishing) for this repo's subject — with immutable subject
+# Keyless: the repo's GitHub Actions OIDC identity is exchanged for a 1-hour release-hub token scoped to
+# this app, so no RELEASE_HUB_TOKEN secret is stored. Needs vars.RELEASE_HUB_URL and an OIDC grant on the
+# release hub (App → Configuration → Keyless publishing) for this repo's subject — with immutable subject
 # claims (repos created after 2026-07-15) the prefix carries owner/repo IDs; copy it from
 # Settings → Actions → OIDC configuration, then append :ref:refs/heads/main (default branch).
 name: Mobile Release
@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       slug:
-        description: App slug on the hub
+        description: App slug on the release hub
         default: release-hub
       notes:
         description: Release notes (shown as "What's new")
@@ -21,14 +21,14 @@ on:
 
 permissions:
   contents: read
-  id-token: write # request the repo's OIDC token for the hub exchange
+  id-token: write # request the repo's OIDC token for the release hub exchange
 
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      HUB_URL: ${{ vars.RELEASE_HUB_URL }}
+      RELEASE_HUB_URL: ${{ vars.RELEASE_HUB_URL }}
       SLUG: ${{ inputs.slug }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,29 +36,29 @@ jobs:
           persist-credentials: false
       - uses: ./mobile/.github/actions/setup-android
 
-      - name: Exchange the job's OIDC token for a hub token
+      - name: Exchange the job's OIDC token for a release-hub token
         run: |
           set -euo pipefail
-          : "${HUB_URL:?RELEASE_HUB_URL repo variable is not set (Settings → Secrets and variables → Actions → Variables)}"
+          : "${RELEASE_HUB_URL:?RELEASE_HUB_URL repo variable is not set (Settings → Secrets and variables → Actions → Variables)}"
           oidc=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             -H "Accept: application/json; api-version=2.0" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=release-hub" | jq -r .value)
-          resp=$(curl -sS -X POST "$HUB_URL/api/oidc/exchange" \
+          resp=$(curl -sS -X POST "$RELEASE_HUB_URL/api/oidc/exchange" \
             --data-urlencode "token=$oidc" -w '\n%{http_code}')
           code=$(tail -n1 <<<"$resp"); body=$(sed '$d' <<<"$resp")
           if [ "$code" != "200" ]; then
-            echo "::error::hub exchange failed (HTTP $code): $body — if the grant is missing or the subject differs, copy the subject from this message into the hub's Keyless publishing grant."
+            echo "::error::release-hub exchange failed (HTTP $code): $body. If the grant is missing or the subject differs, copy the subject from this message into the release hub's Keyless publishing grant."
             exit 1
           fi
-          HUB_TOKEN=$(jq -r .token <<<"$body")
-          echo "::add-mask::$HUB_TOKEN"
-          echo "HUB_TOKEN=$HUB_TOKEN" >> "$GITHUB_ENV"
+          RELEASE_HUB_TOKEN=$(jq -r .token <<<"$body")
+          echo "::add-mask::$RELEASE_HUB_TOKEN"
+          echo "RELEASE_HUB_TOKEN=$RELEASE_HUB_TOKEN" >> "$GITHUB_ENV"
 
-      - name: Fetch the signing key from the hub
+      - name: Fetch the signing key from the release hub
         run: |
           set -euo pipefail
-          curl -fsS -D "$RUNNER_TEMP/h" -H "Authorization: Bearer $HUB_TOKEN" \
-            -o "$RUNNER_TEMP/release.jks" "$HUB_URL/api/apps/$SLUG/android/signing"
+          curl -fsS -D "$RUNNER_TEMP/h" -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
+            -o "$RUNNER_TEMP/release.jks" "$RELEASE_HUB_URL/api/apps/$SLUG/android/signing"
           header() { grep -i "^$1:" "$RUNNER_TEMP/h" | cut -d' ' -f2- | tr -d '\r'; }
           echo "$(header x-release-hub-keystore-sha256)  $RUNNER_TEMP/release.jks" | sha256sum -c
           {
@@ -74,15 +74,15 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew :app:assembleRelease --console=plain
 
-      - name: Upload to the hub's direct channel
+      - name: Upload to the release hub's direct channel
         working-directory: mobile/android
         env:
           NOTES: ${{ inputs.notes }}
         run: |
           set -euo pipefail
           . ./version.properties
-          curl -fsS -H "Authorization: Bearer $HUB_TOKEN" \
+          curl -fsS -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
             -F "file=@app/build/outputs/apk/release/app-release.apk" \
             -F channel=direct -F "versionCode=$VERSION_CODE" -F "versionName=$VERSION_NAME" -F "notes=$NOTES" \
-            "$HUB_URL/api/apps/$SLUG/android/releases"
+            "$RELEASE_HUB_URL/api/apps/$SLUG/android/releases"
           rm -f "$RELEASE_STORE_FILE"

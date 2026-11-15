@@ -15,7 +15,7 @@ import (
 )
 
 // pruneConfig returns the effective keep-count for a platform: the
-// platform's override when set, else the hub-wide Settings value. 0 means
+// platform's override when set, else the release-hub-wide Settings value. 0 means
 // keep everything (never prune); unset config also means keep everything —
 // retention is opt-in.
 func (s *Server) pruneConfig(ctx context.Context, plat dbgen.AppPlatform) int {

@@ -34,7 +34,7 @@ enum class RowAction { Install, Update, Open }
 fun primaryAction(entry: CatalogEntry, canOpen: Boolean): RowAction? = when (entry.status) {
     AppStatus.UpdateAvailable -> RowAction.Update
     AppStatus.NotInstalled -> RowAction.Install
-    AppStatus.UpToDate, AppStatus.AheadOfHub -> if (canOpen && !entry.isSelf) RowAction.Open else null
+    AppStatus.UpToDate, AppStatus.AheadOfReleaseHub -> if (canOpen && !entry.isSelf) RowAction.Open else null
     AppStatus.NoRelease -> if (canOpen && entry.installed != null && !entry.isSelf) RowAction.Open else null
 }
 
@@ -113,7 +113,7 @@ private fun subtitle(entry: CatalogEntry, install: InstallState?): String {
     val line = when (entry.status) {
         AppStatus.UpdateAvailable -> stringResource(R.string.status_update_line, installed.orEmpty(), latest.orEmpty())
         AppStatus.NotInstalled, AppStatus.UpToDate -> latest.orEmpty()
-        AppStatus.AheadOfHub -> stringResource(R.string.status_ahead, installed.orEmpty(), latest.orEmpty())
+        AppStatus.AheadOfReleaseHub -> stringResource(R.string.status_ahead, installed.orEmpty(), latest.orEmpty())
         AppStatus.NoRelease -> entry.error ?: installed ?: stringResource(R.string.status_no_release)
     }
     return if (entry.isSelf) "${stringResource(R.string.apps_this_app)} · $line" else line

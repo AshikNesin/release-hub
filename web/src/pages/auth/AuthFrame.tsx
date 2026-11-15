@@ -7,7 +7,7 @@ const FEATURES = [
   {
     icon: Upload,
     title: "One upload endpoint",
-    desc: "CI posts the build once; the hub stores it and pushes .aab files to Play.",
+    desc: "CI posts the build once; the release hub stores it and pushes .aab files to Play.",
   },
   {
     icon: Navigation,
@@ -59,7 +59,7 @@ export function AuthFrame({
         <div className="relative max-w-md text-primary-foreground dark:text-foreground">
           <h2 className={displayClass}>Ship every build from one place.</h2>
           <p className="mt-3 text-sm text-primary-foreground/70 dark:text-foreground/70">
-            Versioning, artifact storage, channels and the update manifest for your apps — so build
+            Versioning, artifact storage, channels and the update manifest for your apps, so build
             environments only ever talk to one endpoint.
           </p>
           <ul className="mt-8 space-y-4">

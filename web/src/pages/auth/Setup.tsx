@@ -40,7 +40,7 @@ export function Setup() {
   const onSubmit = async ({ password }: z.infer<typeof setupSchema>) => {
     try {
       await setup(password);
-      toast.success("Hub ready", { description: "Register your first app to get started." });
+      toast.success("Release hub ready", { description: "Register your first app to get started." });
       navigate("/apps", { replace: true });
     } catch (error) {
       if (error instanceof ApiError && error.status === 403) {
@@ -57,7 +57,7 @@ export function Setup() {
   return (
     <AuthFrame
       title="Set the admin password"
-      subtitle="This hub has no password yet. The one you choose here signs you in, and this page closes once it is set."
+      subtitle="This release hub has no password yet. The one you choose here signs you in, and this page closes once it is set."
     >
       <Form
         schema={setupSchema}

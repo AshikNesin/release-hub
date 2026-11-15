@@ -3,7 +3,7 @@
 
 export type Platform = "android" | "ios";
 
-/** Hub channels; legacy spellings (open, closed:<name>) can still appear on old rows. */
+/** Release hub channels; legacy spellings (open, closed:<name>) can still appear on old rows. */
 export type Channel = "direct" | "internal" | "alpha" | "beta" | "public" | (string & {});
 
 /** Play push outcome per release: direct/.apk rows stay `pending`. */
@@ -73,7 +73,7 @@ export interface CertField {
   value: string;
 }
 
-export interface HubSettings {
+export interface ReleaseHubSettings {
   bundlePrefix: string;
   playTesters: string;
   playTesterEmails: string;

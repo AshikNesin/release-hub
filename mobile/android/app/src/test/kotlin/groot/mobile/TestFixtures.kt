@@ -7,17 +7,17 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import groot.kit.buildinfo.BuildInfo
 import groot.kit.theme.ThemeModeStore
-import groot.mobile.data.HubSettings
+import groot.mobile.data.ReleaseHubSettings
 import groot.mobile.data.InstalledApp
 import groot.mobile.data.InstalledApps
 import groot.mobile.data.SecretCipher
 import groot.mobile.data.catalog.CatalogRepository
-import groot.mobile.data.hub.HubApi
-import groot.mobile.data.hub.HubApp
-import groot.mobile.data.hub.HubEndpoint
-import groot.mobile.data.hub.HubException
-import groot.mobile.data.hub.HubManifest
-import groot.mobile.data.hub.HubRelease
+import groot.mobile.data.releasehub.ReleaseHubApi
+import groot.mobile.data.releasehub.ReleaseHubApp
+import groot.mobile.data.releasehub.ReleaseHubEndpoint
+import groot.mobile.data.releasehub.ReleaseHubException
+import groot.mobile.data.releasehub.ReleaseHubManifest
+import groot.mobile.data.releasehub.ReleaseHubRelease
 import groot.mobile.install.ApkDownloader
 import groot.mobile.install.InstallController
 import groot.mobile.install.InstallException
@@ -50,44 +50,44 @@ class FakeCipher : SecretCipher {
 
 fun fakeThemeModeStore() = ThemeModeStore(FakePreferencesDataStore())
 
-fun fakeHubSettings(store: FakePreferencesDataStore = FakePreferencesDataStore()) = HubSettings(store, FakeCipher())
+fun fakeReleaseHubSettings(store: FakePreferencesDataStore = FakePreferencesDataStore()) = ReleaseHubSettings(store, FakeCipher())
 
 val fakeBuildInfo = BuildInfo(versionName = "0.1.0", versionCode = 1, commit = "3a4fd6d", isDebug = true)
 
-const val HUB_URL = "https://hub.example.com"
-val fakeEndpoint = HubEndpoint(HUB_URL, "rh_test")
+const val RELEASE_HUB_URL = "https://release-hub.example.com"
+val fakeEndpoint = ReleaseHubEndpoint(RELEASE_HUB_URL, "rh_test")
 const val SELF_PACKAGE = "io.nesin.releasehub"
 
 fun manifest(code: Long, name: String = "1.$code", notes: String = "") =
-    HubManifest(code, name, "$HUB_URL/artifacts/x/android/app-$code.apk", sha256 = "", size = 0, notes = notes, createdAt = "2026-11-01T10:00:00Z")
+    ReleaseHubManifest(code, name, "$RELEASE_HUB_URL/artifacts/x/android/app-$code.apk", sha256 = "", size = 0, notes = notes, createdAt = "2026-11-01T10:00:00Z")
 
 fun release(code: Long, channel: String = "direct", fileName: String = "app-$code.apk") =
-    HubRelease(code, "1.$code", channel, "$HUB_URL/artifacts/x/android/$fileName", "", 2_048_000, "2026-11-01T10:00:00Z", fileName)
+    ReleaseHubRelease(code, "1.$code", channel, "$RELEASE_HUB_URL/artifacts/x/android/$fileName", "", 2_048_000, "2026-11-01T10:00:00Z", fileName)
 
-class FakeHubApi(
-    var apps: List<HubApp> = emptyList(),
-    var manifests: Map<String, HubManifest> = emptyMap(),
-    var releases: Map<String, List<HubRelease>> = emptyMap(),
+class FakeReleaseHubApi(
+    var apps: List<ReleaseHubApp> = emptyList(),
+    var manifests: Map<String, ReleaseHubManifest> = emptyMap(),
+    var releases: Map<String, List<ReleaseHubRelease>> = emptyMap(),
     /** Thrown by every call when set. */
-    var failure: HubException? = null,
+    var failure: ReleaseHubException? = null,
     /** Per-slug manifest failures. */
-    var manifestFailures: Map<String, HubException> = emptyMap(),
-) : HubApi {
-    val endpointsSeen = mutableListOf<HubEndpoint>()
+    var manifestFailures: Map<String, ReleaseHubException> = emptyMap(),
+) : ReleaseHubApi {
+    val endpointsSeen = mutableListOf<ReleaseHubEndpoint>()
 
-    override suspend fun listApps(endpoint: HubEndpoint): List<HubApp> {
+    override suspend fun listApps(endpoint: ReleaseHubEndpoint): List<ReleaseHubApp> {
         endpointsSeen += endpoint
         failure?.let { throw it }
         return apps
     }
 
-    override suspend fun latest(endpoint: HubEndpoint, slug: String): HubManifest? {
+    override suspend fun latest(endpoint: ReleaseHubEndpoint, slug: String): ReleaseHubManifest? {
         failure?.let { throw it }
         manifestFailures[slug]?.let { throw it }
         return manifests[slug]
     }
 
-    override suspend fun releases(endpoint: HubEndpoint, slug: String): List<HubRelease> {
+    override suspend fun releases(endpoint: ReleaseHubEndpoint, slug: String): List<ReleaseHubRelease> {
         failure?.let { throw it }
         return releases[slug].orEmpty()
     }
@@ -106,9 +106,9 @@ class FakeInstalledApps(val installed: MutableMap<String, InstalledApp> = mutabl
 }
 
 class FakeDownloader(var failure: InstallException? = null) : ApkDownloader {
-    val downloaded = mutableListOf<HubManifest>()
+    val downloaded = mutableListOf<ReleaseHubManifest>()
 
-    override suspend fun download(manifest: HubManifest, dest: File, onProgress: (Float?) -> Unit) {
+    override suspend fun download(manifest: ReleaseHubManifest, dest: File, onProgress: (Float?) -> Unit) {
         failure?.let { throw it }
         onProgress(0.5f)
         dest.parentFile?.mkdirs()
@@ -161,9 +161,9 @@ class FakeInstallUi(var foreground: Boolean = true) : InstallUi {
 
 /** A whole app wired from fakes. */
 class TestApp(scope: CoroutineScope) {
-    val api = FakeHubApi()
+    val api = FakeReleaseHubApi()
     val installed = FakeInstalledApps()
-    val settings = fakeHubSettings()
+    val settings = fakeReleaseHubSettings()
     val tracker = InstallTracker()
     val catalog = CatalogRepository(api, settings, installed, SELF_PACKAGE, clock = { 1_000L })
     val downloader = FakeDownloader()
@@ -176,8 +176,8 @@ class TestApp(scope: CoroutineScope) {
     )
     val graph = AppGraph(
         themeModeStore = fakeThemeModeStore(),
-        hubSettings = settings,
-        hubApi = api,
+        releaseHubSettings = settings,
+        releaseHubApi = api,
         catalog = catalog,
         installController = controller,
         installTracker = tracker,

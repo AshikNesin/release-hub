@@ -11,7 +11,7 @@ import { Text } from "@groot/ui/typography";
 import { cn } from "@groot/ui/lib/utils";
 import { PageLayout } from "@groot/shell/components/layout/PageLayout";
 import { ChannelBadge, PlatformBadge } from "@/components/badges";
-import { useApps } from "@/lib/hub";
+import { useApps } from "@/lib/releaseHub";
 import { fromNow, formatDateTime } from "@/lib/format";
 import type { AppSummary } from "@/lib/types";
 import { RegisterAppDialog } from "./RegisterAppDialog";
@@ -58,7 +58,7 @@ export function Apps() {
         ) : isError ? (
           <ErrorState
             title="Failed to load apps"
-            description="The hub did not answer. Check it is running, then retry."
+            description="The release hub did not answer. Check it is running, then retry."
             action={
               <Button variant="outline" size="sm" onClick={() => void refetch()}>
                 <RotateCcw />
@@ -114,7 +114,7 @@ function AppRow({ app }: { app: AppSummary }) {
           <Text variant="meta" className="mt-0.5 block truncate font-mono">
             {app.platforms.length
               ? [...new Set(app.platforms.map((p) => p.packageName))].join(" · ")
-              : "No platform yet — open to add Android or iOS"}
+              : "No platform yet; open to add Android or iOS"}
           </Text>
         </div>
 

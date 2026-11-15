@@ -24,8 +24,8 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	dir := t.TempDir()
 	s, err := New(Options{
 		DBPath: filepath.Join(dir, "test.sqlite3"), Hostname: "test-host",
-		BaseURL: "http://hub.test",
-		Storage: &LocalStorage{Dir: filepath.Join(dir, "artifacts"), BaseURL: "http://hub.test"},
+		BaseURL: "http://release-hub.test",
+		Storage: &LocalStorage{Dir: filepath.Join(dir, "artifacts"), BaseURL: "http://release-hub.test"},
 	})
 	if err != nil {
 		t.Fatalf("new server: %v", err)
@@ -493,7 +493,7 @@ func TestAppPageShareLinks(t *testing.T) {
 
 	// Play disabled: only the direct share link.
 	d := get()
-	if got := shareURLs(d); len(got) != 1 || got[0] != "http://hub.test/apps/demo/download?channel=direct" {
+	if got := shareURLs(d); len(got) != 1 || got[0] != "http://release-hub.test/apps/demo/download?channel=direct" {
 		t.Fatalf("share links with Play disabled = %v, want only the direct link", got)
 	}
 	if d.Platforms[0].Play.Enabled {
@@ -502,7 +502,7 @@ func TestAppPageShareLinks(t *testing.T) {
 	if !d.Platforms[0].Signing.HasKey {
 		t.Fatal("android platform must carry its generated signing key")
 	}
-	if d.Platforms[0].ManifestURL != "http://hub.test/api/apps/demo/android/manifest" {
+	if d.Platforms[0].ManifestURL != "http://release-hub.test/api/apps/demo/android/manifest" {
 		t.Fatalf("manifest URL = %q", d.Platforms[0].ManifestURL)
 	}
 
@@ -527,10 +527,10 @@ func TestAppPageShareLinks(t *testing.T) {
 
 	d = get()
 	want := []string{
-		"http://hub.test/apps/demo/download?channel=direct",
-		"http://hub.test/apps/demo/download?channel=internal",
-		"http://hub.test/apps/demo/download?channel=beta",
-		"http://hub.test/apps/demo/download?channel=public",
+		"http://release-hub.test/apps/demo/download?channel=direct",
+		"http://release-hub.test/apps/demo/download?channel=internal",
+		"http://release-hub.test/apps/demo/download?channel=beta",
+		"http://release-hub.test/apps/demo/download?channel=public",
 	}
 	if got := shareURLs(d); strings.Join(got, " ") != strings.Join(want, " ") {
 		t.Fatalf("share links with Play enabled = %v, want %v", got, want)

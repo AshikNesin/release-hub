@@ -1,12 +1,12 @@
 # release-hub
 
-Self-hosted release distribution hub for personal Android (later iOS) apps.
+Self-hosted release distribution release hub for personal Android (later iOS) apps.
 Single Go binary (React UI embedded) + SQLite. Owns versioning, artifact storage, channels and the
 update-manifest API so coding environments only talk to one endpoint.
 
 ## Android app
 
-`mobile/` holds **Release Hub for Android**: your own app store for this hub. Point it at the hub with an
+`mobile/` holds **Release Hub for Android**: your own app store for this release hub. Point it at the release hub with an
 API token and it lists every android app, installs direct-channel APKs (checked against the manifest's
 SHA-256), and keeps installed apps (and itself) up to date in the background. Details:
 [`mobile/docs/app/README.md`](mobile/docs/app/README.md).
@@ -24,40 +24,40 @@ pnpm check            # repo checks + Android lint and unit tests
 
 CI lives at the root: `.github/workflows/mobile.yml` (checks, lint, tests, size budget, debug APK),
 `mobile-sync.yml` (boilerplate sync PR twice a day) and `mobile-release.yml` (publishes the app to this
-hub's direct channel, signed with the hub's key).
+release hub's direct channel, signed with the release hub's key).
 
 ## Channels
 
-- `public` — production releases (Play production track)
-- `internal` — testing tracks (Play internal testing)
-- `direct` — direct APK distribution + update manifest for in-app updaters
+- `public`: production releases (Play production track)
+- `internal`: testing tracks (Play internal testing)
+- `direct`: direct APK distribution + update manifest for in-app updaters
   (wire-compatible with Tiny Firewall's `AppUpdater` / `UPDATE_URL`)
 
 ## Auth
 
 - **UI**: single admin password, set on first visit (`/setup`), session cookie (30d).
-  The React UI talks to `/api/v1/*` with that cookie only — bearer tokens are
+  The React UI talks to `/api/v1/*` with that cookie only; bearer tokens are
   not accepted there, and cross-site writes are refused (Fetch Metadata/Origin).
 - **API**: `Authorization: Bearer rh_...` tokens, created in the UI (shown once)
   or via `POST /api/tokens`. Stored as SHA-256 hashes.
 - **Keyless (OIDC)**: GitHub Actions (or any OIDC issuer) can publish without
-  a stored secret — see [Keyless publishing](#keyless-publishing-oidc) below.
-  The minted hub token is scoped to one app's publish endpoints and lives
+  a stored secret; see [Keyless publishing](#keyless-publishing-oidc) below.
+  The minted release-hub token is scoped to one app's publish endpoints and lives
   1 hour.
 - **Public, no auth** (devices need them): `GET /api/apps/{slug}/manifest`,
   `GET /artifacts/...`, `GET /health`.
-- When self-hosting outside exe.dev, run behind TLS (e.g. Caddy/nginx) — the
+- When self-hosting outside exe.dev, run behind TLS (e.g. Caddy/nginx); the
   session cookie and bearer tokens must not cross the network in cleartext.
 
 ## API
 
 ## Apps and platforms
 
-An app is a product (one slug); each platform variant — android, ios — has
+An app is a product (one slug); each platform variant (android, ios) has
 its own package/bundle name, signing key, Play credentials, releases and
 version codes. `POST /api/apps` registers the product (slug only);
 `POST /api/apps/{slug}/platforms` adds each platform (e.g. android now, ios
-when it ships). In the UI, registering asks for the slug alone — platforms
+when it ships). In the UI, registering asks for the slug alone; platforms
 are added from the app's own page.
 
 ```
@@ -75,15 +75,15 @@ GET  /api/apps/{slug}/releases              (also /{platform}/… everywhere)
 POST /api/tokens                            form: name → token shown once
 POST /api/oidc/exchange                    form: token (a CI job's OIDC identity
                                             token, audience "release-hub")
-                                            → {token, expiresIn, app}: a hub
+                                            → {token, expiresIn, app}: a release hub
                                             token scoped to one app, 1h TTL
 GET  /api/apps/{slug}/manifest?channel=direct    (public)
 GET  /api/apps/{slug}/{platform}/tracks          (Play track inventory)
-GET  /api/apps/{slug}/{platform}/testers         (hub tester inventory)
+GET  /api/apps/{slug}/{platform}/testers         (release hub tester inventory)
 GET  /artifacts/{slug}/{platform}/{file}         (public)
 ```
 
-Testers: `GET …/testers` returns `{groups, emails}` — the hub-wide Google
+Testers: `GET …/testers` returns `{groups, emails}`: the release-hub-wide Google
 Groups (pushable to closed tracks) and individual tester emails
 (Settings → Individual tester emails). Google's API cannot push personal
 addresses or email lists at all, so the emails list is the copy-paste
@@ -95,20 +95,20 @@ Platform defaults to `android` when omitted from the path, so
 Upload example:
 
 ```bash
-curl -H "Authorization: Bearer $HUB_TOKEN" \
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
      -F file=app-release.apk -F channel=direct \
      -F versionCode=142 -F versionName=1.15 \
-     https://hub.example.com/api/apps/tinyfirewall/releases
+     https://release-hub.example.com/api/apps/tinyfirewall/releases
 ```
 
 ## Keyless publishing (OIDC)
 
-CI can publish with **no stored hub secret**. The hub trusts a GitHub repo's
+CI can publish with **no stored release hub secret**. The release hub trusts a GitHub repo's
 Actions identity: register a grant binding that repo to **one app** (one repo
-→ one app), and the workflow exchanges its short-lived job token for a hub
+→ one app), and the workflow exchanges its short-lived job token for a release hub
 token on every run.
 
-**Hub side** (App → Configuration → Keyless publishing): paste the repo's OIDC
+**Release Hub side** (App → Configuration → Keyless publishing): paste the repo's OIDC
 subject. For a run on the default branch it ends in `:ref:refs/heads/main`;
 the prefix depends on the repo's age:
 
@@ -116,7 +116,7 @@ the prefix depends on the repo's age:
 - newer repos use **immutable subject claims** (see the repo's
   Settings → Actions → OIDC configuration): `repo:owner@OWNER-ID/name@REPO-ID:ref:refs/heads/main`
 
-The subject differs per ref/event — grab it from a failed exchange's 401
+The subject differs per ref/event; grab it from a failed exchange's 401
 message or the workflow's OIDC debug output. The issuer is fixed to GitHub's
 (`https://token.actions.githubusercontent.com`); any other OIDC issuer works
 too if it's registered in the grant.
@@ -129,9 +129,9 @@ it:
 oidc=$(curl -fsS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
   -H "Accept: application/json; api-version=2.0" \
   "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=release-hub" | jq -r .value)
-HUB_TOKEN=$(curl -fsS -X POST "$HUB_URL/api/oidc/exchange" \
+RELEASE_HUB_TOKEN=$(curl -fsS -X POST "$RELEASE_HUB_URL/api/oidc/exchange" \
   --data-urlencode "token=$oidc" | jq -r .token)
-# use $HUB_TOKEN like any bearer — for one hour, on this app's publish
+# use $RELEASE_HUB_TOKEN like any bearer, for one hour, on this app's publish
 # endpoints only (upload/list/delete releases, manifest, signing-key fetch)
 ```
 
@@ -140,7 +140,7 @@ What the minted token can and cannot do:
 - ✅ upload/list/delete releases **of the granted app**, read its manifest,
   fetch its signing key (CI signs the build with it)
 - ❌ anything else: other apps, token creation, Play config, testers,
-  hub-wide listings — 403
+  release-hub-wide listings: 403
 - Revoking the grant kills its outstanding minted tokens immediately; expired
   tokens are deleted on sight.
 
@@ -164,7 +164,7 @@ export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 With S3:
 - uploads stream to the bucket (multipart for 50MB+ APKs),
 - download URLs in the manifest are **presigned** (7-day TTL) so devices fetch
-  straight from S3 — the hub never proxies artifact traffic.
+  straight from S3; the release hub never proxies artifact traffic.
 - if the bucket is public behind CloudFront, pass `-s3-public-base https://cdn.example.com`
   to use plain URLs instead of presigned ones.
 
@@ -173,41 +173,41 @@ any provider in the default AWS chain (env, shared config, IAM role).
 
 ## Signing keystores (per app)
 
-App signing keys live in the hub — encrypted like Play credentials
-(`RELEASE_HUB_SECRET_KEY`) — so **any** authenticated build environment can
+App signing keys live in the release hub, encrypted like Play credentials
+(`RELEASE_HUB_SECRET_KEY`), so **any** authenticated build environment can
 produce signed releases, and the key survives a lost laptop. One keystore
 per app; never share across apps.
 
 **Auto-generated at platform creation.** Adding the android platform to an
 app (`POST /api/apps/{slug}/platforms`) generates a fresh RSA-2048 keystore
 (30-year self-signed cert, random high-entropy password, alias `release`)
-and stores it encrypted — no keytool, no upload, no thinking about keys:
+and stores it encrypted: no keytool, no upload, no thinking about keys:
 
 ```bash
-curl -H "Authorization: Bearer $HUB_TOKEN" -F slug=myapp \
-     https://hub.example.com/api/apps
-curl -H "Authorization: Bearer $HUB_TOKEN" \
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" -F slug=myapp \
+     https://release-hub.example.com/api/apps
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
      -F platform=android -F packageName=io.example.myapp \
-     https://hub.example.com/api/apps/myapp/platforms
+     https://release-hub.example.com/api/apps/myapp/platforms
 # → {"slug":"myapp","platform":"android","signingKey":"generated","signingSha256":"26a4…"}
 ```
 
 The generated key never rotates (rotation breaks installed-base update
 signature continuity). To bring an app with an existing key history instead,
-upload it explicitly — that replaces the generated one:
+upload it explicitly; that replaces the generated one:
 
 ```bash
-curl -H "Authorization: Bearer $HUB_TOKEN" \
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
      -F file=release.jks -F storePassword=... -F keyAlias=release \
-     https://hub.example.com/api/apps/tinyfirewall/signing
+     https://release-hub.example.com/api/apps/tinyfirewall/signing
 # → {"stored":true,"keystoreSha256":"8862…"}
 ```
 
 Fetch (CI / any coding env):
 
 ```bash
-curl -sD /tmp/h -H "Authorization: Bearer $HUB_TOKEN" \
-     -o app.jks https://hub.example.com/api/apps/tinyfirewall/signing
+curl -sD /tmp/h -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
+     -o app.jks https://release-hub.example.com/api/apps/tinyfirewall/signing
 STORE_PW=$(grep -i x-release-hub-store-password /tmp/h | cut -d' ' -f2 | tr -d '\r')
 ALIAS=$(grep -i x-release-hub-key-alias /tmp/h | cut -d' ' -f2 | tr -d '\r')
 KEY_PW=$(grep -i x-release-hub-key-password /tmp/h | cut -d' ' -f2 | tr -d '\r')
@@ -218,26 +218,26 @@ echo "$(grep -i x-release-hub-keystore-sha256 /tmp/h | cut -d' ' -f2 | tr -d '\r
 Then point gradle at it (`signingConfigs` reading env vars). Delete with
 `POST /api/apps/{slug}/signing/delete`.
 
-⚠️ This endpoint is bearer-auth only and returns live key material — the hub
-token now unlocks signing. Keep tokens scoped and the hub behind TLS.
+⚠️ This endpoint is bearer-auth only and returns live key material: the release hub
+token now unlocks signing. Keep tokens scoped and the release hub behind TLS.
 Also keep an offline backup of the keystore: if Play App Signing is NOT
 enrolled, losing this key means users can never update the app.
 
 ## Google Play (optional)
 
 Apps with Play enabled get their **.aab** uploads pushed to Google Play
-automatically, alongside normal hub storage. A **single shared service
+automatically, alongside normal release hub storage. A **single shared service
 account** covers all apps; its JSON key is stored in the DB, encrypted at
-rest (AES-256-GCM, key from the `RELEASE_HUB_SECRET_KEY` env var — 32
+rest (AES-256-GCM, key from the `RELEASE_HUB_SECRET_KEY` env var (32
 bytes, base64- or hex-encoded):
 
 - `channel=public`   → Play **production** track
 - `channel=beta`     → Play **open testing** (Google's track id `beta`)
-- `channel=alpha`    → Play **closed testing** — the hub's `alpha` track,
+- `channel=alpha`    → Play **closed testing** on the release hub's `alpha` track,
   **created automatically on first use** via `edits.tracks.create`,
   no Console visit needed
 - `channel=internal` → Play **internal testing** track
-- `channel=direct` (or any `.apk`) → hub only, Play untouched
+- `channel=direct` (or any `.apk`) → release hub only, Play untouched
 
 Five channels, Android-convention names. Legacy spellings (`open`,
 `closed`, `closed:<name>`) still map correctly on input.
@@ -246,31 +246,31 @@ Play's API track ids: `production`, `beta` (open testing), `internal`
 (internal testing) plus any manually created closed tracks by name.
 `GET /api/apps/{slug}/{platform}/tracks` lists what exists for an app.
 Tester groups (Settings → Beta testers) attach on the `alpha` (closed
-testing) track only — internal uses Console email lists, open testing is
+testing) track only; internal uses Console email lists, open testing is
 open to all.
 
-**Full walkthrough** — Play Console setup, service account + JSON key,
+**Full walkthrough**: Play Console setup, service account + JSON key,
 granting release access, enabling per app (UI **or** API), testers, and
 troubleshooting: see [`docs/play-internal-testing.md`](docs/play-internal-testing.md).
 
-The release itself is recorded even if Play publishing fails — the API
+The release itself is recorded even if Play publishing fails; the API
 response includes `playRelease` or `playError` so CI can decide whether
 to fail.
 
-Setup is now **one service account for the whole hub** — upload it once, then
+Setup is now **one service account for the whole release hub**: upload it once, then
 enable apps individually (no per-app credential copies to manage):
 
 ```bash
-# once per hub: store the shared service account
-curl -H "Authorization: Bearer $HUB_TOKEN" \
+# once per release hub: store the shared service account
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
      -F file=service-account.json \
-     https://hub.example.com/api/play-accounts
-# → {"id":1,"serviceAccount":"hub@project.iam.gserviceaccount.com"}
+     https://release-hub.example.com/api/play-accounts
+# → {"id":1,"serviceAccount":"release release-hub@project.iam.gserviceaccount.com"}
 
 # per app: enable Play publishing against it
-curl -H "Authorization: Bearer $HUB_TOKEN" -F account=1 \
-     https://hub.example.com/api/apps/tinyfirewall/play
-# → {"playEnabled":true,"serviceAccount":"hub@…"}
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" -F account=1 \
+     https://release-hub.example.com/api/apps/tinyfirewall/play
+# → {"playEnabled":true,"serviceAccount":"release-hub@…"}
 
 # disable an app:  -F enable=false
 # rotate the key:  re-POST the file to /api/play-accounts (same email replaces)
@@ -282,29 +282,29 @@ each app's page has an Enable/disable toggle (dropdown of shared accounts,
 or upload a new key inline). Uploading the JSON on an app page also works
 and creates the shared account implicitly.
 
-A shared service account with account-wide release access serves many apps —
+A shared service account with account-wide release access serves many apps;
 that's the intended setup.
 
 Upload example:
 
 ```bash
 ./gradlew bundleRelease
-curl -H "Authorization: Bearer $HUB_TOKEN" \
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
      -F file=app-release.aab -F channel=internal -F versionName=1.15 \
-     https://hub.example.com/api/apps/tinyfirewall/releases
+     https://release-hub.example.com/api/apps/tinyfirewall/releases
 # → {"apkUrl":…, "playRelease":"1.15 (115)"}
 
 # closed testing (track auto-created on first use):
-curl -H "Authorization: Bearer $HUB_TOKEN" \
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
      -F file=app-release.aab -F channel=alpha \
-     https://hub.example.com/api/apps/tinyfirewall/releases
+     https://release-hub.example.com/api/apps/tinyfirewall/releases
 
 # open testing / production:
 #   -F channel=beta      /   -F channel=public
 
 # which closed track names exist?
-curl -H "Authorization: Bearer $HUB_TOKEN" \
-     https://hub.example.com/api/apps/tinyfirewall/android/tracks
+curl -H "Authorization: Bearer $RELEASE_HUB_TOKEN" \
+     https://release-hub.example.com/api/apps/tinyfirewall/android/tracks
 # → [{"track":"production","channel":"public","isClosed":false,…},
 #    {"track":"alpha","channel":"closed:alpha","isClosed":true,…}]
 ```
@@ -328,7 +328,7 @@ docker run -d --name release-hub \
   release-hub
 ```
 
-`/data` holds db.sqlite3 + artifacts — back that volume up.
+`/data` holds db.sqlite3 + artifacts; back that volume up.
 
 Set `-base-url` to the public URL (it appears in manifests/download links):
 
@@ -336,7 +336,7 @@ Set `-base-url` to the public URL (it appears in manifests/download links):
 docker run -d -p 9100:9100 -v release-hub-data:/data \
   release-hub \
   release-hub -listen :9100 -db /data/db.sqlite3 -artifacts /data/artifacts \
-  -base-url https://hub.example.com
+  -base-url https://release-hub.example.com
 ```
 
 **S3 variant** (artifacts skip the volume entirely):
@@ -346,7 +346,7 @@ docker run -d -p 9100:9100 \
   -e AWS_ACCESS_KEY_ID=... -e AWS_SECRET_ACCESS_KEY=... \
   release-hub \
   release-hub -listen :9100 -db /data/db.sqlite3 \
-  -base-url https://hub.example.com \
+  -base-url https://release-hub.example.com \
   -s3-bucket my-releases -s3-region eu-west-1
 ```
 
@@ -364,39 +364,39 @@ services:
     command: >-
       release-hub -listen :9100 -db /data/db.sqlite3
       -artifacts /data/artifacts
-      -base-url https://hub.example.com
+      -base-url https://release-hub.example.com
       # -s3-bucket my-releases -s3-region eu-west-1
 volumes:
   release-hub-data:
 ```
 
-Run behind a TLS-terminating proxy (Caddy/nginx/Traefik) in production —
+Run behind a TLS-terminating proxy (Caddy/nginx/Traefik) in production;
 the session cookie and bearer tokens must not cross the network in cleartext.
 
 ## Deploy on Coolify
 
-Coolify can deploy this repo directly — the Dockerfile is already
+Coolify can deploy this repo directly: the Dockerfile is already
 self-contained (static Go binary, unprivileged user, SQLite in `/data`).
 No database service needed.
 
 1. **New Resource → Application** in your Coolify project.
 2. Point it at this repo (GitHub / Git provider). Build pack: **Dockerfile**
-   (auto-detected). Leave the port at **9100** — that's what the container
+   (auto-detected). Leave the port at **9100**: that's what the container
    listens on; Coolify maps it to your domain automatically.
-3. **Persistence** — Coolify treats `/data` as the state directory. In the
+3. **Persistence**: Coolify treats `/data` as the state directory. In the
    application settings, add a **persistent storage volume** mounted at `/data`
    (file storage is fine; db.sqlite3 + artifacts live there). Without this,
-   every redeploy starts with a fresh empty hub.
+   every redeploy starts with a fresh empty release hub.
 4. **Environment variables** (Application → Environment):
 
    | Variable | Required | Notes |
    |---|---|---|
-   | `RELEASE_HUB_SECRET_KEY` | **yes** | 32-byte base64/hex. Encrypts Play credentials and signing keystores at rest. `openssl rand -base64 32`. Losing it = losing stored keys — back it up. |
+   | `RELEASE_HUB_SECRET_KEY` | **yes** | 32-byte base64/hex. Encrypts Play credentials and signing keystores at rest. `openssl rand -base64 32`. Losing it = losing stored keys; back it up. |
    | `RELEASE_HUB_BASE_URL` | **yes** | Public address Coolify assigns (e.g. `https://hub.nesin.io`). Used in manifest/download links. |
 
-5. **Base URL** — the manifest/download URLs embed the public address. Set it
+5. **Base URL**: the manifest/download URLs embed the public address. Set it
    via the `RELEASE_HUB_BASE_URL` env var (also accepted as a `-base-url`
-   flag). Use the **https** URL Coolify assigns — Coolify terminates TLS, and
+   flag). Use the **https** URL Coolify assigns; Coolify terminates TLS, and
    the session cookie is marked Secure automatically when the base URL is
    https.
 
@@ -426,14 +426,14 @@ full-page settings, light/dark/system theme. `make build` builds it and
 embeds it into the Go binary (`web/embed.go`, `go:embed`), so deploys are
 still one file.
 
-- `web/vendor/groot/` — the vendored `@groot/ui` kit and the `@groot/shell`
+- `web/vendor/groot/`: the vendored `@groot/ui` kit and the `@groot/shell`
   pieces release-hub uses (layout, sidebar, palette, settings chrome, theme,
   API client). Don't edit these; refresh them with
   `web/scripts/sync-groot.sh [path/to/groot]`. Two files there are
   release-hub overrides the sync never touches: `shell/src/store/auth.ts`
   (single admin password, no passkeys) and
   `shell/src/pages/settings/sections.tsx` (types only).
-- `web/src/` — release-hub's own pages: apps, app detail
+- `web/src/` holds release-hub's own pages: apps, app detail
   (releases / distribution / configuration), login/setup, settings sections.
 - The Go side speaks the groot shell's wire contract (`srv/api_v1.go`):
   `{success, data}` / `{success: false, error: {code, message}}`, and a
@@ -461,7 +461,7 @@ Code layout (one file per concern, single canonical route table):
 cmd/srv/            flags + wiring (storage backend choice)
 srv/
   server.go         Server, Options, New(), Serve()
-  routes.go         THE route table (used by Serve and tests — no drift)
+  routes.go         THE route table (used by Serve and tests; no drift)
   auth.go           bearer tokens, sessions, middleware
   api_apps.go       app/platform registration + tokens (bearer API)
   api_releases.go   upload, release list, Play publish (bearer API)

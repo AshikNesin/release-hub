@@ -1,7 +1,7 @@
 package srv
 
 // /api/v1 handlers that have no bearer-API twin: the app list and detail
-// views, retention, hub settings, token and Play-account inventory.
+// views, retention, release-hub settings, token and Play-account inventory.
 // Wire types mirror web/src/lib/types.ts — change both together.
 
 import (
@@ -111,7 +111,7 @@ func (s *Server) handleV1AppDetail(w http.ResponseWriter, r *http.Request) {
 		URL   string `json:"url"`
 	}
 	type retention struct {
-		Override  *int64 `json:"override"`  // null = inherit the hub setting
+		Override  *int64 `json:"override"`  // null = inherit the release hub setting
 		Effective int64  `json:"effective"` // what applies; 0 = keep everything
 		Label     string `json:"label"`
 	}
@@ -212,7 +212,7 @@ func (s *Server) handleV1AppDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleV1Retention PUT /api/v1/apps/{slug}/{platform}/retention {keep}
-// keep: "" / null = inherit the hub setting, 0 = keep everything, N = newest N.
+// keep: "" / null = inherit the release hub setting, 0 = keep everything, N = newest N.
 func (s *Server) handleV1Retention(w http.ResponseWriter, r *http.Request) {
 	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
 	if !ok {
@@ -232,7 +232,7 @@ func (s *Server) handleV1Retention(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"override": keep, "effective": effective, "label": inheritLabel(&effective)})
 }
 
-// ---- hub settings ----
+// ---- release-hub settings ----
 
 type v1CertField struct {
 	Field       string `json:"field"`

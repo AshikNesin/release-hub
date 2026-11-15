@@ -267,7 +267,7 @@ func (s *Server) publishToPlay(r *http.Request, plat dbgen.AppPlatform, key, cha
 		return "", err
 	}
 	// Materialize the artifact to a temp file for the uploader.
-	tmp, err := os.CreateTemp("", "hub-aab-*.aab")
+	tmp, err := os.CreateTemp("", "release-hub-aab-*.aab")
 	if err != nil {
 		return "", err
 	}
@@ -291,7 +291,7 @@ func (s *Server) publishToPlay(r *http.Request, plat dbgen.AppPlatform, key, cha
 	return release, nil
 }
 
-// playTesters reads the hub-wide beta-tester list (Google Group addresses,
+// playTesters reads the release-hub-wide beta-tester list (Google Group addresses,
 // comma/newline separated) from config. Empty when unset.
 func (s *Server) playTesters(ctx context.Context) []string {
 	v, err := dbgen.New(s.DB).GetConfig(ctx, "play_testers")
@@ -301,7 +301,7 @@ func (s *Server) playTesters(ctx context.Context) []string {
 	return normalizeTesterGroups(v)
 }
 
-// testerEmails reads the hub-wide individual tester emails (comma/newline
+// testerEmails reads the release-hub-wide individual tester emails (comma/newline
 // separated) from config. Empty when unset. These are NOT pushable to Play
 // (the API takes Google Groups only) — they're the copy-paste source for
 // the Console's tester email lists.
@@ -314,8 +314,8 @@ func (s *Server) testerEmails(ctx context.Context) []string {
 }
 
 // handleApiInviteTesters POST /api/apps/{slug}/{platform}/testers
-// Push the hub-wide beta-tester groups to a Play closed testing track
-// (?channel=alpha, the hub's closed testing track). Requires Play publishing
+// Push the release-hub-wide beta-tester groups to a Play closed testing track
+// (?channel=alpha, the release hub's closed testing track). Requires Play publishing
 // enabled (needs the service account).
 func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) {
 	plat, ok := s.platformFromRequest(w, r, r.PathValue("slug"))
@@ -339,7 +339,7 @@ func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) 
 	}
 	groups := s.playTesters(r.Context())
 	if len(groups) == 0 {
-		writeErr(w, 400, "no beta testers configured — add Google Group addresses in Settings")
+		writeErr(w, 400, "no beta testers configured; add Google Group addresses in Settings")
 		return
 	}
 	creds, err := s.playAccountCreds(*plat.PlayAccountID)
@@ -366,7 +366,7 @@ func (s *Server) handleApiInviteTesters(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleApiGetTesters GET /api/apps/{slug}/{platform}/testers
-// The hub's tester inventory: groups (pushable to Play closed tracks) and
+// The release hub's tester inventory: groups (pushable to Play closed tracks) and
 // individual emails (Console-only; the Play API cannot accept personal
 // addresses). Lets a helper script or CI paste the email list into Play
 // Console's tester email lists.
@@ -377,7 +377,7 @@ func (s *Server) handleApiGetTesters(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{
 		"groups": s.playTesters(r.Context()),
 		"emails": s.testerEmails(r.Context()),
-		"hint":   "groups: pushable to the alpha (closed testing) track (POST channel=alpha); emails: paste into Play Console email lists — the API cannot accept individual addresses",
+		"hint":   "groups: pushable to the alpha (closed testing) track (POST channel=alpha); emails: paste into Play Console email lists; the API cannot accept individual addresses",
 	})
 }
 
@@ -412,7 +412,7 @@ func (s *Server) handleApiListTracks(w http.ResponseWriter, r *http.Request) {
 	type trackInfo struct {
 		Track    string   `json:"track"`
 		IsClosed bool     `json:"isClosed"`
-		Channel  string   `json:"channel"`  // the hub channel value to use
+		Channel  string   `json:"channel"`  // the release-hub channel value to use
 		Releases []string `json:"releases"` // current releases on the track
 	}
 	out := make([]trackInfo, 0, len(tracks))
@@ -426,7 +426,7 @@ func (s *Server) handleApiListTracks(w http.ResponseWriter, r *http.Request) {
 		case "internal", "qa":
 			info.Channel, info.IsClosed = "internal", false
 		case alphaTrack:
-			// The hub's closed testing track — the "alpha" channel.
+			// The release hub's closed testing track — the "alpha" channel.
 			info.Channel, info.IsClosed = "alpha", true
 		default:
 			info.IsClosed = true // free-form name = closed testing track
@@ -542,7 +542,7 @@ func (s *Server) handleApiPlayPreflight(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, 200, map[string]any{"ok": true,
-		"detail": fmt.Sprintf("Play wiring OK for %s — ready to publish .aab releases.", plat.PackageName)})
+		"detail": fmt.Sprintf("Play wiring OK for %s: ready to publish .aab releases.", plat.PackageName)})
 }
 
 // upsertPlayAccountFromRequest reads the multipart file field, validates it
@@ -596,7 +596,7 @@ func (s *Server) mustListPlayAccounts(r *http.Request) []dbgen.PlayAccount {
 	return accts
 }
 
-// handleApiPlayAccounts manages the hub-wide service accounts.
+// handleApiPlayAccounts manages the release-hub-wide service accounts.
 // POST /api/play-accounts   (file=<service-account.json>, label?) → create
 // GET  /api/play-accounts   → list (ids + emails only, no credentials)
 // POST /api/play-accounts/delete  (id=<id>) → remove

@@ -146,7 +146,7 @@ func (s *Server) handleApiDeleteSigning(w http.ResponseWriter, r *http.Request) 
 //
 // The PKCS#12 encoder is LegacyRC2 (the traditional keytool/OpenSSL parameters)
 // rather than Modern2023 — not for crypto reasons (the keystore is additionally
-// encrypted at rest by the hub) but because older Android build tooling and
+// encrypted at rest by the release hub) but because older Android build tooling and
 // some JDK builds still expect the legacy PBE algorithms. Everything modern
 // still reads it fine.
 func generateKeystore(commonName string) (p12 []byte, cfg signingConfig, certPEM []byte, err error) {
@@ -154,7 +154,7 @@ func generateKeystore(commonName string) (p12 []byte, cfg signingConfig, certPEM
 }
 
 // certSubject holds the configurable parts of the generated certificate's
-// distinguished name. Values come from hub-wide settings (Settings page) and
+// distinguished name. Values come from release-hub-wide settings (Settings page) and
 // apply to every keystore generated after they are saved. Blank fields are
 // simply omitted from the DN.
 type certSubject struct {
@@ -292,8 +292,8 @@ func generateKeystoreWithSubject(commonName string, subj certSubject) (p12 []byt
 
 // FetchSigningForBuild is the helper CI scripts use: writes the keystore to
 // path and returns the signing properties for gradle.
-func FetchSigningForBuild(hubBaseURL, slug, token, outPath string) (storePassword, keyAlias, keyPassword, sha string, err error) {
-	req, err := http.NewRequest("GET", hubBaseURL+"/api/apps/"+slug+"/signing", nil)
+func FetchSigningForBuild(releaseHubBaseURL, slug, token, outPath string) (storePassword, keyAlias, keyPassword, sha string, err error) {
+	req, err := http.NewRequest("GET", releaseHubBaseURL+"/api/apps/"+slug+"/signing", nil)
 	if err != nil {
 		return
 	}

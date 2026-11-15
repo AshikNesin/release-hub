@@ -29,7 +29,7 @@ android {
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
     }
 
-    // Release signing comes from the environment (CI fetches the key from the hub, see
+    // Release signing comes from the environment (CI fetches the key from the release hub, see
     // .github/workflows/mobile-release.yml at the repo root). Without it, release builds stay unsigned.
     val releaseStore = System.getenv("RELEASE_STORE_FILE")
     if (releaseStore != null) {
