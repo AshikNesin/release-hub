@@ -2,7 +2,7 @@
 
 End-to-end guide for pushing releases from the release hub to Google Play:
 one-time Play Console + service-account setup, enabling it per app in the
-release hub, and the day-2 release loop. Everything here is also in `README.md` in
+release hub, and the day-2 release loop. Everything here is also in [`google-play.md`](google-play.md) in
 compressed form; this is the walkthrough version.
 
 ## How the release hub talks to Play
