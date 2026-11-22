@@ -3,18 +3,18 @@
 # versionCode it already has, and devices only update to a higher one.
 #
 # Keyless: the repo's GitHub Actions OIDC identity is exchanged for a 1-hour release-hub token scoped to
-# this app, so no RELEASE_HUB_TOKEN secret is stored. Needs vars.RELEASE_HUB_URL and an OIDC grant on the
-# release hub (App → Configuration → Keyless publishing) for this repo's subject — with immutable subject
-# claims (repos created after 2026-07-15) the prefix carries owner/repo IDs; copy it from
-# Settings → Actions → OIDC configuration, then append :ref:refs/heads/main (default branch).
+# this app, so no RELEASE_HUB_TOKEN secret is stored. Easiest setup: Settings → GitHub on the release hub,
+# then App → Configuration → Keyless publishing → Connect this repo. That creates the grant and sets the
+# vars.RELEASE_HUB_URL and vars.RELEASE_HUB_APP repo variables this workflow reads. By hand: add an OIDC
+# grant for this repo's subject and set vars.RELEASE_HUB_URL yourself (see README → Keyless publishing).
 name: Mobile Release
 
 on:
   workflow_dispatch:
     inputs:
       slug:
-        description: App slug on the release hub
-        default: release-hub
+        description: App slug on the release hub (blank = the RELEASE_HUB_APP repo variable, else release-hub)
+        default: ""
       notes:
         description: Release notes (shown as "What's new")
         default: ""
@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 30
     env:
       RELEASE_HUB_URL: ${{ vars.RELEASE_HUB_URL }}
-      RELEASE_HUB_SLUG: ${{ inputs.slug }}
+      RELEASE_HUB_SLUG: ${{ inputs.slug || vars.RELEASE_HUB_APP || 'release-hub' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,7 +47,7 @@ jobs:
             --data-urlencode "token=$oidc" -w '\n%{http_code}')
           code=$(tail -n1 <<<"$resp"); body=$(sed '$d' <<<"$resp")
           if [ "$code" != "200" ]; then
-            echo "::error::release-hub exchange failed (HTTP $code): $body. If the grant is missing or the subject differs, copy the subject from this message into the release hub's Keyless publishing grant."
+            echo "::error::release-hub exchange failed (HTTP $code): $body. Connect this repo on the release hub (App → Configuration → Keyless publishing), or copy the subject from this message into a grant there."
             exit 1
           fi
           RELEASE_HUB_TOKEN=$(jq -r .token <<<"$body")

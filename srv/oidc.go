@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -172,13 +173,45 @@ func fetchJWKS(ctx context.Context, client *http.Client, jwksURL string) (*jose.
 	return &set, nil
 }
 
-// oidcClaims is the claim set exchange cares about (jwt.Claims embedded).
-type oidcClaims = jwt.Claims
+// githubIssuer is GitHub Actions' OIDC issuer.
+const githubIssuer = "https://token.actions.githubusercontent.com"
+
+// oidcClaims is the claim set exchange cares about: the registered claims
+// plus GitHub's repository claims, which repository grants match on.
+type oidcClaims struct {
+	jwt.Claims
+	RepositoryID      flexID `json:"repository_id,omitempty"`
+	RepositoryOwnerID flexID `json:"repository_owner_id,omitempty"`
+	Ref               string `json:"ref,omitempty"`
+}
+
+// flexID is a numeric id GitHub sends as a JSON string ("123"); a bare
+// number is accepted too. 0 means absent.
+type flexID int64
+
+func (f *flexID) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "" || s == "null" {
+		*f = 0
+		return nil
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return fmt.Errorf("bad id %s", b)
+	}
+	*f = flexID(n)
+	return nil
+}
 
 // verifyOIDCToken validates a raw identity token against the grant table and
 // the issuer's keys, and returns the matching grant. The issuer of any
 // incoming token must already carry a grant — unknown issuers are rejected
 // before any network fetch, which also blocks SSRF via crafted iss claims.
+//
+// A token carrying a repository_id claim (GitHub) is matched against
+// repository grants first: same issuer and repository id, then (after the
+// signature check) the same owner id and ref. Otherwise, or when no
+// repository grant exists, the issuer+subject grant applies as before.
 func (s *Server) verifyOIDCToken(ctx context.Context, raw string) (dbgen.OidcGrantByIssuerSubjectRow, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || len(raw) > 64<<10 {
@@ -188,7 +221,7 @@ func (s *Server) verifyOIDCToken(ctx context.Context, raw string) (dbgen.OidcGra
 	if err != nil {
 		return dbgen.OidcGrantByIssuerSubjectRow{}, fmt.Errorf("malformed token: %w", err)
 	}
-	var unsafe jwt.Claims
+	var unsafe oidcClaims
 	if err := tok.UnsafeClaimsWithoutVerification(&unsafe); err != nil {
 		return dbgen.OidcGrantByIssuerSubjectRow{}, fmt.Errorf("malformed claims: %w", err)
 	}
@@ -199,11 +232,27 @@ func (s *Server) verifyOIDCToken(ctx context.Context, raw string) (dbgen.OidcGra
 	}
 
 	// Gate on a registered grant before any fetch.
-	grant, err := dbgen.New(s.DB).OidcGrantByIssuerSubject(ctx, dbgen.OidcGrantByIssuerSubjectParams{
-		Issuer: iss, Subject: sub,
-	})
-	if err != nil {
-		return dbgen.OidcGrantByIssuerSubjectRow{}, fmt.Errorf("no grant for issuer %s, subject %s", iss, sub)
+	q := dbgen.New(s.DB)
+	var grant dbgen.OidcGrantByIssuerSubjectRow
+	found := false
+	if unsafe.RepositoryID > 0 {
+		id := int64(unsafe.RepositoryID)
+		if g, err := q.OidcGrantByIssuerRepository(ctx, dbgen.OidcGrantByIssuerRepositoryParams{
+			Issuer: iss, RepositoryID: &id,
+		}); err == nil {
+			grant, found = dbgen.OidcGrantByIssuerSubjectRow(g), true
+		}
+	}
+	if !found {
+		g, err := q.OidcGrantByIssuerSubject(ctx, dbgen.OidcGrantByIssuerSubjectParams{Issuer: iss, Subject: sub})
+		if err != nil {
+			msg := fmt.Sprintf("no grant for issuer %s, subject %s", iss, sub)
+			if unsafe.RepositoryID > 0 {
+				msg += fmt.Sprintf(" (repository id %d)", int64(unsafe.RepositoryID))
+			}
+			return dbgen.OidcGrantByIssuerSubjectRow{}, errors.New(msg)
+		}
+		grant = g
 	}
 
 	jwksURL, err := discoverConfig(ctx, s.oidcHTTP, grant.Issuer)
@@ -233,14 +282,35 @@ func (s *Server) verifyOIDCToken(ctx context.Context, raw string) (dbgen.OidcGra
 	}
 
 	// Claims must match the grant and the release hub, with a little clock leeway.
-	if err := claims.ValidateWithLeeway(jwt.Expected{
-		Issuer:     grant.Issuer,
-		Subject:    grant.Subject,
-		AnyAudience: jwt.Audience{oidcAudience},
-	}, oidcLeeway); err != nil {
+	expected := jwt.Expected{Issuer: grant.Issuer, AnyAudience: jwt.Audience{oidcAudience}}
+	if grant.RepositoryID == nil {
+		expected.Subject = grant.Subject
+	}
+	if err := claims.ValidateWithLeeway(expected, oidcLeeway); err != nil {
 		return grant, fmt.Errorf("claims rejected: %w", err)
 	}
+	if grant.RepositoryID != nil {
+		if err := matchRepositoryGrant(grant, claims); err != nil {
+			return grant, err
+		}
+	}
 	return grant, nil
+}
+
+// matchRepositoryGrant checks a verified token's repository claims against a
+// repository grant: same repository, same owner (a transfer to another
+// account needs a new grant), and the granted ref when one is set.
+func matchRepositoryGrant(grant dbgen.OidcGrantByIssuerSubjectRow, c oidcClaims) error {
+	if int64(c.RepositoryID) != *grant.RepositoryID {
+		return fmt.Errorf("claims rejected: repository id %d is not the granted %d", int64(c.RepositoryID), *grant.RepositoryID)
+	}
+	if grant.RepositoryOwnerID != nil && int64(c.RepositoryOwnerID) != *grant.RepositoryOwnerID {
+		return fmt.Errorf("claims rejected: repository owner id %d is not the granted %d", int64(c.RepositoryOwnerID), *grant.RepositoryOwnerID)
+	}
+	if grant.Ref != "" && c.Ref != grant.Ref {
+		return fmt.Errorf("claims rejected: ref %q may not publish; this grant allows %s", c.Ref, grant.Ref)
+	}
+	return nil
 }
 
 func keyID(tok *jwt.JSONWebToken) string {

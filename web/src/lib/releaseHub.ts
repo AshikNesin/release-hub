@@ -4,6 +4,9 @@ import type {
   ApiToken,
   AppDetail,
   AppSummary,
+  GithubConnectResult,
+  GithubRepository,
+  GithubSettings,
   ReleaseHubSettings,
   OidcGrant,
   OidcGrantAll,
@@ -26,6 +29,8 @@ export const keys = {
   oidcGrants: (slug: string) => ["apps", slug, "oidc-grants"] as const,
   allOidcGrants: ["oidc-grants"] as const,
   vault: ["vault"] as const,
+  github: ["github"] as const,
+  githubRepositories: ["github", "repositories"] as const,
   tracks: (slug: string, platform: Platform) => ["apps", slug, platform, "tracks"] as const,
 };
 
@@ -90,7 +95,25 @@ export const releaseHub = {
       `/apps/${encodeURIComponent(slug)}/oidc/grants`,
       v,
     ),
-  deleteOidcGrant: (id: number) => apiClient.delete(`/oidc/grants/${id}`),
+  /** variables: also remove the RELEASE_HUB_* repo variables Connect set (repository grants). */
+  deleteOidcGrant: (id: number, variables = false) =>
+    apiClient.delete<{ ok: true; variablesRemoved?: boolean; variablesError?: string }>(
+      `/oidc/grants/${id}${variables ? "?variables=1" : ""}`,
+    ),
+  getGithub: () => apiClient.get<GithubSettings>("/github"),
+  githubRepositories: () => apiClient.get<GithubRepository[]>("/github/repositories"),
+  githubManifest: (organization: string) =>
+    apiClient.post<{ url: string; manifest: object }>(
+      "/github/manifest",
+      organization ? { organization } : {},
+    ),
+  githubInstall: () => apiClient.post<{ url: string }>("/github/install", {}),
+  githubDisconnect: () => apiClient.post<{ disconnected: true }>("/github/disconnect", {}),
+  githubConnect: (slug: string, repository: string, overwrite = false) =>
+    apiClient.post<GithubConnectResult>(`/apps/${encodeURIComponent(slug)}/github/connect`, {
+      repository,
+      overwrite,
+    }),
   listPlayAccounts: () => apiClient.get<PlayAccount[]>("/play-accounts"),
   addPlayAccount: (file: File) => {
     const form = new FormData();
@@ -113,3 +136,11 @@ export const useAllOidcGrants = () =>
   useQuery({ queryKey: keys.allOidcGrants, queryFn: releaseHub.listAllOidcGrants });
 export const usePlayAccounts = () =>
   useQuery({ queryKey: keys.playAccounts, queryFn: releaseHub.listPlayAccounts });
+export const useGithub = () => useQuery({ queryKey: keys.github, queryFn: releaseHub.getGithub });
+export const useGithubRepositories = (enabled = true) =>
+  useQuery({
+    queryKey: keys.githubRepositories,
+    queryFn: releaseHub.githubRepositories,
+    enabled,
+    retry: false,
+  });

@@ -21,7 +21,7 @@ export function KeylessGrantsSettings() {
   const { data: grants, isLoading } = useAllOidcGrants();
   const stale = grants?.filter((g) => g.app === null) ?? [];
 
-  const revoke = useAction((g: OidcGrantAll) => releaseHub.deleteOidcGrant(g.id), {
+  const revoke = useAction((g: OidcGrantAll) => releaseHub.deleteOidcGrant(g.id, g.repositoryId !== null), {
     confirm: (g) => ({
       title: `Remove the grant for ${g.name || subjectRepo(g.subject)}?`,
       description: g.app
