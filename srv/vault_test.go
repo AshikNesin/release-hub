@@ -525,3 +525,23 @@ func TestVaultStatusSaysWhyKeysStayed(t *testing.T) {
 		t.Fatalf("pending = %s", b)
 	}
 }
+
+// Platforms left behind by apps deleted before foreign keys were on for
+// every connection hold keys no app uses: they are not "in the database"
+// waiting to move, which the move would never pick up.
+func TestVaultCountsSkipKeysOfDeletedApps(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	tok := bearer(t, s)
+	createAndroidApp(t, ts, tok, "kept")
+	createAndroidApp(t, ts, tok, "gone")
+	if _, err := s.DB.Exec(`PRAGMA foreign_keys = OFF; DELETE FROM apps WHERE slug = 'gone'; PRAGMA foreign_keys = ON;`); err != nil {
+		t.Fatal(err)
+	}
+	_, b := apiDo(t, ts, tok, "GET", "/api/vault", "", nil)
+	var info vaultInfo
+	_ = json.Unmarshal(b, &info)
+	if info.Local.SigningKeys != 1 || info.OrphanedKeys != 1 || len(info.Pending) != 1 {
+		t.Fatalf("status = %s", b)
+	}
+}

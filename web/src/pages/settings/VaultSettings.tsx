@@ -178,6 +178,14 @@ export function VaultSettings() {
               </AlertDescription>
             </Alert>
           )}
+          {info.orphanedKeys > 0 && (
+            <p>
+              <Text variant="meta">
+                Not counted: {plural(info.orphanedKeys, "signing key")} of apps deleted before
+                November 15. No app uses them, so they are not moved.
+              </Text>
+            </p>
+          )}
           {info.inVault.signingKeys + info.inVault.playAccounts > 0 && (
             <p>
               <Text variant="meta">
