@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Cable, GitBranch, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@groot/ui/alert";
@@ -15,7 +15,6 @@ import { EmptyState } from "@groot/ui/empty-state";
 import { Input } from "@groot/ui/input";
 import { Label } from "@groot/ui/label";
 import { useConfirm } from "@groot/ui/primitives";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@groot/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@groot/ui/table";
 import { Text, monoClass } from "@groot/ui/typography";
 import { useAction } from "@groot/shell/lib/feedback";
@@ -27,6 +26,8 @@ import {
   useOidcGrants,
 } from "@/lib/releaseHub";
 import { formatDateTime, fromNow } from "@/lib/format";
+import { appNames, confidentPick, rankByRelevance } from "@/lib/repoMatch";
+import { RepoCombobox } from "@/components/RepoCombobox";
 import type { AppDetail, GithubConnectResult, OidcGrant } from "@/lib/types";
 
 const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
@@ -265,7 +266,7 @@ export function KeylessCard({ app }: { app: AppDetail }) {
 
         {github?.app ? (
           <>
-            <ConnectRepository slug={app.slug} />
+            <ConnectRepository app={app} />
             <details className="group rounded-xl border px-4 py-3">
               <summary className="cursor-pointer text-sm text-muted-foreground select-none">
                 Other CI, or set up by hand: paste an OIDC subject
@@ -318,11 +319,26 @@ export function KeylessCard({ app }: { app: AppDetail }) {
  * RELEASE_HUB_URL / RELEASE_HUB_APP Actions variables. A variable that
  * already holds something else is only replaced after a confirmation.
  */
-function ConnectRepository({ slug }: { slug: string }) {
+function ConnectRepository({ app }: { app: AppDetail }) {
+  const slug = app.slug;
   const repos = useGithubRepositories();
   const confirm = useConfirm();
   const [repository, setRepository] = useState("");
-  const free = repos.data?.filter((r) => !r.app) ?? [];
+  const [touched, setTouched] = useState(false);
+  const free = useMemo(() => repos.data?.filter((r) => !r.app) ?? [], [repos.data]);
+  const names = useMemo(
+    () => appNames(slug, app.platforms.map((p) => p.packageName)),
+    [slug, app.platforms],
+  );
+  // The repo that most likely publishes this app (slug and package ids vs
+  // repo names), pre-selected until the user picks something themselves.
+  const suggested = useMemo(() => {
+    const pick = confidentPick(rankByRelevance(free, (r) => r.fullName, names));
+    return pick?.fullName ?? null;
+  }, [free, names]);
+  useEffect(() => {
+    if (!touched) setRepository(suggested ?? "");
+  }, [suggested, touched]);
 
   const connect = useAction(
     async (v: { repository: string }): Promise<GithubConnectResult> => {
@@ -349,7 +365,10 @@ function ConnectRepository({ slug }: { slug: string }) {
       fallback: "Unable to connect the repository",
       invalidate: [keys.oidcGrants(slug), keys.allOidcGrants, keys.githubRepositories],
       onSuccess: (r) => {
-        if (r.connected) setRepository("");
+        if (r.connected) {
+          setRepository("");
+          setTouched(true);
+        }
       },
     },
   );
@@ -365,26 +384,25 @@ function ConnectRepository({ slug }: { slug: string }) {
       >
         <div className="min-w-64 flex-1 space-y-2">
           <Label htmlFor="gh-repo">GitHub repository</Label>
-          <Select value={repository} onValueChange={setRepository} disabled={repos.isLoading || !free.length}>
-            <SelectTrigger id="gh-repo" className="w-full">
-              <SelectValue
-                placeholder={
-                  repos.isLoading
-                    ? "Loading repositories…"
-                    : free.length
-                      ? "Pick the repository that publishes this app"
-                      : "No unconnected repositories"
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {free.map((r) => (
-                <SelectItem key={r.id} value={r.fullName}>
-                  {r.fullName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <RepoCombobox
+            id="gh-repo"
+            repos={repos.data ?? []}
+            appNames={names}
+            value={repository}
+            suggested={suggested}
+            onChange={(r) => {
+              setTouched(true);
+              setRepository(r);
+            }}
+            disabled={repos.isLoading || !free.length}
+            placeholder={
+              repos.isLoading
+                ? "Loading repositories…"
+                : free.length
+                  ? "Search for the repository that publishes this app"
+                  : "No unconnected repositories"
+            }
+          />
         </div>
         <Button type="submit" disabled={!repository || connect.isPending}>
           {connect.isPending ? <Loader2 className="animate-spin" /> : <Cable />}
@@ -401,7 +419,10 @@ function ConnectRepository({ slug }: { slug: string }) {
         <Link to="/settings/github" className="underline">
           Install the GitHub App on it
         </Link>
-        . Repos that already publish another app aren't listed (one repo → one app).
+        .{" "}
+        {suggested && repository === suggested && !touched
+          ? "Pre-selected by matching this app's name and package id against your repos."
+          : "Repos that already publish another app can't be picked (one repo → one app)."}
       </Text>
     </div>
   );
