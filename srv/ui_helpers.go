@@ -46,11 +46,13 @@ func playStoreURL(pkg string) string {
 
 // playEmail extracts the service-account identifier from stored (encrypted)
 // Play credentials, for display. Anything else stays sealed in the DB.
-func playEmail(encCreds string) string {
+func (s *Server) playEmail(encCreds string) string {
 	if encCreds == "" {
 		return ""
 	}
-	raw, err := decryptCreds(encCreds)
+	ctx, cancel := context.WithTimeout(context.Background(), displaySecretTimeout)
+	defer cancel()
+	raw, err := s.openSecret(ctx, encCreds)
 	if err != nil {
 		return ""
 	}
@@ -73,7 +75,7 @@ func (s *Server) playAccountInfo(p dbgen.AppPlatform) (int64, string) {
 	if err != nil {
 		return *p.PlayAccountID, ""
 	}
-	return acct.ID, playEmail(acct.Credentials)
+	return acct.ID, s.playEmail(acct.Credentials)
 }
 
 // settlePlayStatus reconciles 'pending' Play-channel releases against the

@@ -79,6 +79,10 @@ func (s *Server) v1Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/play-accounts", s.v1(s.handleApiPlayAccounts))
 	mux.HandleFunc("DELETE /api/v1/play-accounts/{id}", s.v1(s.handleV1DeletePlayAccount))
 
+	// 1Password vault: status and moving stored keys into it.
+	mux.HandleFunc("GET /api/v1/vault", s.v1(s.handleVaultStatus))
+	mux.HandleFunc("POST /api/v1/vault/migrate", s.v1(s.handleVaultMigrate))
+
 	// Anything else under /api/v1 is a JSON 404, never the SPA shell.
 	mux.HandleFunc("/api/v1/", s.v1Public(func(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "no such endpoint: "+r.Method+" "+r.URL.Path)

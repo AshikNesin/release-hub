@@ -168,7 +168,10 @@ func (s *Server) handleV1AppDetail(w http.ResponseWriter, r *http.Request) {
 
 		alias := ""
 		if p.SignConfig != "" {
-			if cfgJSON, derr := decryptCreds(p.SignConfig); derr == nil {
+			ctx, cancel := context.WithTimeout(r.Context(), displaySecretTimeout)
+			cfgJSON, derr := s.openSecret(ctx, p.SignConfig)
+			cancel()
+			if derr == nil {
 				var cfg struct {
 					KeyAlias string `json:"keyAlias"`
 				}
@@ -200,7 +203,7 @@ func (s *Server) handleV1AppDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	accounts := make([]account, 0)
 	for _, acct := range s.mustListPlayAccounts(r) {
-		accounts = append(accounts, account{acct.ID, playEmail(acct.Credentials)})
+		accounts = append(accounts, account{acct.ID, s.playEmail(acct.Credentials)})
 	}
 	writeJSON(w, 200, map[string]any{
 		"slug":             app.Slug,
@@ -387,7 +390,7 @@ func (s *Server) handleV1ListPlayAccounts(w http.ResponseWriter, r *http.Request
 	}
 	out := make([]row, 0)
 	for _, acct := range s.mustListPlayAccounts(r) {
-		rw := row{ID: acct.ID, Email: playEmail(acct.Credentials), CreatedAt: acct.CreatedAt.UTC().Format(time.RFC3339), UsedBy: []string{}}
+		rw := row{ID: acct.ID, Email: s.playEmail(acct.Credentials), CreatedAt: acct.CreatedAt.UTC().Format(time.RFC3339), UsedBy: []string{}}
 		for _, p := range plats {
 			if p.PlayAccountID != nil && *p.PlayAccountID == acct.ID && p.PlayEnabled == 1 {
 				rw.UsedBy = append(rw.UsedBy, slugByID[p.AppID]+"/"+p.Platform)

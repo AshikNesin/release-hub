@@ -78,6 +78,16 @@ func (s *Server) handleApiDeleteApp(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	var stored []string
+	if rows, err := s.DB.QueryContext(r.Context(), `SELECT sign_keystore, sign_config FROM app_platforms WHERE app_id = ?`, app.ID); err == nil {
+		for rows.Next() {
+			var ks, cfg string
+			if rows.Scan(&ks, &cfg) == nil {
+				stored = append(stored, ks, cfg)
+			}
+		}
+		rows.Close()
+	}
 	tx, err := s.DB.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeErr(w, 500, err.Error())
@@ -104,6 +114,7 @@ func (s *Server) handleApiDeleteApp(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	s.retireSecrets(r.Context(), stored...)
 	if err := s.storage.DeletePrefix(r.Context(), app.Slug+"/"); err != nil {
 		slog.Warn("app artifacts not fully deleted", "app", app.Slug, "error", err)
 	}

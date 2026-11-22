@@ -138,3 +138,29 @@ export interface PlayTrack {
   channel: string;
   releases: string[] | null;
 }
+
+/** 1Password vault (srv/vault_migrate.go): where stored keys live. */
+export interface VaultCounts {
+  signingKeys: number;
+  playAccounts: number;
+}
+
+export interface VaultInfo {
+  configured: boolean;
+  /** bundled = Connect runs inside the release-hub container; external = OP_CONNECT_HOST. */
+  mode: "off" | "bundled" | "external";
+  status: {
+    state: "off" | "starting" | "ready" | "error";
+    code?: string;
+    detail: string;
+    vault?: string;
+  };
+  /** Keys still sealed in the database. */
+  local: VaultCounts;
+  inVault: VaultCounts;
+}
+
+export interface VaultMoveResult {
+  moved: string[];
+  failed: { kind: "signing" | "play"; name: string; reason: string }[];
+}

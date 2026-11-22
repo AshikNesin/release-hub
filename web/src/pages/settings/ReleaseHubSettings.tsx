@@ -2,6 +2,7 @@ import {
   FileBadge,
   GitBranch,
   KeyRound,
+  LockKeyhole,
   Palette,
   SlidersHorizontal,
   Store,
@@ -17,6 +18,7 @@ import { KeylessGrantsSettings } from "./KeylessGrantsSettings";
 import { PlayAccountsSettings } from "./PlayAccountsSettings";
 import { SettingsForm } from "./SettingsForm";
 import { TokensSettings } from "./TokensSettings";
+import { VaultSettings } from "./VaultSettings";
 
 function GeneralSettings() {
   return (
@@ -156,6 +158,19 @@ const SECTIONS: SettingsSection[] = [
     keywords: ["keystore", "certificate", "organization", "country", "dn"],
     items: [{ label: "Certificate subject" }],
     element: <CertificateSettings />,
+  },
+  {
+    id: "vault",
+    label: "1Password",
+    group: "Release hub",
+    icon: LockKeyhole,
+    description: "Keep signing keys and Play service accounts in a 1Password vault.",
+    keywords: ["1password", "vault", "connect", "secrets", "migrate", "move", "keystore"],
+    items: [
+      { label: "1Password status" },
+      { label: "Move keys to 1Password", description: "Migrate stored keys into the vault" },
+    ],
+    element: <VaultSettings />,
   },
   {
     id: "tokens",

@@ -66,15 +66,9 @@ func (s *Server) handleApiSetSigning(w http.ResponseWriter, r *http.Request) {
 	if cfg.KeyPassword == "" {
 		cfg.KeyPassword = cfg.StorePassword
 	}
-	cfgJSON, _ := json.Marshal(cfg)
-	encKS, err := encryptCreds(ks)
+	encKS, encCfg, err := s.sealSigning(r.Context(), r.PathValue("slug"), plat.Platform, ks, cfg)
 	if err != nil {
-		writeErr(w, 500, err.Error())
-		return
-	}
-	encCfg, err := encryptCreds(cfgJSON)
-	if err != nil {
-		writeErr(w, 500, err.Error())
+		writeErr(w, 500, "store keystore: "+err.Error())
 		return
 	}
 	sum := sha256.Sum256(ks)
@@ -85,6 +79,7 @@ func (s *Server) handleApiSetSigning(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	s.retireSecrets(r.Context(), plat.SignKeystore, plat.SignConfig)
 	writeJSON(w, 200, map[string]any{"stored": true, "keystoreSha256": hex.EncodeToString(sum[:])})
 }
 
@@ -101,12 +96,12 @@ func (s *Server) handleApiGetSigning(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 404, "no signing keystore stored for this app")
 		return
 	}
-	ks, err := decryptCreds(plat.SignKeystore)
+	ks, err := s.openSecret(r.Context(), plat.SignKeystore)
 	if err != nil {
 		writeErr(w, 500, "decrypt keystore: "+err.Error())
 		return
 	}
-	cfgRaw, err := decryptCreds(plat.SignConfig)
+	cfgRaw, err := s.openSecret(r.Context(), plat.SignConfig)
 	if err != nil {
 		writeErr(w, 500, "decrypt config: "+err.Error())
 		return
@@ -135,6 +130,7 @@ func (s *Server) handleApiDeleteSigning(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, 500, err.Error())
 		return
 	}
+	s.retireSecrets(r.Context(), plat.SignKeystore, plat.SignConfig)
 	writeJSON(w, 200, map[string]any{"stored": false})
 }
 
@@ -176,11 +172,9 @@ func (s *Server) generateAndStoreSigning(ctx context.Context, appID int64, slug 
 	if err != nil {
 		return "", fmt.Errorf("generate: %w", err)
 	}
-	cfgJSON, _ := json.Marshal(cfg)
-	encKS, e1 := encryptCreds(p12)
-	encCfg, e2 := encryptCreds(cfgJSON)
-	if e1 != nil || e2 != nil {
-		return "", fmt.Errorf("encrypt: %v %v", e1, e2)
+	encKS, encCfg, err := s.sealSigning(ctx, slug, "android", p12, cfg)
+	if err != nil {
+		return "", fmt.Errorf("store: %w", err)
 	}
 	sum := sha256.Sum256(p12)
 	if err := dbgen.New(s.DB).SetSigningConfig(ctx, dbgen.SetSigningConfigParams{
