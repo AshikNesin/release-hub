@@ -326,13 +326,14 @@ docker volume create release-hub-data
 docker run -d --name release-hub \
   -p 9100:9100 \
   -v release-hub-data:/data \
-  -e BASE_URL=...                       # see compose below for the flag
+  -e RELEASE_HUB_BASE_URL=https://release-hub.example.com \
   release-hub
 ```
 
 `/data` holds db.sqlite3 + artifacts; back that volume up.
 
-Set `-base-url` to the public URL (it appears in manifests/download links):
+The base URL (it appears in manifests/download links) is the
+`RELEASE_HUB_BASE_URL` env var or the `-base-url` flag:
 
 ```bash
 docker run -d -p 9100:9100 -v release-hub-data:/data \
@@ -404,7 +405,7 @@ No database service needed.
 
 6. **Deploy**. First visit to the domain shows the one-time `/setup` page to
    set the admin password; then register your app (it gets a signing key
-   automatically) and create an API token for CI/`deploy.sh`.
+   automatically) and create an API token for CI.
 
 ### S3 artifacts on Coolify
 
@@ -467,6 +468,9 @@ srv/
   auth.go           bearer tokens, sessions, middleware
   api_apps.go       app/platform registration + tokens (bearer API)
   api_releases.go   upload, release list, Play publish (bearer API)
+  api_oidc.go       OIDC exchange endpoint (bearer API)
+  oidc.go           keyless publishing: grants, token exchange, scoping
+  prune.go          direct-channel release retention (auto-prune after upload)
   api_v1.go         UI API: envelope, session + same-origin guard, auth routes
   api_v1_handlers.go UI API: app list/detail, retention, settings, tokens, Play accounts
   ui_helpers.go     Play links/identity, lazy Play-status reconciliation
@@ -478,7 +482,7 @@ srv/
   secrets.go        at-rest encryption of keystores/credentials
 web/
   embed.go          go:embed of web/dist (the built UI)
-  src/              release-hub pages, typed API (lib/hub.ts, lib/types.ts)
+  src/              release-hub pages, typed API (lib/releaseHub.ts, lib/types.ts)
   vendor/groot/     vendored groot UI kit + shell (scripts/sync-groot.sh)
 db/
   migrations/       numbered SQLite migrations (auto-run at startup)

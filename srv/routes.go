@@ -3,7 +3,8 @@ package srv
 import "net/http"
 
 // routes is the single canonical route table, used by Serve and by tests.
-// Every handler lives in handlers_*.go; registration happens only here.
+// Registration happens only here; the handlers live beside their API in
+// api_apps.go, api_releases.go, api_oidc.go, api_v1*.go, public.go, signing.go.
 func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
