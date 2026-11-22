@@ -22,6 +22,13 @@ type Server struct {
 	oidcJWKS *jwksCache
 	vault    *opVault // 1Password Connect (vault.go); nil = keys sealed in the DB only
 	moves    vaultMoves
+
+	// GitHub App (github_app.go): API and web hosts (tests point them at a
+	// fake), the outbound client and in-memory installation tokens.
+	githubAPI    string
+	githubWeb    string
+	githubHTTP   *http.Client
+	githubTokens githubTokenCache
 }
 
 // Options configures a Server at construction time (listmonk-style config
@@ -36,12 +43,18 @@ type Options struct {
 
 func New(opt Options) (*Server, error) {
 	s := &Server{
-		Hostname: opt.Hostname,
-		baseURL:  opt.BaseURL,
-		storage:  opt.Storage,
-		uiFS:     opt.UI,
-		oidcHTTP: &http.Client{Timeout: 15 * time.Second},
-		oidcJWKS: &jwksCache{},
+		Hostname:  opt.Hostname,
+		baseURL:   opt.BaseURL,
+		storage:   opt.Storage,
+		uiFS:      opt.UI,
+		oidcHTTP:  &http.Client{Timeout: 15 * time.Second},
+		oidcJWKS:  &jwksCache{},
+		githubAPI: defaultGithubAPI,
+		githubWeb: defaultGithubWeb,
+		githubHTTP: &http.Client{
+			Timeout:       15 * time.Second,
+			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		},
 	}
 	if s.storage == nil {
 		s.storage = &LocalStorage{Dir: "artifacts", BaseURL: opt.BaseURL}

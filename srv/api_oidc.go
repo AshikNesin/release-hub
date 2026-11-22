@@ -48,11 +48,11 @@ func (s *Server) handleApiOidcExchange(w http.ResponseWriter, r *http.Request) {
 	q := dbgen.New(s.DB)
 	expires := time.Now().Add(exchangeTTL)
 	if _, err := q.CreateScopedApiToken(r.Context(), dbgen.CreateScopedApiTokenParams{
-		Name:         "oidc: " + grant.AppSlug,
-		TokenHash:    hashToken(token),
-		ScopeSlug:    grant.AppSlug,
-		ExpiresAt:    &expires,
-		OidcGrantID:  &grant.ID,
+		Name:        "oidc: " + grant.AppSlug,
+		TokenHash:   hashToken(token),
+		ScopeSlug:   grant.AppSlug,
+		ExpiresAt:   &expires,
+		OidcGrantID: &grant.ID,
 	}); err != nil {
 		writeErr(w, 500, "mint failed: "+err.Error())
 		return
@@ -88,6 +88,7 @@ func (s *Server) handleV1ListOidcGrants(w http.ResponseWriter, r *http.Request) 
 			"name":      g.Name,
 			"createdAt": g.CreatedAt.UTC().Format(time.RFC3339),
 		}
+		addRepositoryFields(row, g.RepositoryID, g.Ref)
 		if g.LastUsedAt != nil {
 			v := g.LastUsedAt.UTC().Format(time.RFC3339)
 			row["lastUsedAt"] = v
@@ -117,6 +118,7 @@ func (s *Server) handleV1ListAllOidcGrants(w http.ResponseWriter, r *http.Reques
 			// nil (marshalled as JSON null) when the app is gone → stale.
 			"app": g.AppSlug,
 		}
+		addRepositoryFields(row, g.RepositoryID, g.Ref)
 		if g.LastUsedAt != nil {
 			v := g.LastUsedAt.UTC().Format(time.RFC3339)
 			row["lastUsedAt"] = v
@@ -124,6 +126,16 @@ func (s *Server) handleV1ListAllOidcGrants(w http.ResponseWriter, r *http.Reques
 		out = append(out, row)
 	}
 	writeJSON(w, 200, out)
+}
+
+// addRepositoryFields marks a repository grant (bound by GitHub repo id,
+// made by Connect) in a grant row: repositoryId and the ref it may publish
+// from. Subject grants carry repositoryId null.
+func addRepositoryFields(row map[string]any, repositoryID *int64, ref string) {
+	row["repositoryId"] = repositoryID
+	if repositoryID != nil {
+		row["ref"] = ref
+	}
 }
 
 // handleV1CreateOidcGrant POST /api/v1/apps/{slug}/oidc/grants
@@ -166,7 +178,10 @@ func isLocalhost(host string) bool {
 }
 
 // handleV1DeleteOidcGrant DELETE /api/v1/oidc/grants/{id} — also kills the
-// grant's outstanding minted tokens.
+// grant's outstanding minted tokens. With ?variables=1 on a repository
+// grant, the RELEASE_HUB_URL / RELEASE_HUB_APP variables Connect set are
+// removed from the repo too (where they still hold release-hub's values);
+// failing that, the grant is still removed and the reply says why.
 func (s *Server) handleV1DeleteOidcGrant(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
@@ -174,6 +189,16 @@ func (s *Server) handleV1DeleteOidcGrant(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	q := dbgen.New(s.DB)
+	out := map[string]any{"ok": true}
+	if r.FormValue("variables") == "1" {
+		if g, err := q.OidcGrantByID(r.Context(), id); err == nil && g.RepositoryID != nil {
+			if err := s.removeGithubVariables(r.Context(), g); err != nil {
+				out["variablesError"] = err.Error()
+			} else {
+				out["variablesRemoved"] = true
+			}
+		}
+	}
 	if err := q.DeleteApiTokensByGrant(r.Context(), &id); err != nil {
 		writeErr(w, 500, "db error")
 		return
@@ -182,5 +207,5 @@ func (s *Server) handleV1DeleteOidcGrant(w http.ResponseWriter, r *http.Request)
 		writeErr(w, 500, "db error")
 		return
 	}
-	writeJSON(w, 200, map[string]bool{"ok": true})
+	writeJSON(w, 200, out)
 }

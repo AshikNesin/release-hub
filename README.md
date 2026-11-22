@@ -120,8 +120,11 @@ Keep it somewhere safe: without it, stored keys can't be opened.
 
 ## Publish from GitHub Actions
 
-Open the app's **Configuration** tab, paste the repo's OIDC subject (for
-example `repo:you/myapp`) and copy the workflow snippet it shows. The job
+Connect GitHub once in **Settings → GitHub** (it creates this release hub's own
+GitHub App), then on the app's **Configuration** tab pick the repo and press
+**Connect**: that creates the grant and sets the repo's `RELEASE_HUB_URL` and
+`RELEASE_HUB_APP` variables. Without the app, paste the repo's OIDC subject
+(for example `repo:you/myapp`) instead. Then copy the workflow snippet. The job
 asks GitHub for an identity token, swaps it for a one-hour release-hub token
 and uses that to fetch the signing key and upload the build. No
 `RELEASE_HUB_TOKEN` secret is stored anywhere. The full flow is in

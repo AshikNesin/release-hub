@@ -122,7 +122,19 @@ SELECT og.*, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app
 SELECT og.*, a.slug AS app_slug FROM oidc_grants og LEFT JOIN apps a ON a.id = og.app_id ORDER BY og.created_at;
 
 -- name: OidcGrantByIssuerSubject :one
-SELECT og.*, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id WHERE og.issuer = ? AND og.subject = ?;
+SELECT og.*, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id
+WHERE og.issuer = ? AND og.subject = ? AND og.repository_id IS NULL;
+
+-- name: OidcGrantByIssuerRepository :one
+SELECT og.*, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id
+WHERE og.issuer = ? AND og.repository_id = ?;
+
+-- name: CreateOidcRepositoryGrant :execresult
+INSERT INTO oidc_grants (app_id, issuer, subject, name, repository_id, repository_owner_id, ref)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+-- name: OidcGrantByID :one
+SELECT og.*, a.slug AS app_slug FROM oidc_grants og LEFT JOIN apps a ON a.id = og.app_id WHERE og.id = ?;
 
 -- name: TouchOidcGrant :exec
 UPDATE oidc_grants SET last_used_at = ? WHERE id = ?;
@@ -149,3 +161,26 @@ SELECT t.*, g.app_id AS grant_app_id FROM api_tokens t
 LEFT JOIN oidc_grants g ON g.id = t.oidc_grant_id
 WHERE t.token_hash = ?;
 
+
+-- github app (one-click keyless publishing)
+
+-- name: GetGithubApp :one
+SELECT * FROM github_app WHERE id = 1;
+
+-- name: CreateGithubApp :exec
+INSERT INTO github_app (id, app_id, slug, name, owner, html_url, private_key) VALUES (1, ?, ?, ?, ?, ?, ?);
+
+-- name: DeleteGithubApp :exec
+DELETE FROM github_app;
+
+-- name: DeleteExpiredGithubFlows :exec
+DELETE FROM github_flows WHERE expires_at < ?;
+
+-- name: DeleteGithubFlows :exec
+DELETE FROM github_flows;
+
+-- name: CreateGithubFlow :exec
+INSERT INTO github_flows (state, binding, kind, expires_at) VALUES (?, ?, ?, ?);
+
+-- name: ClaimGithubFlow :execrows
+DELETE FROM github_flows WHERE state = ? AND binding = ? AND kind = ? AND expires_at > ?;
