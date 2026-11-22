@@ -28,7 +28,9 @@ type fakeConnect struct {
 	items  map[string]opItem
 	next   int
 	down   bool
-	ts     *httptest.Server
+	// dropEmpty mimics Connect leaving out fields saved with no value.
+	dropEmpty bool
+	ts        *httptest.Server
 }
 
 func newFakeConnect(t *testing.T, vaults ...string) *fakeConnect {
@@ -62,6 +64,15 @@ func (fc *fakeConnect) serve(w http.ResponseWriter, r *http.Request) {
 		if it.Vault.ID != segs[2] {
 			http.Error(w, `{"message":"vault mismatch"}`, 400)
 			return
+		}
+		if fc.dropEmpty {
+			kept := it.Fields[:0]
+			for _, f := range it.Fields {
+				if f.Value != "" {
+					kept = append(kept, f)
+				}
+			}
+			it.Fields = kept
 		}
 		fc.next++
 		it.ID = fmt.Sprintf("item%02d", fc.next)
@@ -463,5 +474,54 @@ func TestBundledConnectWithoutBinariesSaysWhy(t *testing.T) {
 	b := startBundledConnect(bundledOptions{session: "S", dir: t.TempDir(), binDir: t.TempDir(), ports: defaultBundledPorts, backoff: time.Second})
 	if st := b.status(); st.State != "error" || !strings.Contains(st.Detail, "connect-sync is not in this image") {
 		t.Fatalf("status = %+v", st)
+	}
+}
+
+// A keystore whose readable copies are empty (e.g. no key password stored)
+// still moves: Connect may drop empty fields, and only the referenced
+// fields are read back.
+func TestMigrateMovesKeyWithEmptyReadableFields(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	tok := bearer(t, s)
+	createAndroidApp(t, ts, tok, "one")
+	cfg, _ := encryptCreds([]byte(`{"storePassword":"pw","keyAlias":"release","keyPassword":""}`))
+	if _, err := s.DB.Exec(`UPDATE app_platforms SET sign_config = ?`, cfg); err != nil {
+		t.Fatal(err)
+	}
+	fc := newFakeConnect(t, "vlt1")
+	fc.dropEmpty = true
+	s.vault = newOpVault(fc.ts.URL, fc.token, "")
+
+	_, b := apiDo(t, ts, tok, "POST", "/api/vault/migrate", "", nil)
+	var res vaultMoveResult
+	_ = json.Unmarshal(b, &res)
+	if len(res.Moved) != 1 || len(res.Failed) != 0 {
+		t.Fatalf("migrate: %s", b)
+	}
+	if got := fetchSigning(t, ts, tok, "one"); got.storePW != "pw" || got.keyPW != "" {
+		t.Fatalf("after move: store %q key %q", got.storePW, got.keyPW)
+	}
+}
+
+// Settings lists each key still in the database with why it stayed.
+func TestVaultStatusSaysWhyKeysStayed(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	tok := bearer(t, s)
+	createAndroidApp(t, ts, tok, "bad")
+	createAndroidApp(t, ts, tok, "good")
+	if _, err := s.DB.Exec(`UPDATE app_platforms SET sign_sha256 = 'deadbeef' WHERE app_id = (SELECT id FROM apps WHERE slug = 'bad')`); err != nil {
+		t.Fatal(err)
+	}
+	fc := newFakeConnect(t, "vlt1")
+	s.vault = newOpVault(fc.ts.URL, fc.token, "")
+	apiDo(t, ts, tok, "POST", "/api/vault/migrate", "", nil)
+
+	_, b := apiDo(t, ts, tok, "GET", "/api/vault", "", nil)
+	var info vaultInfo
+	_ = json.Unmarshal(b, &info)
+	if len(info.Pending) != 1 || info.Pending[0].Name != "bad/android" || !strings.Contains(info.Pending[0].Reason, "sha256") {
+		t.Fatalf("pending = %s", b)
 	}
 }

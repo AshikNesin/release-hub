@@ -21,7 +21,32 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 )
+
+// vaultMoves serialises moves (two at once would copy a key twice) and
+// remembers why keys failed, so Settings can show it after the toast.
+type vaultMoves struct {
+	run    sync.Mutex
+	mu     sync.Mutex
+	failed map[string]vaultMoveFailure // by kind + name
+}
+
+func (m *vaultMoves) record(res vaultMoveResult) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.failed = map[string]vaultMoveFailure{}
+	for _, f := range res.Failed {
+		m.failed[f.Kind+":"+f.Name] = f
+	}
+}
+
+func (m *vaultMoves) lastFailure(kind, name string) (vaultMoveFailure, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f, ok := m.failed[kind+":"+name]
+	return f, ok
+}
 
 type vaultCounts struct {
 	SigningKeys  int `json:"signingKeys"`
@@ -34,6 +59,15 @@ type vaultInfo struct {
 	Status     vaultStatus `json:"status"`
 	Local      vaultCounts `json:"local"`
 	InVault    vaultCounts `json:"inVault"`
+	// Pending lists the keys still in the database, with why the last
+	// move left each one there (empty when it wasn't tried yet).
+	Pending []vaultPending `json:"pending"`
+}
+
+type vaultPending struct {
+	Kind   string `json:"kind"` // signing | play
+	Name   string `json:"name"`
+	Reason string `json:"reason,omitempty"`
 }
 
 type vaultMoveFailure struct {
@@ -59,6 +93,7 @@ func (s *Server) vaultInfo(ctx context.Context, force bool) vaultInfo {
 	info.Local.PlayAccounts, info.InVault.PlayAccounts = count(`SELECT
 		COALESCE(SUM(credentials NOT LIKE 'op:%'), 0),
 		COALESCE(SUM(credentials LIKE 'op:%'), 0) FROM play_accounts`)
+	info.Pending = s.pendingKeys(ctx)
 	if s.vault == nil {
 		return info
 	}
@@ -83,7 +118,13 @@ func (s *Server) handleVaultMigrate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 409, "1Password is not ready: "+st.Detail)
 		return
 	}
+	if !s.moves.run.TryLock() {
+		writeErr(w, 409, "a move is already running")
+		return
+	}
+	defer s.moves.run.Unlock()
 	res := s.migrateToVault(r.Context())
+	s.moves.record(res)
 	writeJSON(w, 200, res)
 }
 
@@ -152,18 +193,82 @@ func (s *Server) migrateToVault(ctx context.Context) vaultMoveResult {
 	return res
 }
 
-func (s *Server) moveSigning(ctx context.Context, id int64, slug, platform, encKS, encCfg, wantSHA string) error {
+// pendingKeys names every key still sealed in the database. A reason comes
+// from the last move, or from checks that need no network (the key opens
+// with RELEASE_HUB_SECRET_KEY and matches its recorded sha256).
+func (s *Server) pendingKeys(ctx context.Context) []vaultPending {
+	out := []vaultPending{}
+	rows, err := s.DB.QueryContext(ctx, `SELECT a.slug, p.platform, p.sign_keystore, p.sign_config, p.sign_sha256
+		FROM app_platforms p JOIN apps a ON a.id = p.app_id
+		WHERE p.sign_keystore != '' AND p.sign_keystore NOT LIKE 'op:%'
+		ORDER BY a.slug, p.platform`)
+	if err == nil {
+		for rows.Next() {
+			var slug, platform, ks, cfg, sha string
+			if rows.Scan(&slug, &platform, &ks, &cfg, &sha) != nil {
+				continue
+			}
+			p := vaultPending{Kind: "signing", Name: slug + "/" + platform}
+			if _, _, err := openStoredSigning(ks, cfg, sha); err != nil {
+				p.Reason = err.Error()
+			} else if f, ok := s.moves.lastFailure(p.Kind, p.Name); ok {
+				p.Reason = f.Reason
+			}
+			out = append(out, p)
+		}
+		rows.Close()
+	}
+	rows, err = s.DB.QueryContext(ctx, `SELECT id, credentials FROM play_accounts WHERE credentials NOT LIKE 'op:%' ORDER BY id`)
+	if err == nil {
+		for rows.Next() {
+			var id int64
+			var enc string
+			if rows.Scan(&id, &enc) != nil {
+				continue
+			}
+			p := vaultPending{Kind: "play", Name: fmt.Sprintf("#%d", id)}
+			if raw, err := decryptCreds(enc); err != nil {
+				p.Reason = "open the stored key: " + err.Error()
+			} else {
+				var probe struct {
+					ClientEmail string `json:"client_email"`
+				}
+				if json.Unmarshal(raw, &probe) == nil && probe.ClientEmail != "" {
+					p.Name = probe.ClientEmail
+				}
+				if f, ok := s.moves.lastFailure(p.Kind, p.Name); ok {
+					p.Reason = f.Reason
+				}
+			}
+			out = append(out, p)
+		}
+		rows.Close()
+	}
+	return out
+}
+
+// openStoredSigning opens a sealed keystore and its config and checks the
+// keystore against its recorded sha256.
+func openStoredSigning(encKS, encCfg, wantSHA string) ([]byte, []byte, error) {
 	ks, err := decryptCreds(encKS)
 	if err != nil {
-		return fmt.Errorf("open the stored keystore: %w", err)
+		return nil, nil, fmt.Errorf("open the stored keystore: %w", err)
 	}
 	cfgRaw, err := decryptCreds(encCfg)
 	if err != nil {
-		return fmt.Errorf("open the stored signing config: %w", err)
+		return nil, nil, fmt.Errorf("open the stored signing config: %w", err)
 	}
 	sum := sha256.Sum256(ks)
 	if wantSHA != "" && !strings.EqualFold(hex.EncodeToString(sum[:]), wantSHA) {
-		return fmt.Errorf("the stored keystore doesn't match its recorded sha256; left as it is")
+		return nil, nil, fmt.Errorf("the stored keystore doesn't match its recorded sha256; left as it is")
+	}
+	return ks, cfgRaw, nil
+}
+
+func (s *Server) moveSigning(ctx context.Context, id int64, slug, platform, encKS, encCfg, wantSHA string) error {
+	ks, cfgRaw, err := openStoredSigning(encKS, encCfg, wantSHA)
+	if err != nil {
+		return err
 	}
 	var cfg signingConfig
 	if err := json.Unmarshal(cfgRaw, &cfg); err != nil {
