@@ -34,7 +34,7 @@ jobs:
       - name: Copy the README's screens
         run: |
           mkdir -p docs/screenshots/android
-          for s in apps_light apps_dark detail_light settings_light connect_dark; do
+          for s in apps_dark detail_dark settings_dark connect_dark; do
             cp "mobile/android/app/build/outputs/roborazzi/$s.png" docs/screenshots/android/
           done
       - name: Commit if changed

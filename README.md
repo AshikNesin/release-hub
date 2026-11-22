@@ -80,14 +80,14 @@ updates to apps it installed happen silently.
 
 <table>
   <tr>
-    <td width="33%" valign="top"><img src="docs/screenshots/android/apps_light.png" alt="Apps on your release-hub, with updates waiting"></td>
-    <td width="33%" valign="top"><img src="docs/screenshots/android/detail_light.png" alt="An app's page: release notes, history, auto-update"></td>
-    <td width="33%" valign="top"><img src="docs/screenshots/android/apps_dark.png" alt="The app list in dark mode"></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/android/apps_dark.png" alt="Apps on your release-hub, with updates waiting"></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/android/detail_dark.png" alt="An app's page: release notes, history, auto-update"></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/android/connect_dark.png" alt="Connecting the app to your release-hub"></td>
   </tr>
   <tr>
     <td>Every app, with updates queued.</td>
     <td>Release notes, history and per-app auto-update.</td>
-    <td>Light and dark, following your phone.</td>
+    <td>Connect with your release-hub's URL and a token.</td>
   </tr>
 </table>
 
