@@ -70,6 +70,14 @@ updates to apps it installed happen silently.
 
 [**Download the APK**](https://release-hub.nesin.io/apps/release-hub/download?channel=direct)
 
+> [!WARNING]
+> The app isn't from the Play Store, so Android will warn you while
+> installing it. Your browser asks to allow installs from unknown sources,
+> and Play Protect may say the app is unrecognised. Allow both, and choose
+> **Install anyway**, or the app won't install. Release Hub then needs the
+> same permission ("Install unknown apps") to install and update your other
+> apps.
+
 <table>
   <tr>
     <td width="33%"><img src="docs/screenshots/android/apps_light.png" alt="Apps on your release-hub, with updates waiting"></td>
