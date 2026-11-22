@@ -173,6 +173,36 @@ func (s *Server) migrateToVault(ctx context.Context) vaultMoveResult {
 		res.Moved = append(res.Moved, name+" signing key")
 	}
 
+	// Keys of apps deleted before foreign keys were on everywhere: back
+	// each up to 1Password, tagged retired, then delete the leftover row.
+	type orphanRow struct {
+		id                    int64
+		platform, pkg         string
+		keystore, cfg, sha256 string
+	}
+	var orphans []orphanRow
+	rows, err = s.DB.QueryContext(ctx, `SELECT id, platform, package_name, sign_keystore, sign_config, sign_sha256
+		FROM app_platforms WHERE sign_keystore != '' AND app_id NOT IN (SELECT id FROM apps) ORDER BY id`)
+	if err != nil {
+		fail("signing", "leftover keys", err)
+	} else {
+		for rows.Next() {
+			var o orphanRow
+			if err := rows.Scan(&o.id, &o.platform, &o.pkg, &o.keystore, &o.cfg, &o.sha256); err == nil {
+				orphans = append(orphans, o)
+			}
+		}
+		rows.Close()
+	}
+	for _, o := range orphans {
+		name := fmt.Sprintf("%s (%s) of a deleted app", o.pkg, o.platform)
+		if err := s.retireOrphan(ctx, o.id, o.platform, o.pkg, o.keystore, o.cfg, o.sha256); err != nil {
+			fail("signing", name, err)
+			continue
+		}
+		res.Moved = append(res.Moved, name+": backed up as retired and removed")
+	}
+
 	type acctRow struct {
 		id    int64
 		creds string
@@ -294,6 +324,36 @@ func (s *Server) moveSigning(ctx context.Context, id int64, slug, platform, encK
 			return err
 		}
 		return fmt.Errorf("the key changed while it was being moved; run the move again")
+	}
+	return nil
+}
+
+// retireOrphan backs up a deleted app's leftover key (when it has one) as a
+// retired 1Password item, then deletes the leftover platform row; its
+// releases go with it (ON DELETE CASCADE).
+func (s *Server) retireOrphan(ctx context.Context, id int64, platform, pkg, encKS, encCfg, wantSHA string) error {
+	if strings.HasPrefix(encKS, opRefPrefix) {
+		s.vault.retire(ctx, encKS)
+	} else if encKS != "" {
+		ks, cfgRaw, err := openStoredSigning(encKS, encCfg, wantSHA)
+		if err != nil {
+			return err
+		}
+		var cfg signingConfig
+		_ = json.Unmarshal(cfgRaw, &cfg)
+		title := fmt.Sprintf("release-hub: %s (%s) signing key, deleted app", pkg, platform)
+		refs, err := s.vault.createItem(ctx, title, "Signing keystore of an app deleted from release-hub, kept as a backup. "+signingNotes(pkg, platform), signingValues(ks, cfgRaw, cfg))
+		if err != nil {
+			return err
+		}
+		s.vault.retire(ctx, refs[0])
+	}
+	out, err := s.DB.ExecContext(ctx, `DELETE FROM app_platforms WHERE id = ? AND sign_keystore = ? AND app_id NOT IN (SELECT id FROM apps)`, id, encKS)
+	if n, _ := rowsAffected(out, err); n != 1 {
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("the leftover row changed while it was being removed; run the move again")
 	}
 	return nil
 }

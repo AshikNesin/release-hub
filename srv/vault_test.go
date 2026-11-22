@@ -545,3 +545,41 @@ func TestVaultCountsSkipKeysOfDeletedApps(t *testing.T) {
 		t.Fatalf("status = %s", b)
 	}
 }
+
+// The move backs up a deleted app's leftover key as a retired 1Password
+// item, then removes the leftover row.
+func TestMigrateBacksUpAndRemovesKeysOfDeletedApps(t *testing.T) {
+	t.Setenv("RELEASE_HUB_SECRET_KEY", "dGVzdGtleXRlc3RrZXl0ZXN0a2V5dGVzdGtleXRlc3QyMw==")
+	s, ts := newTestServer(t)
+	tok := bearer(t, s)
+	createAndroidApp(t, ts, tok, "kept")
+	createAndroidApp(t, ts, tok, "gone")
+	gone := fetchSigning(t, ts, tok, "gone")
+	if _, err := s.DB.Exec(`PRAGMA foreign_keys = OFF; DELETE FROM apps WHERE slug = 'gone'; PRAGMA foreign_keys = ON;`); err != nil {
+		t.Fatal(err)
+	}
+	fc := newFakeConnect(t, "vlt1")
+	s.vault = newOpVault(fc.ts.URL, fc.token, "")
+
+	_, b := apiDo(t, ts, tok, "POST", "/api/vault/migrate", "", nil)
+	var res vaultMoveResult
+	_ = json.Unmarshal(b, &res)
+	want := "kept/android signing key|io.gone (android) of a deleted app: backed up as retired and removed"
+	if strings.Join(res.Moved, "|") != want || len(res.Failed) != 0 {
+		t.Fatalf("migrate: %s", b)
+	}
+	var left int
+	_ = s.DB.QueryRow(`SELECT COUNT(*) FROM app_platforms WHERE app_id NOT IN (SELECT id FROM apps)`).Scan(&left)
+	if left != 0 {
+		t.Fatalf("%d leftover rows remain", left)
+	}
+	var backup opItem
+	for _, it := range fc.items {
+		if it.Title == "release-hub: io.gone (android) signing key, deleted app" {
+			backup = it
+		}
+	}
+	if strings.Join(backup.Tags, ",") != "release-hub,release-hub/retired" || fieldValue(backup, "keystore_sha256") != gone.sha || fieldValue(backup, "store_password") != gone.storePW {
+		t.Fatalf("backup item = %+v", backup)
+	}
+}

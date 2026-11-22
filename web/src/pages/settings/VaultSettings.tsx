@@ -86,9 +86,9 @@ export function VaultSettings() {
   const local = info ? info.local.signingKeys + info.local.playAccounts : 0;
   const move = useAction(() => releaseHub.migrateToVault(), {
     confirm: () => ({
-      title: `Move ${plural(local, "key")} to 1Password?`,
+      title: local > 0 ? `Move ${plural(local, "key")} to 1Password?` : "Back up leftover keys?",
       description:
-        "Each key is copied into an item in the vault and read back, then release-hub uses the copy. The sealed copy in the database is replaced. CI keeps fetching the same keys.",
+        "Each key is copied into an item in the vault and read back, then release-hub uses the copy. The sealed copy in the database is replaced. CI keeps fetching the same keys. Keys left by deleted apps are backed up as retired items, then removed from the database.",
       confirmLabel: "Move keys",
     }),
     success: (res) =>
@@ -152,11 +152,11 @@ export function VaultSettings() {
             <Text>In the database: {describe(info.local)}</Text>
             {info.configured && <Text>In 1Password: {describe(info.inVault)}</Text>}
           </div>
-          {info.configured && local > 0 && (
+          {info.configured && local + info.orphanedKeys > 0 && (
             <div>
               <Button disabled={!ready || move.isPending} onClick={() => void move.run()}>
                 {move.isPending ? <Loader2 className="animate-spin" /> : <ArrowRightLeft />}
-                Move {plural(local, "key")} to 1Password
+                {local > 0 ? `Move ${plural(local, "key")} to 1Password` : "Back up leftover keys"}
               </Button>
             </div>
           )}
@@ -181,8 +181,9 @@ export function VaultSettings() {
           {info.orphanedKeys > 0 && (
             <p>
               <Text variant="meta">
-                Not counted: {plural(info.orphanedKeys, "signing key")} of apps deleted before
-                November 15. No app uses them, so they are not moved.
+                Also in the database: {plural(info.orphanedKeys, "signing key")} of apps deleted
+                before November 15. The button backs them up to 1Password, tagged retired, and
+                removes them.
               </Text>
             </p>
           )}
