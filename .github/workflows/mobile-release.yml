@@ -6,7 +6,7 @@
 # this app, so no RELEASE_HUB_TOKEN secret is stored. Easiest setup: Settings → GitHub on the release hub,
 # then App → Configuration → Keyless publishing → Connect this repo. That creates the grant and sets the
 # vars.RELEASE_HUB_URL and vars.RELEASE_HUB_APP repo variables this workflow reads. By hand: add an OIDC
-# grant for this repo's subject and set vars.RELEASE_HUB_URL yourself (see README → Keyless publishing).
+# grant for this repo's subject and set vars.RELEASE_HUB_URL yourself (see docs/keyless-publishing.md).
 name: Mobile Release
 
 on:

@@ -1,0 +1,47 @@
+# Renders the Android app's screens (Roborazzi, see mobile/android/app/src/test/.../ScreenshotTest.kt)
+# and commits the ones the README shows to docs/screenshots/android/. Run it from the Actions tab
+# (on any branch) after a UI change; it also runs on PRs that touch it.
+name: README screenshots
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/readme-screenshots.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android screenshots
+    # Pushing back needs a branch in this repo, not a fork.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - uses: ./mobile/.github/actions/setup-android
+      - name: Render screens
+        working-directory: mobile/android
+        run: ./gradlew :app:recordRoborazziDebug --console=plain
+      - name: Copy the README's screens
+        run: |
+          mkdir -p docs/screenshots/android
+          for s in apps_dark detail_dark settings_dark connect_dark; do
+            cp "mobile/android/app/build/outputs/roborazzi/$s.png" docs/screenshots/android/
+          done
+      - name: Commit if changed
+        run: |
+          git add docs/screenshots/android
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh Android screenshots"
+          git push
