@@ -80,9 +80,9 @@ updates to apps it installed happen silently.
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/screenshots/android/apps_light.png" alt="Apps on your release-hub, with updates waiting"></td>
-    <td width="33%"><img src="docs/screenshots/android/detail_light.png" alt="An app's page: release notes, history, auto-update"></td>
-    <td width="33%"><img src="docs/screenshots/android/apps_dark.png" alt="The app list in dark mode"></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/android/apps_light.png" alt="Apps on your release-hub, with updates waiting"></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/android/detail_light.png" alt="An app's page: release notes, history, auto-update"></td>
+    <td width="33%" valign="top"><img src="docs/screenshots/android/apps_dark.png" alt="The app list in dark mode"></td>
   </tr>
   <tr>
     <td>Every app, with updates queued.</td>
