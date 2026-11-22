@@ -106,10 +106,6 @@ func (s *Server) handleV1AppDetail(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, "db error")
 		return
 	}
-	type share struct {
-		Label string `json:"label"`
-		URL   string `json:"url"`
-	}
 	type retention struct {
 		Override  *int64 `json:"override"`  // null = inherit the release hub setting
 		Effective int64  `json:"effective"` // what applies; 0 = keep everything
@@ -130,7 +126,7 @@ func (s *Server) handleV1AppDetail(w http.ResponseWriter, r *http.Request) {
 		PackageName  string      `json:"packageName"`
 		ManifestURL  string      `json:"manifestUrl"`
 		UploadURL    string      `json:"uploadUrl"`
-		Shares       []share     `json:"shares"`
+		Shares       []shareLink `json:"shares"`
 		BetaTesters  []string    `json:"betaTesters"`
 		TesterEmails []string    `json:"testerEmails"`
 		Retention    retention   `json:"retention"`
@@ -183,16 +179,11 @@ func (s *Server) handleV1AppDetail(w http.ResponseWriter, r *http.Request) {
 		acctID, acctEmail := s.playAccountInfo(p)
 
 		effective := int64(s.pruneConfig(r.Context(), p))
-		dl := s.baseURL + "/apps/" + app.Slug + "/download?channel="
-		shares := []share{{"direct", dl + "direct"}}
-		if p.PlayEnabled == 1 {
-			shares = append(shares, share{"internal", dl + "internal"}, share{"beta", dl + "beta"}, share{"public", dl + "public"})
-		}
 		sections = append(sections, platOut{
 			Platform: p.Platform, PackageName: p.PackageName,
 			ManifestURL:  s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/manifest",
 			UploadURL:    s.baseURL + "/api/apps/" + app.Slug + "/" + p.Platform + "/releases",
-			Shares:       shares,
+			Shares:       s.shareLinks(app.Slug, p),
 			BetaTesters:  betaTesters,
 			TesterEmails: testerEmails,
 			Retention:    retention{Override: p.PruneKeep, Effective: effective, Label: inheritLabel(&effective)},

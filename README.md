@@ -37,6 +37,9 @@ publish a signed release.
 - **Shares stable links.** `/apps/<slug>/download?channel=direct` always
   resolves to the newest build, and the update manifest feeds in-app
   updaters.
+- **Talks to your AI tools.** A built-in MCP server at `/mcp` lets Claude
+  Code, Cursor and friends create apps, add platforms and fetch download
+  links with an API token. See [docs/mcp.md](docs/mcp.md).
 - **Keeps keys in 1Password, if you like.** Signing keys and Play
   credentials can live in a 1Password vault, with Connect bundled in the
   image.
@@ -155,6 +158,7 @@ in [docs/1password.md](docs/1password.md).
 | Guide | What's in it |
 |---|---|
 | [API reference](docs/api.md) | Channels, auth, apps, platforms, releases, testers |
+| [MCP server](docs/mcp.md) | Driving release-hub from Claude Code and other AI clients |
 | [Keyless publishing](docs/keyless-publishing.md) | OIDC grants and the CI exchange |
 | [Signing keys](docs/signing-keys.md) | Generated keystores, bringing your own, fetching in CI |
 | [Google Play](docs/google-play.md) | Tracks, the shared service account, uploads |

@@ -16,6 +16,8 @@ Everything the release hub serves: channels, auth, and the bearer API that CI an
   not accepted there, and cross-site writes are refused (Fetch Metadata/Origin).
 - **API**: `Authorization: Bearer rh_...` tokens, created in the UI (shown once)
   or via `POST /api/tokens`. Stored as SHA-256 hashes.
+- **MCP**: `POST /mcp` takes the same bearer tokens and exposes the web
+  app's actions as MCP tools; see [MCP server](mcp.md).
 - **Keyless (OIDC)**: GitHub Actions (or any OIDC issuer) can publish without
   a stored secret; see [Keyless publishing](keyless-publishing.md).
   The minted release-hub token is scoped to one app's publish endpoints and lives

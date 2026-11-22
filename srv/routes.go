@@ -49,6 +49,13 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/apps/{slug}/signing/delete", s.requireAPI(s.handleApiDeleteSigning))
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/signing/delete", s.requireAPI(s.handleApiDeleteSigning))
 
+	// MCP (bearer auth, stateless Streamable HTTP; see mcp.go). No OAuth:
+	// the discovery documents 404 so MCP clients don't parse the SPA shell.
+	mux.HandleFunc("/mcp", s.requireAPI(s.handleMCP))
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource/", http.NotFound)
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", http.NotFound)
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", http.NotFound)
+
 	// Public (devices): manifest + artifact download need no auth.
 	mux.HandleFunc("GET /api/apps/{slug}/manifest", s.handleManifest)
 	mux.HandleFunc("GET /api/apps/{slug}/{platform}/manifest", s.handleManifest)
