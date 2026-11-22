@@ -40,6 +40,8 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/play-accounts", s.requireAPI(s.handleApiPlayAccounts))
 	mux.HandleFunc("POST /api/play-accounts", s.requireAPI(s.handleApiPlayAccounts))
 	mux.HandleFunc("POST /api/play-accounts/delete", s.requireAPI(s.handleApiDeletePlayAccount))
+	mux.HandleFunc("GET /api/vault", s.requireAPI(s.handleVaultStatus))
+	mux.HandleFunc("POST /api/vault/migrate", s.requireAPI(s.handleVaultMigrate))
 	mux.HandleFunc("POST /api/apps/{slug}/signing", s.requireAPI(s.handleApiSetSigning))
 	mux.HandleFunc("POST /api/apps/{slug}/{platform}/signing", s.requireAPI(s.handleApiSetSigning))
 	mux.HandleFunc("GET /api/apps/{slug}/signing", s.requireAPI(s.handleApiGetSigning))

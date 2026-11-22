@@ -500,7 +500,7 @@ func (s *Server) handleApiSetPlay(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	writeJSON(w, 200, map[string]any{"playEnabled": true, "serviceAccount": playEmail(acct.Credentials)})
+	writeJSON(w, 200, map[string]any{"playEnabled": true, "serviceAccount": s.playEmail(acct.Credentials)})
 }
 
 // playAccountCreds decrypts a shared play account's credentials.
@@ -509,7 +509,7 @@ func (s *Server) playAccountCreds(id int64) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("account %d not found: %w", id, err)
 	}
-	creds, err := decryptCreds(acct.Credentials)
+	creds, err := s.openSecret(context.Background(), acct.Credentials)
 	if err != nil {
 		return nil, fmt.Errorf("decrypt play credentials: %w", err)
 	}
@@ -568,17 +568,20 @@ func (s *Server) upsertPlayAccountFromRequest(r *http.Request) (int64, string, e
 		return 0, "", fmt.Errorf("file is not a service-account JSON (missing client_email)")
 	}
 	// Replace an existing account with the same email (key rotation).
-	for _, acct := range s.mustListPlayAccounts(r) {
-		if playEmail(acct.Credentials) == probe.ClientEmail {
-			if err := dbgen.New(s.DB).DeletePlayAccount(r.Context(), acct.ID); err != nil {
-				return 0, "", err
-			}
-			break
-		}
-	}
-	enc, err := encryptCreds(raw)
+	// The new key is stored first, so a failed store leaves the old one.
+	enc, err := s.sealPlayAccount(r.Context(), probe.ClientEmail, raw)
 	if err != nil {
 		return 0, "", err
+	}
+	for _, acct := range s.mustListPlayAccounts(r) {
+		if s.playEmail(acct.Credentials) == probe.ClientEmail {
+			if err := dbgen.New(s.DB).DeletePlayAccount(r.Context(), acct.ID); err != nil {
+				s.retireSecrets(r.Context(), enc)
+				return 0, "", err
+			}
+			s.retireSecrets(r.Context(), acct.Credentials)
+			break
+		}
 	}
 	acct, err := dbgen.New(s.DB).CreatePlayAccount(r.Context(), dbgen.CreatePlayAccountParams{
 		Label: probe.ClientEmail, Credentials: enc,
@@ -612,7 +615,7 @@ func (s *Server) handleApiPlayAccounts(w http.ResponseWriter, r *http.Request) {
 		}
 		rows := make([]row, 0)
 		for _, acct := range s.mustListPlayAccounts(r) {
-			rows = append(rows, row{acct.ID, playEmail(acct.Credentials), acct.Label})
+			rows = append(rows, row{acct.ID, s.playEmail(acct.Credentials), acct.Label})
 		}
 		writeJSON(w, 200, rows)
 	case http.MethodPost:
@@ -634,7 +637,8 @@ func (s *Server) handleApiDeletePlayAccount(w http.ResponseWriter, r *http.Reque
 		writeErr(w, 400, "id required")
 		return
 	}
-	if _, err := dbgen.New(s.DB).PlayAccountByID(r.Context(), id); err != nil {
+	acct, err := dbgen.New(s.DB).PlayAccountByID(r.Context(), id)
+	if err != nil {
 		writeErr(w, 404, "unknown play account")
 		return
 	}
@@ -648,6 +652,7 @@ func (s *Server) handleApiDeletePlayAccount(w http.ResponseWriter, r *http.Reque
 		writeErr(w, 500, err.Error())
 		return
 	}
+	s.retireSecrets(r.Context(), acct.Credentials)
 	writeJSON(w, 200, map[string]any{"deleted": true})
 }
 

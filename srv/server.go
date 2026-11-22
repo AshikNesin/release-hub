@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"srv.exe.dev/db"
@@ -14,11 +15,12 @@ import (
 type Server struct {
 	DB       *sql.DB
 	Hostname string
-	baseURL  string    // public base URL for links
-	storage  Storage   // local FS or S3 (see storage.go)
-	uiFS     fs.FS     // built React UI; nil = the copy embedded from web/dist
+	baseURL  string       // public base URL for links
+	storage  Storage      // local FS or S3 (see storage.go)
+	uiFS     fs.FS        // built React UI; nil = the copy embedded from web/dist
 	oidcHTTP *http.Client // outbound client for OIDC discovery/JWKS
 	oidcJWKS *jwksCache
+	vault    *opVault // 1Password Connect (vault.go); nil = keys sealed in the DB only
 }
 
 // Options configures a Server at construction time (listmonk-style config
@@ -46,6 +48,7 @@ func New(opt Options) (*Server, error) {
 	if err := s.setUpDatabase(opt.DBPath); err != nil {
 		return nil, err
 	}
+	s.vault = vaultFromEnv(filepath.Dir(opt.DBPath))
 	return s, nil
 }
 

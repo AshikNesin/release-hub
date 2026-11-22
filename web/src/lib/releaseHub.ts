@@ -12,6 +12,8 @@ import type {
   PlayTrack,
   Preflight,
   SettingsPatch,
+  VaultInfo,
+  VaultMoveResult,
 } from "./types";
 
 /** Query keys, one place: actions invalidate these. */
@@ -23,6 +25,7 @@ export const keys = {
   playAccounts: ["play-accounts"] as const,
   oidcGrants: (slug: string) => ["apps", slug, "oidc-grants"] as const,
   allOidcGrants: ["oidc-grants"] as const,
+  vault: ["vault"] as const,
   tracks: (slug: string, platform: Platform) => ["apps", slug, platform, "tracks"] as const,
 };
 
@@ -95,6 +98,8 @@ export const releaseHub = {
     return apiClient.postForm<{ id: number; serviceAccount: string }>("/play-accounts", form);
   },
   deletePlayAccount: (id: number) => apiClient.delete(`/play-accounts/${id}`),
+  getVault: (refresh = false) => apiClient.get<VaultInfo>(refresh ? "/vault?refresh=1" : "/vault"),
+  migrateToVault: () => apiClient.post<VaultMoveResult>("/vault/migrate", {}),
 };
 
 export const useApps = () => useQuery({ queryKey: keys.apps, queryFn: releaseHub.listApps });
