@@ -105,6 +105,30 @@ func (q *Queries) AppPlatformByAppAndPlatform(ctx context.Context, arg AppPlatfo
 	return i, err
 }
 
+const claimGithubFlow = `-- name: ClaimGithubFlow :execrows
+DELETE FROM github_flows WHERE state = ? AND binding = ? AND kind = ? AND expires_at > ?
+`
+
+type ClaimGithubFlowParams struct {
+	State     string    `json:"state"`
+	Binding   string    `json:"binding"`
+	Kind      string    `json:"kind"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (q *Queries) ClaimGithubFlow(ctx context.Context, arg ClaimGithubFlowParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, claimGithubFlow,
+		arg.State,
+		arg.Binding,
+		arg.Kind,
+		arg.ExpiresAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const countPlatformsBySlug = `-- name: CountPlatformsBySlug :one
 SELECT COUNT(*) AS n FROM app_platforms ap JOIN apps a ON a.id = ap.app_id WHERE a.slug = ?
 `
@@ -157,6 +181,52 @@ func (q *Queries) CreateAppPlatform(ctx context.Context, arg CreateAppPlatformPa
 	return q.db.ExecContext(ctx, createAppPlatform, arg.AppID, arg.Platform, arg.PackageName)
 }
 
+const createGithubApp = `-- name: CreateGithubApp :exec
+INSERT INTO github_app (id, app_id, slug, name, owner, html_url, private_key) VALUES (1, ?, ?, ?, ?, ?, ?)
+`
+
+type CreateGithubAppParams struct {
+	AppID      int64  `json:"app_id"`
+	Slug       string `json:"slug"`
+	Name       string `json:"name"`
+	Owner      string `json:"owner"`
+	HtmlUrl    string `json:"html_url"`
+	PrivateKey string `json:"private_key"`
+}
+
+func (q *Queries) CreateGithubApp(ctx context.Context, arg CreateGithubAppParams) error {
+	_, err := q.db.ExecContext(ctx, createGithubApp,
+		arg.AppID,
+		arg.Slug,
+		arg.Name,
+		arg.Owner,
+		arg.HtmlUrl,
+		arg.PrivateKey,
+	)
+	return err
+}
+
+const createGithubFlow = `-- name: CreateGithubFlow :exec
+INSERT INTO github_flows (state, binding, kind, expires_at) VALUES (?, ?, ?, ?)
+`
+
+type CreateGithubFlowParams struct {
+	State     string    `json:"state"`
+	Binding   string    `json:"binding"`
+	Kind      string    `json:"kind"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (q *Queries) CreateGithubFlow(ctx context.Context, arg CreateGithubFlowParams) error {
+	_, err := q.db.ExecContext(ctx, createGithubFlow,
+		arg.State,
+		arg.Binding,
+		arg.Kind,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
 const createOidcGrant = `-- name: CreateOidcGrant :execresult
 
 INSERT INTO oidc_grants (app_id, issuer, subject, name) VALUES (?, ?, ?, ?)
@@ -176,6 +246,33 @@ func (q *Queries) CreateOidcGrant(ctx context.Context, arg CreateOidcGrantParams
 		arg.Issuer,
 		arg.Subject,
 		arg.Name,
+	)
+}
+
+const createOidcRepositoryGrant = `-- name: CreateOidcRepositoryGrant :execresult
+INSERT INTO oidc_grants (app_id, issuer, subject, name, repository_id, repository_owner_id, ref)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+`
+
+type CreateOidcRepositoryGrantParams struct {
+	AppID             int64  `json:"app_id"`
+	Issuer            string `json:"issuer"`
+	Subject           string `json:"subject"`
+	Name              string `json:"name"`
+	RepositoryID      *int64 `json:"repository_id"`
+	RepositoryOwnerID *int64 `json:"repository_owner_id"`
+	Ref               string `json:"ref"`
+}
+
+func (q *Queries) CreateOidcRepositoryGrant(ctx context.Context, arg CreateOidcRepositoryGrantParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createOidcRepositoryGrant,
+		arg.AppID,
+		arg.Issuer,
+		arg.Subject,
+		arg.Name,
+		arg.RepositoryID,
+		arg.RepositoryOwnerID,
+		arg.Ref,
 	)
 }
 
@@ -302,12 +399,39 @@ func (q *Queries) DeleteAppPlatform(ctx context.Context, id int64) error {
 	return err
 }
 
+const deleteExpiredGithubFlows = `-- name: DeleteExpiredGithubFlows :exec
+DELETE FROM github_flows WHERE expires_at < ?
+`
+
+func (q *Queries) DeleteExpiredGithubFlows(ctx context.Context, expiresAt time.Time) error {
+	_, err := q.db.ExecContext(ctx, deleteExpiredGithubFlows, expiresAt)
+	return err
+}
+
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
 DELETE FROM sessions WHERE expires_at < ?
 `
 
 func (q *Queries) DeleteExpiredSessions(ctx context.Context, expiresAt time.Time) error {
 	_, err := q.db.ExecContext(ctx, deleteExpiredSessions, expiresAt)
+	return err
+}
+
+const deleteGithubApp = `-- name: DeleteGithubApp :exec
+DELETE FROM github_app
+`
+
+func (q *Queries) DeleteGithubApp(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteGithubApp)
+	return err
+}
+
+const deleteGithubFlows = `-- name: DeleteGithubFlows :exec
+DELETE FROM github_flows
+`
+
+func (q *Queries) DeleteGithubFlows(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, deleteGithubFlows)
 	return err
 }
 
@@ -365,6 +489,28 @@ func (q *Queries) GetConfig(ctx context.Context, key string) (string, error) {
 	return value, err
 }
 
+const getGithubApp = `-- name: GetGithubApp :one
+
+SELECT id, app_id, slug, name, owner, html_url, private_key, created_at FROM github_app WHERE id = 1
+`
+
+// github app (one-click keyless publishing)
+func (q *Queries) GetGithubApp(ctx context.Context) (GithubApp, error) {
+	row := q.db.QueryRowContext(ctx, getGithubApp)
+	var i GithubApp
+	err := row.Scan(
+		&i.ID,
+		&i.AppID,
+		&i.Slug,
+		&i.Name,
+		&i.Owner,
+		&i.HtmlUrl,
+		&i.PrivateKey,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const latestReleaseForChannel = `-- name: LatestReleaseForChannel :many
 SELECT id, app_platform_id, version_code, version_name, channel, notes, sha256, size_bytes, file_name, created_at, play_status, play_error, play_release FROM releases
 WHERE app_platform_id = ? AND channel = ?
@@ -414,18 +560,21 @@ func (q *Queries) LatestReleaseForChannel(ctx context.Context, arg LatestRelease
 }
 
 const listAllOidcGrants = `-- name: ListAllOidcGrants :many
-SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, a.slug AS app_slug FROM oidc_grants og LEFT JOIN apps a ON a.id = og.app_id ORDER BY og.created_at
+SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, og.repository_id, og.repository_owner_id, og.ref, a.slug AS app_slug FROM oidc_grants og LEFT JOIN apps a ON a.id = og.app_id ORDER BY og.created_at
 `
 
 type ListAllOidcGrantsRow struct {
-	ID         int64      `json:"id"`
-	AppID      int64      `json:"app_id"`
-	Issuer     string     `json:"issuer"`
-	Subject    string     `json:"subject"`
-	Name       string     `json:"name"`
-	CreatedAt  time.Time  `json:"created_at"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	AppSlug    *string    `json:"app_slug"`
+	ID                int64      `json:"id"`
+	AppID             int64      `json:"app_id"`
+	Issuer            string     `json:"issuer"`
+	Subject           string     `json:"subject"`
+	Name              string     `json:"name"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	RepositoryID      *int64     `json:"repository_id"`
+	RepositoryOwnerID *int64     `json:"repository_owner_id"`
+	Ref               string     `json:"ref"`
+	AppSlug           *string    `json:"app_slug"`
 }
 
 func (q *Queries) ListAllOidcGrants(ctx context.Context) ([]ListAllOidcGrantsRow, error) {
@@ -445,6 +594,9 @@ func (q *Queries) ListAllOidcGrants(ctx context.Context) ([]ListAllOidcGrantsRow
 			&i.Name,
 			&i.CreatedAt,
 			&i.LastUsedAt,
+			&i.RepositoryID,
+			&i.RepositoryOwnerID,
+			&i.Ref,
 			&i.AppSlug,
 		); err != nil {
 			return nil, err
@@ -524,18 +676,21 @@ func (q *Queries) ListApps(ctx context.Context) ([]App, error) {
 }
 
 const listOidcGrantsByApp = `-- name: ListOidcGrantsByApp :many
-SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id WHERE og.app_id = ? ORDER BY og.created_at
+SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, og.repository_id, og.repository_owner_id, og.ref, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id WHERE og.app_id = ? ORDER BY og.created_at
 `
 
 type ListOidcGrantsByAppRow struct {
-	ID         int64      `json:"id"`
-	AppID      int64      `json:"app_id"`
-	Issuer     string     `json:"issuer"`
-	Subject    string     `json:"subject"`
-	Name       string     `json:"name"`
-	CreatedAt  time.Time  `json:"created_at"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	AppSlug    string     `json:"app_slug"`
+	ID                int64      `json:"id"`
+	AppID             int64      `json:"app_id"`
+	Issuer            string     `json:"issuer"`
+	Subject           string     `json:"subject"`
+	Name              string     `json:"name"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	RepositoryID      *int64     `json:"repository_id"`
+	RepositoryOwnerID *int64     `json:"repository_owner_id"`
+	Ref               string     `json:"ref"`
+	AppSlug           string     `json:"app_slug"`
 }
 
 func (q *Queries) ListOidcGrantsByApp(ctx context.Context, appID int64) ([]ListOidcGrantsByAppRow, error) {
@@ -555,6 +710,9 @@ func (q *Queries) ListOidcGrantsByApp(ctx context.Context, appID int64) ([]ListO
 			&i.Name,
 			&i.CreatedAt,
 			&i.LastUsedAt,
+			&i.RepositoryID,
+			&i.RepositoryOwnerID,
+			&i.Ref,
 			&i.AppSlug,
 		); err != nil {
 			return nil, err
@@ -709,8 +867,89 @@ func (q *Queries) MaxVersionCode(ctx context.Context, appPlatformID int64) (inte
 	return max_code, err
 }
 
+const oidcGrantByID = `-- name: OidcGrantByID :one
+SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, og.repository_id, og.repository_owner_id, og.ref, a.slug AS app_slug FROM oidc_grants og LEFT JOIN apps a ON a.id = og.app_id WHERE og.id = ?
+`
+
+type OidcGrantByIDRow struct {
+	ID                int64      `json:"id"`
+	AppID             int64      `json:"app_id"`
+	Issuer            string     `json:"issuer"`
+	Subject           string     `json:"subject"`
+	Name              string     `json:"name"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	RepositoryID      *int64     `json:"repository_id"`
+	RepositoryOwnerID *int64     `json:"repository_owner_id"`
+	Ref               string     `json:"ref"`
+	AppSlug           *string    `json:"app_slug"`
+}
+
+func (q *Queries) OidcGrantByID(ctx context.Context, id int64) (OidcGrantByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, oidcGrantByID, id)
+	var i OidcGrantByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.AppID,
+		&i.Issuer,
+		&i.Subject,
+		&i.Name,
+		&i.CreatedAt,
+		&i.LastUsedAt,
+		&i.RepositoryID,
+		&i.RepositoryOwnerID,
+		&i.Ref,
+		&i.AppSlug,
+	)
+	return i, err
+}
+
+const oidcGrantByIssuerRepository = `-- name: OidcGrantByIssuerRepository :one
+SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, og.repository_id, og.repository_owner_id, og.ref, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id
+WHERE og.issuer = ? AND og.repository_id = ?
+`
+
+type OidcGrantByIssuerRepositoryParams struct {
+	Issuer       string `json:"issuer"`
+	RepositoryID *int64 `json:"repository_id"`
+}
+
+type OidcGrantByIssuerRepositoryRow struct {
+	ID                int64      `json:"id"`
+	AppID             int64      `json:"app_id"`
+	Issuer            string     `json:"issuer"`
+	Subject           string     `json:"subject"`
+	Name              string     `json:"name"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	RepositoryID      *int64     `json:"repository_id"`
+	RepositoryOwnerID *int64     `json:"repository_owner_id"`
+	Ref               string     `json:"ref"`
+	AppSlug           string     `json:"app_slug"`
+}
+
+func (q *Queries) OidcGrantByIssuerRepository(ctx context.Context, arg OidcGrantByIssuerRepositoryParams) (OidcGrantByIssuerRepositoryRow, error) {
+	row := q.db.QueryRowContext(ctx, oidcGrantByIssuerRepository, arg.Issuer, arg.RepositoryID)
+	var i OidcGrantByIssuerRepositoryRow
+	err := row.Scan(
+		&i.ID,
+		&i.AppID,
+		&i.Issuer,
+		&i.Subject,
+		&i.Name,
+		&i.CreatedAt,
+		&i.LastUsedAt,
+		&i.RepositoryID,
+		&i.RepositoryOwnerID,
+		&i.Ref,
+		&i.AppSlug,
+	)
+	return i, err
+}
+
 const oidcGrantByIssuerSubject = `-- name: OidcGrantByIssuerSubject :one
-SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id WHERE og.issuer = ? AND og.subject = ?
+SELECT og.id, og.app_id, og.issuer, og.subject, og.name, og.created_at, og.last_used_at, og.repository_id, og.repository_owner_id, og.ref, a.slug AS app_slug FROM oidc_grants og JOIN apps a ON a.id = og.app_id
+WHERE og.issuer = ? AND og.subject = ? AND og.repository_id IS NULL
 `
 
 type OidcGrantByIssuerSubjectParams struct {
@@ -719,14 +958,17 @@ type OidcGrantByIssuerSubjectParams struct {
 }
 
 type OidcGrantByIssuerSubjectRow struct {
-	ID         int64      `json:"id"`
-	AppID      int64      `json:"app_id"`
-	Issuer     string     `json:"issuer"`
-	Subject    string     `json:"subject"`
-	Name       string     `json:"name"`
-	CreatedAt  time.Time  `json:"created_at"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	AppSlug    string     `json:"app_slug"`
+	ID                int64      `json:"id"`
+	AppID             int64      `json:"app_id"`
+	Issuer            string     `json:"issuer"`
+	Subject           string     `json:"subject"`
+	Name              string     `json:"name"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	RepositoryID      *int64     `json:"repository_id"`
+	RepositoryOwnerID *int64     `json:"repository_owner_id"`
+	Ref               string     `json:"ref"`
+	AppSlug           string     `json:"app_slug"`
 }
 
 func (q *Queries) OidcGrantByIssuerSubject(ctx context.Context, arg OidcGrantByIssuerSubjectParams) (OidcGrantByIssuerSubjectRow, error) {
@@ -740,6 +982,9 @@ func (q *Queries) OidcGrantByIssuerSubject(ctx context.Context, arg OidcGrantByI
 		&i.Name,
 		&i.CreatedAt,
 		&i.LastUsedAt,
+		&i.RepositoryID,
+		&i.RepositoryOwnerID,
+		&i.Ref,
 		&i.AppSlug,
 	)
 	return i, err

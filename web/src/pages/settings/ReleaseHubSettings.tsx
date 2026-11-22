@@ -1,7 +1,9 @@
 import {
   FileBadge,
   GitBranch,
+  Cable,
   KeyRound,
+  LockKeyhole,
   Palette,
   SlidersHorizontal,
   Store,
@@ -13,10 +15,12 @@ import { monoClass } from "@groot/ui/typography";
 import { ThemeSettings } from "@groot/shell/components/ThemeSettings";
 import { Settings, type SettingsSection } from "@groot/shell/pages/settings/Settings";
 import { useSettings } from "@/lib/releaseHub";
+import { GithubSettings } from "./GithubSettings";
 import { KeylessGrantsSettings } from "./KeylessGrantsSettings";
 import { PlayAccountsSettings } from "./PlayAccountsSettings";
 import { SettingsForm } from "./SettingsForm";
 import { TokensSettings } from "./TokensSettings";
+import { VaultSettings } from "./VaultSettings";
 
 function GeneralSettings() {
   return (
@@ -158,6 +162,19 @@ const SECTIONS: SettingsSection[] = [
     element: <CertificateSettings />,
   },
   {
+    id: "vault",
+    label: "1Password",
+    group: "Release hub",
+    icon: LockKeyhole,
+    description: "Keep signing keys and Play service accounts in a 1Password vault.",
+    keywords: ["1password", "vault", "connect", "secrets", "migrate", "move", "keystore"],
+    items: [
+      { label: "1Password status" },
+      { label: "Move keys to 1Password", description: "Migrate stored keys into the vault" },
+    ],
+    element: <VaultSettings />,
+  },
+  {
     id: "tokens",
     label: "API tokens",
     group: "Access",
@@ -176,6 +193,19 @@ const SECTIONS: SettingsSection[] = [
     keywords: ["oidc", "grant", "github", "keyless", "stale", "claim"],
     items: [{ label: "All grants", description: "Remove stale or active grants" }],
     element: <KeylessGrantsSettings />,
+  },
+  {
+    id: "github",
+    label: "GitHub",
+    group: "Access",
+    icon: Cable,
+    description: "This release hub's GitHub App: connect repositories for keyless publishing in one click.",
+    keywords: ["github app", "install", "repository", "variables", "RELEASE_HUB_URL", "manifest", "keyless"],
+    items: [
+      { label: "Create GitHub App" },
+      { label: "Install on repositories", keywords: ["installation"] },
+    ],
+    element: <GithubSettings />,
   },
   {
     id: "google-play",

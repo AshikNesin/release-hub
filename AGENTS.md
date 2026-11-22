@@ -1,7 +1,7 @@
 # Agent Instructions
 
 release-hub: a Go server (srv/, SQLite) with a React UI (web/) embedded into
-the binary. See README.md for structure, the UI section in particular.
+the binary. See docs/development.md for structure, the UI section in particular.
 
 - Build: `make build` (pnpm builds web/, then go build embeds web/dist).
   Test: `make test` (go test ./... and the UI typecheck).

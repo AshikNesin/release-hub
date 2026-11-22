@@ -75,9 +75,24 @@ func (s *Server) v1Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/apps/{slug}/oidc/grants", s.v1(s.handleV1ListOidcGrants))
 	mux.HandleFunc("POST /api/v1/apps/{slug}/oidc/grants", s.v1(s.handleV1CreateOidcGrant))
 	mux.HandleFunc("DELETE /api/v1/oidc/grants/{id}", s.v1(s.handleV1DeleteOidcGrant))
+
+	// GitHub App: one-click keyless publishing (github_app.go). The two
+	// callbacks are GitHub's browser redirects: no envelope, they redirect.
+	mux.HandleFunc("GET /api/v1/github", s.v1(s.handleV1GithubSettings))
+	mux.HandleFunc("GET /api/v1/github/repositories", s.v1(s.handleV1GithubRepositories))
+	mux.HandleFunc("POST /api/v1/github/manifest", s.v1(s.handleV1GithubManifest))
+	mux.HandleFunc("POST /api/v1/github/install", s.v1(s.handleV1GithubInstall))
+	mux.HandleFunc("POST /api/v1/github/disconnect", s.v1(s.handleV1GithubDisconnect))
+	mux.HandleFunc("GET /api/v1/github/callback", s.githubCallback("connected", s.completeGithubManifest))
+	mux.HandleFunc("GET /api/v1/github/installed", s.githubCallback("installed", s.completeGithubInstall))
+	mux.HandleFunc("POST /api/v1/apps/{slug}/github/connect", s.v1(s.handleV1GithubConnect))
 	mux.HandleFunc("GET /api/v1/play-accounts", s.v1(s.handleV1ListPlayAccounts))
 	mux.HandleFunc("POST /api/v1/play-accounts", s.v1(s.handleApiPlayAccounts))
 	mux.HandleFunc("DELETE /api/v1/play-accounts/{id}", s.v1(s.handleV1DeletePlayAccount))
+
+	// 1Password vault: status and moving stored keys into it.
+	mux.HandleFunc("GET /api/v1/vault", s.v1(s.handleVaultStatus))
+	mux.HandleFunc("POST /api/v1/vault/migrate", s.v1(s.handleVaultMigrate))
 
 	// Anything else under /api/v1 is a JSON 404, never the SPA shell.
 	mux.HandleFunc("/api/v1/", s.v1Public(func(w http.ResponseWriter, r *http.Request) {

@@ -112,6 +112,10 @@ export interface OidcGrant {
   name: string;
   createdAt: string;
   lastUsedAt: string | null;
+  /** Set on a repository grant (made by Connect): bound by GitHub repo id, not subject. */
+  repositoryId: number | null;
+  /** The ref a repository grant may publish from, e.g. refs/heads/main. */
+  ref?: string;
 }
 
 /** Every grant across apps; `app` is null when its app was deleted (stale). */
@@ -138,3 +142,78 @@ export interface PlayTrack {
   channel: string;
   releases: string[] | null;
 }
+
+/** 1Password vault (srv/vault_migrate.go): where stored keys live. */
+export interface VaultCounts {
+  signingKeys: number;
+  playAccounts: number;
+}
+
+export interface VaultInfo {
+  configured: boolean;
+  /** bundled = Connect runs inside the release-hub container; external = OP_CONNECT_HOST. */
+  mode: "off" | "bundled" | "external";
+  status: {
+    state: "off" | "starting" | "ready" | "error";
+    code?: string;
+    detail: string;
+    vault?: string;
+  };
+  /** Keys still sealed in the database. */
+  local: VaultCounts;
+  inVault: VaultCounts;
+  /** Keys still in the database, with why the last move left each (if it did). */
+  pending: { kind: "signing" | "play"; name: string; reason?: string }[];
+  /** Signing keys of apps deleted before 2026-11-15, which no app uses. */
+  orphanedKeys: number;
+}
+
+export interface VaultMoveResult {
+  moved: string[];
+  failed: { kind: "signing" | "play"; name: string; reason: string }[];
+}
+
+/** This release hub's own GitHub App (Settings → GitHub). */
+export interface GithubAppInfo {
+  slug: string;
+  name: string;
+  owner: string;
+  htmlUrl: string;
+  installUrl: string;
+  createdAt: string;
+}
+
+export interface GithubSettings {
+  /** 1Password or RELEASE_HUB_SECRET_KEY is set, so the app's key can be stored. */
+  canStoreKey: boolean;
+  baseUrl: string;
+  /** RELEASE_HUB_BASE_URL is a public https URL GitHub can redirect to. */
+  baseUrlOk: boolean;
+  baseUrlProblem?: string;
+  app: GithubAppInfo | null;
+  /** The repo Actions variables Connect sets. */
+  variables: string[];
+}
+
+/** A repository the GitHub App's installations can reach. */
+export interface GithubRepository {
+  id: number;
+  fullName: string;
+  ownerId: number;
+  defaultBranch: string;
+  private: boolean;
+  installationId: number;
+  /** The app this repo already publishes (one repo → one app), or null. */
+  app: string | null;
+}
+
+export interface GithubVariable {
+  name: string;
+  value: string;
+  /** The repo's current, different value (only on a conflict). */
+  current?: string;
+}
+
+export type GithubConnectResult =
+  | { connected: true; repository: string; ref: string; variables: GithubVariable[] }
+  | { connected: false; repository: string; conflicts: GithubVariable[] };

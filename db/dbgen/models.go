@@ -44,6 +44,24 @@ type Config struct {
 	Value string `json:"value"`
 }
 
+type GithubApp struct {
+	ID         int64     `json:"id"`
+	AppID      int64     `json:"app_id"`
+	Slug       string    `json:"slug"`
+	Name       string    `json:"name"`
+	Owner      string    `json:"owner"`
+	HtmlUrl    string    `json:"html_url"`
+	PrivateKey string    `json:"private_key"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type GithubFlow struct {
+	State     string    `json:"state"`
+	Binding   string    `json:"binding"`
+	Kind      string    `json:"kind"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
 type Migration struct {
 	MigrationNumber int64     `json:"migration_number"`
 	MigrationName   string    `json:"migration_name"`
@@ -51,13 +69,16 @@ type Migration struct {
 }
 
 type OidcGrant struct {
-	ID         int64      `json:"id"`
-	AppID      int64      `json:"app_id"`
-	Issuer     string     `json:"issuer"`
-	Subject    string     `json:"subject"`
-	Name       string     `json:"name"`
-	CreatedAt  time.Time  `json:"created_at"`
-	LastUsedAt *time.Time `json:"last_used_at"`
+	ID                int64      `json:"id"`
+	AppID             int64      `json:"app_id"`
+	Issuer            string     `json:"issuer"`
+	Subject           string     `json:"subject"`
+	Name              string     `json:"name"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastUsedAt        *time.Time `json:"last_used_at"`
+	RepositoryID      *int64     `json:"repository_id"`
+	RepositoryOwnerID *int64     `json:"repository_owner_id"`
+	Ref               string     `json:"ref"`
 }
 
 type PlayAccount struct {
