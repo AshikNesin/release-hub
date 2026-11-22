@@ -356,6 +356,10 @@ type vaultValue struct {
 	Data      []byte
 	Binary    bool
 	Concealed bool
+	// Info marks a readable copy for people opening the item (alias,
+	// passwords, sha256). Nothing references it, so it is left out when
+	// empty and not part of the read-back check.
+	Info bool
 }
 
 func (f vaultValue) fieldID() string {
@@ -374,6 +378,9 @@ func (v *opVault) createItem(ctx context.Context, title, notes string, values []
 	}
 	item := opItem{Title: title, Category: "API_CREDENTIAL", Vault: opVaultID{vaultID}, Tags: []string{opTag}}
 	for _, f := range values {
+		if f.Info && len(f.Data) == 0 {
+			continue
+		}
 		typ := "STRING"
 		if f.Concealed || f.Binary {
 			typ = "CONCEALED"
@@ -401,12 +408,17 @@ func (v *opVault) createItem(ctx context.Context, title, notes string, values []
 	// Read the copy back before anyone relies on it (Connect's sync can
 	// answer a fresh item with 404 for a moment: fetch retries).
 	for i, f := range values {
+		if f.Info {
+			continue
+		}
 		got, err := v.fetch(ctx, refs[i])
 		if err != nil {
-			return nil, fmt.Errorf("1Password saved the item but reading it back failed: %w", err)
+			v.retire(ctx, refs[i])
+			return nil, fmt.Errorf("1Password saved the item but reading %s back failed: %w", f.fieldID(), err)
 		}
 		if !bytes.Equal(got, f.Data) {
-			return nil, &vaultError{"failed", "1Password saved the item but a field read back differently."}
+			v.retire(ctx, refs[i])
+			return nil, &vaultError{"failed", fmt.Sprintf("1Password saved the item but %s read back differently (%d bytes written, %d read).", f.fieldID(), len(f.Data), len(got))}
 		}
 		v.remember(refs[i], got)
 	}

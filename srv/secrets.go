@@ -184,10 +184,10 @@ func signingValues(ks, cfgJSON []byte, cfg signingConfig) []vaultValue {
 	return []vaultValue{
 		{ID: "keystore", Label: "keystore (base64)", Data: ks, Binary: true},
 		{ID: "signing_config", Label: "signing config (JSON)", Data: cfgJSON, Concealed: true},
-		{ID: "key_alias", Label: "key alias", Data: []byte(cfg.KeyAlias)},
-		{ID: "store_password", Label: "store password", Data: []byte(cfg.StorePassword), Concealed: true},
-		{ID: "key_password", Label: "key password", Data: []byte(cfg.KeyPassword), Concealed: true},
-		{ID: "keystore_sha256", Label: "keystore sha256", Data: []byte(hex.EncodeToString(sum[:]))},
+		{ID: "key_alias", Label: "key alias", Data: []byte(cfg.KeyAlias), Info: true},
+		{ID: "store_password", Label: "store password", Data: []byte(cfg.StorePassword), Concealed: true, Info: true},
+		{ID: "key_password", Label: "key password", Data: []byte(cfg.KeyPassword), Concealed: true, Info: true},
+		{ID: "keystore_sha256", Label: "keystore sha256", Data: []byte(hex.EncodeToString(sum[:])), Info: true},
 	}
 }
 

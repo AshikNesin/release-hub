@@ -21,6 +21,7 @@ type Server struct {
 	oidcHTTP *http.Client // outbound client for OIDC discovery/JWKS
 	oidcJWKS *jwksCache
 	vault    *opVault // 1Password Connect (vault.go); nil = keys sealed in the DB only
+	moves    vaultMoves
 }
 
 // Options configures a Server at construction time (listmonk-style config

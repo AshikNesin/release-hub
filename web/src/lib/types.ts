@@ -158,6 +158,8 @@ export interface VaultInfo {
   /** Keys still sealed in the database. */
   local: VaultCounts;
   inVault: VaultCounts;
+  /** Keys still in the database, with why the last move left each (if it did). */
+  pending: { kind: "signing" | "play"; name: string; reason?: string }[];
 }
 
 export interface VaultMoveResult {

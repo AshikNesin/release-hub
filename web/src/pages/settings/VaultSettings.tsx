@@ -153,16 +153,38 @@ export function VaultSettings() {
             {info.configured && <Text>In 1Password: {describe(info.inVault)}</Text>}
           </div>
           {info.configured && local > 0 && (
-            <Button disabled={!ready || move.isPending} onClick={() => void move.run()}>
-              {move.isPending ? <Loader2 className="animate-spin" /> : <ArrowRightLeft />}
-              Move {plural(local, "key")} to 1Password
-            </Button>
+            <div>
+              <Button disabled={!ready || move.isPending} onClick={() => void move.run()}>
+                {move.isPending ? <Loader2 className="animate-spin" /> : <ArrowRightLeft />}
+                Move {plural(local, "key")} to 1Password
+              </Button>
+            </div>
+          )}
+          {info.configured && info.pending.some((p) => p.reason) && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                <ul className="space-y-1">
+                  {info.pending
+                    .filter((p) => p.reason)
+                    .map((p) => (
+                      <li key={`${p.kind}:${p.name}`}>
+                        <Text>
+                          <code className={monoClass}>{p.name}</code> stayed in the database:{" "}
+                          {p.reason}
+                        </Text>
+                      </li>
+                    ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
           )}
           {info.inVault.signingKeys + info.inVault.playAccounts > 0 && (
-            <Text variant="meta">
-              Release-hub never deletes 1Password items. A replaced or removed key stays in the
-              vault, tagged <code className={monoClass}>release-hub/retired</code>.
-            </Text>
+            <p>
+              <Text variant="meta">
+                Release-hub never deletes 1Password items. A replaced or removed key stays in the
+                vault, tagged <code className={monoClass}>release-hub/retired</code>.
+              </Text>
+            </p>
           )}
         </CardContent>
       </Card>
