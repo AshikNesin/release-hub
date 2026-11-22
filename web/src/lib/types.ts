@@ -160,6 +160,8 @@ export interface VaultInfo {
   inVault: VaultCounts;
   /** Keys still in the database, with why the last move left each (if it did). */
   pending: { kind: "signing" | "play"; name: string; reason?: string }[];
+  /** Signing keys of apps deleted before 2026-11-15, which no app uses. */
+  orphanedKeys: number;
 }
 
 export interface VaultMoveResult {

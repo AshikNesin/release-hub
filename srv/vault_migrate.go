@@ -62,6 +62,8 @@ type vaultInfo struct {
 	// Pending lists the keys still in the database, with why the last
 	// move left each one there (empty when it wasn't tried yet).
 	Pending []vaultPending `json:"pending"`
+	// OrphanedKeys counts signing keys left by apps deleted long ago.
+	OrphanedKeys int `json:"orphanedKeys"`
 }
 
 type vaultPending struct {
@@ -88,8 +90,14 @@ func (s *Server) vaultInfo(ctx context.Context, force bool) vaultInfo {
 		return
 	}
 	info.Local.SigningKeys, info.InVault.SigningKeys = count(`SELECT
-		COALESCE(SUM(sign_keystore != '' AND sign_keystore NOT LIKE 'op:%'), 0),
-		COALESCE(SUM(sign_keystore LIKE 'op:%'), 0) FROM app_platforms`)
+		COALESCE(SUM(p.sign_keystore != '' AND p.sign_keystore NOT LIKE 'op:%'), 0),
+		COALESCE(SUM(p.sign_keystore LIKE 'op:%'), 0)
+		FROM app_platforms p JOIN apps a ON a.id = p.app_id`)
+	// Platforms whose app is gone: apps deleted before foreign keys were on
+	// for every connection (2026-11-15) left them behind. Their keys belong
+	// to no app, so they are neither counted nor moved.
+	_ = s.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM app_platforms
+		WHERE sign_keystore != '' AND app_id NOT IN (SELECT id FROM apps)`).Scan(&info.OrphanedKeys)
 	info.Local.PlayAccounts, info.InVault.PlayAccounts = count(`SELECT
 		COALESCE(SUM(credentials NOT LIKE 'op:%'), 0),
 		COALESCE(SUM(credentials LIKE 'op:%'), 0) FROM play_accounts`)
